@@ -18,7 +18,13 @@ class SaleController extends Controller
     public function index(Request $request): \Inertia\Response
     {
         $sales = Sale::query()
-            ->with(['customer', 'salesperson'])
+            ->with([
+                'salesperson',
+                'customer' => fn ($q) => $q->withSum(
+                    ['sales as outstanding' => fn ($s) => $s->where('status', 'completed')],
+                    'balance',
+                ),
+            ])
             ->when($request->search, fn ($q, $s) => $q->where(function ($q) use ($s) {
                 $q->where('invoice_no', 'like', "%{$s}%")
                     ->orWhere('ref_id', 'like', "%{$s}%")
@@ -42,9 +48,33 @@ class SaleController extends Controller
     {
         return Inertia::render('Admin/Sales/Form', [
             'products' => Product::where('status', 'active')
+                ->with('images')
                 ->orderBy('name')
-                ->get(['id', 'sku', 'name', 'selling_price', 'current_quantity', 'unit']),
-            'customers' => Customer::orderBy('name')->get(['id', 'name', 'phone']),
+                ->get()
+                ->map(fn ($p) => [
+                    'id' => $p->id,
+                    'sku' => $p->sku,
+                    'name' => $p->name,
+                    'unit' => $p->unit,
+                    'selling_price' => $p->selling_price,
+                    'current_quantity' => $p->current_quantity,
+                    'image' => $p->images->first()?->path ?? '/images/landing/solar_panels_sky.jpg',
+                ])
+                ->values(),
+            'customers' => Customer::withSum(
+                ['sales as outstanding' => fn ($q) => $q->where('status', 'completed')],
+                'balance',
+            )
+                ->orderBy('name')
+                ->get(['id', 'name', 'phone', 'customer_type'])
+                ->map(fn ($c) => [
+                    'id' => $c->id,
+                    'name' => $c->name,
+                    'phone' => $c->phone,
+                    'customer_type' => $c->customer_type,
+                    'outstanding' => (float) $c->outstanding,
+                    'has_outstanding' => (float) $c->outstanding > 0,
+                ]),
             'tax_rate' => (float) (\App\Models\Setting::where('key', 'tax.rate')->value('value') ?? 0),
         ]);
     }
@@ -75,12 +105,34 @@ class SaleController extends Controller
 
         AuditLogger::log('created', 'sale', $sale->id, "Created sale {$sale->invoice_no} for ₦{$sale->total}");
 
-        return redirect()->route('admin.sales.show', $sale)->with('success', 'Sale completed.');
+        $message = 'Sale completed.';
+
+        if ($sale->customer_id) {
+            $sale->load('customer');
+
+            $prior = (float) Sale::where('customer_id', $sale->customer_id)
+                ->where('status', 'completed')
+                ->where('id', '!=', $sale->id)
+                ->sum('balance');
+
+            if ($prior > 0) {
+                $message .= " Note: {$sale->customer->name} owes ₦" . number_format($prior, 2, '.', ',') . ' from previous invoices.';
+            }
+        }
+
+        return redirect()->route('admin.sales.show', $sale)->with('success', $message);
     }
 
     public function show(Sale $sale): \Inertia\Response
     {
-        $sale->load(['customer', 'salesperson', 'items.product']);
+        $sale->load([
+            'salesperson',
+            'items.product',
+            'customer' => fn ($q) => $q->withSum(
+                ['sales as outstanding' => fn ($s) => $s->where('status', 'completed')],
+                'balance',
+            ),
+        ]);
 
         $payments = \App\Models\Payment::where('document_type', 'sale')
             ->where('document_id', $sale->id)

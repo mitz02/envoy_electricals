@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Order;
 use App\Models\Payment;
 use App\Models\Purchase;
 use App\Models\Sale;
 use App\Services\AuditLogger;
+use App\Services\OrderService;
 use App\Services\PaymentService;
 use App\Services\PaystackService;
 use App\Services\PurchaseService;
@@ -23,6 +25,7 @@ class PaymentController extends Controller
     public function __construct(
         protected SaleService $saleService,
         protected PurchaseService $purchaseService,
+        protected OrderService $orderService,
         protected PaystackService $paystack
     ) {}
 
@@ -65,7 +68,7 @@ class PaymentController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'document_type' => ['required', 'in:sale,purchase'],
+            'document_type' => ['required', 'in:sale,purchase,order'],
             'document_id' => ['required', 'integer'],
             'amount' => ['required', 'numeric', 'gt:0'],
             'payment_method' => ['required', 'string', 'max:50'],
@@ -85,6 +88,14 @@ class PaymentController extends Controller
                 ),
                 'purchase' => $this->purchaseService->paySupplier(
                     Purchase::findOrFail($data['document_id']),
+                    (float) $data['amount'],
+                    $data['payment_method'],
+                    $request->user()->id,
+                    remarks: $data['remarks'] ?? null,
+                    paymentDate: $data['payment_date'] ?? null,
+                ),
+                'order' => $this->orderService->receivePayment(
+                    Order::findOrFail($data['document_id']),
                     (float) $data['amount'],
                     $data['payment_method'],
                     $request->user()->id,

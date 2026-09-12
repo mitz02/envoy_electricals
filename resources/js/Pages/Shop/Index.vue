@@ -2,7 +2,7 @@
 import { ref, reactive, computed } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { bumpCart } from '@/lib/cart';
+import { addItem } from '@/lib/cart';
 import { naira, stockStatusLabel } from '@/lib/format';
 
 defineOptions({ layout: PublicLayout });
@@ -113,7 +113,7 @@ function imageFor(product) {
 }
 
 function addToCart(product) {
-    bumpCart();
+    addItem(product);
 }
 
 const pricePresets = computed(() => {

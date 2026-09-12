@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
+use App\Models\Sale;
 use App\Services\AuditLogger;
 use App\Services\ReferenceGenerator;
 use Illuminate\Http\Request;
@@ -22,13 +23,24 @@ class CustomerController extends Controller
             }))
             ->withCount(['sales as total_sales_sum' => fn ($q) => $q->where('status', 'completed')])
             ->withSum('sales as lifetime_purchases', 'total')
+            ->withSum(['sales as outstanding' => fn ($q) => $q->where('status', 'completed')], 'balance')
+            ->when($request->boolean('owing'), fn ($q) => $q->whereRaw('(SELECT COALESCE(SUM(balance), 0) FROM sales WHERE sales.customer_id = customers.id AND sales.status = ? AND sales.deleted_at IS NULL) > 0', ['completed']))
             ->latest()
             ->paginate(15)
             ->withQueryString();
 
+        $summary = [
+            'total_outstanding' => (float) Sale::where('status', 'completed')->sum('balance'),
+            'owing_customers' => Sale::where('status', 'completed')
+                ->where('balance', '>', 0)
+                ->distinct()
+                ->count('customer_id'),
+        ];
+
         return Inertia::render('Admin/Customers/Index', [
             'customers' => $customers,
-            'filters' => $request->only(['search']),
+            'summary' => $summary,
+            'filters' => $request->only(['search', 'owing']),
         ]);
     }
 
@@ -40,6 +52,28 @@ class CustomerController extends Controller
     public function edit(Customer $customer): \Inertia\Response
     {
         return Inertia::render('Admin/Customers/Form', ['customer' => $customer]);
+    }
+
+    public function quickCreate(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:100'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'address' => ['nullable', 'string'],
+            'location' => ['nullable', 'string', 'max:255'],
+            'customer_type' => ['nullable', 'in:walk_in,regular,corporate'],
+        ]);
+
+        $customer = Customer::create([...$data, 'ref_id' => ReferenceGenerator::generate('customer')]);
+
+        AuditLogger::log('created', 'customer', $customer->id, "Created customer {$customer->name}");
+
+        return response()->json([
+            'customer' => $customer->only([
+                'id', 'name', 'phone', 'email', 'address', 'location', 'customer_type',
+            ]),
+        ]);
     }
 
     public function store(Request $request): \Illuminate\Http\RedirectResponse

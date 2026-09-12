@@ -9,7 +9,7 @@ class Payment extends Model
 {
     protected $fillable = [
         'ref_id', 'payment_date', 'amount', 'payment_method', 'document_type',
-        'document_id', 'customer_id', 'supplier_id', 'type', 'reference',
+        'document_id', 'customer_id', 'trainee_id', 'supplier_id', 'type', 'reference',
         'status', 'gateway', 'gateway_reference', 'paid_at',
         'remarks', 'created_by',
     ];
@@ -32,6 +32,11 @@ class Payment extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function trainee(): BelongsTo
+    {
+        return $this->belongsTo(Trainee::class);
     }
 
     public function supplier(): BelongsTo

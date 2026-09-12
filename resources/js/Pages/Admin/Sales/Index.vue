@@ -83,6 +83,13 @@ function applyFilters() {
                             <td class="px-4 py-3 text-slate-600">{{ formatDate(s.sale_date) }}</td>
                             <td class="px-4 py-3">
                                 <span class="font-medium text-slate-800">{{ s.customer?.name ?? 'Walk-in' }}</span>
+                                <span
+                                    v-if="s.customer?.outstanding > 0"
+                                    class="mt-0.5 inline-flex w-fit items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800"
+                                >
+                                    <i class="bi bi-exclamation-triangle text-[10px]"></i>
+                                    Owes {{ naira(s.customer.outstanding) }}
+                                </span>
                             </td>
                             <td class="px-4 py-3 text-right font-semibold text-slate-900">{{ naira(s.total) }}</td>
                             <td class="px-4 py-3 text-right text-emerald-700">{{ naira(s.amount_paid) }}</td>

@@ -5,12 +5,14 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\ProductCategory;
+use App\Models\ProductImage;
 use App\Models\StockMovement;
 use App\Models\Supplier;
 use App\Services\AuditLogger;
 use App\Services\InventoryService;
 use App\Services\ReferenceGenerator;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
@@ -85,6 +87,12 @@ class ProductController extends Controller
             'is_visible_online' => ['nullable', 'boolean'],
             'allow_online_purchase' => ['nullable', 'boolean'],
             'opening_quantity' => ['nullable', 'integer', 'min:0'],
+            'images' => ['nullable', 'array', 'max:10'],
+            'images.*' => ['image', 'mimes:jpeg,jpg,png,webp', 'max:10240'],
+            'remove_images' => ['nullable', 'array'],
+            'remove_images.*' => ['integer'],
+            'featured_image_id' => ['nullable', 'integer'],
+            'featured_new_index' => ['nullable', 'integer', 'min:0'],
         ]);
 
         $this->ensureUniqueSku($data['sku'], null);
@@ -120,6 +128,14 @@ class ProductController extends Controller
                 );
             }
 
+            $createdIds = $this->storeImages($product, $request->file('images') ?: []);
+            $this->syncFeatured(
+                $product,
+                $createdIds,
+                isset($data['featured_image_id']) ? (int) $data['featured_image_id'] : null,
+                isset($data['featured_new_index']) ? (int) $data['featured_new_index'] : null,
+            );
+
             return $product;
         });
 
@@ -149,6 +165,12 @@ class ProductController extends Controller
             'is_featured' => ['nullable', 'boolean'],
             'is_visible_online' => ['nullable', 'boolean'],
             'allow_online_purchase' => ['nullable', 'boolean'],
+            'images' => ['nullable', 'array', 'max:10'],
+            'images.*' => ['image', 'mimes:jpeg,jpg,png,webp', 'max:10240'],
+            'remove_images' => ['nullable', 'array'],
+            'remove_images.*' => ['integer'],
+            'featured_image_id' => ['nullable', 'integer'],
+            'featured_new_index' => ['nullable', 'integer', 'min:0'],
         ]);
 
         $this->ensureUniqueSku($data['sku'], $product->id);
@@ -173,6 +195,25 @@ class ProductController extends Controller
             'is_visible_online' => $request->boolean('is_visible_online', true),
             'allow_online_purchase' => $request->boolean('allow_online_purchase'),
         ]);
+
+        if (! empty($data['remove_images'])) {
+            $removals = ProductImage::where('product_id', $product->id)
+                ->whereIn('id', $data['remove_images'])
+                ->get();
+
+            foreach ($removals as $image) {
+                Storage::disk('public')->delete($image->path);
+                $image->delete();
+            }
+        }
+
+        $createdIds = $this->storeImages($product, $request->file('images') ?: []);
+        $this->syncFeatured(
+            $product,
+            $createdIds,
+            isset($data['featured_image_id']) ? (int) $data['featured_image_id'] : null,
+            isset($data['featured_new_index']) ? (int) $data['featured_new_index'] : null,
+        );
 
         AuditLogger::log('updated', 'product', $product->id, "Updated product {$product->sku} - {$product->name}", $old, $product->toArray());
 
@@ -267,5 +308,55 @@ class ProductController extends Controller
         if ($exists) {
             abort(422, 'The SKU is already in use.');
         }
+    }
+
+    /**
+     * Persist newly uploaded product images and return their created ids in order.
+     *
+     * @return array<int, int>
+     */
+    protected function storeImages(Product $product, array $files): array
+    {
+        $createdIds = [];
+        $baseOrder = (int) $product->images()->count();
+
+        foreach ($files as $i => $file) {
+            $image = ProductImage::create([
+                'product_id' => $product->id,
+                'path' => $file->store('product-images', 'public'),
+                'media_id' => null,
+                'alt' => $product->name,
+                'is_featured' => false,
+                'sort_order' => $baseOrder + $i,
+            ]);
+            $createdIds[] = $image->id;
+        }
+
+        return $createdIds;
+    }
+
+    /**
+     * Ensure exactly one image is marked as the cover (featured) image.
+     *
+     * @param  array<int, int>  $createdIds
+     */
+    protected function syncFeatured(Product $product, array $createdIds, ?int $featuredExistingId, ?int $featuredNewIndex): void
+    {
+        if ($product->images()->count() === 0) {
+            return;
+        }
+
+        $featuredId = null;
+
+        if ($featuredExistingId !== null && $product->images()->whereKey($featuredExistingId)->exists()) {
+            $featuredId = $featuredExistingId;
+        } elseif ($featuredNewIndex !== null && isset($createdIds[$featuredNewIndex])) {
+            $featuredId = $createdIds[$featuredNewIndex];
+        } else {
+            $featuredId = (int) $product->images()->orderBy('sort_order')->orderBy('id')->value('id');
+        }
+
+        $product->images()->update(['is_featured' => false]);
+        ProductImage::whereKey($featuredId)->update(['is_featured' => true]);
     }
 }

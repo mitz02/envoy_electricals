@@ -23,6 +23,8 @@ class DatabaseSeeder extends Seeder
         $this->call(ProjectsSeeder::class);
         $this->call(StaffSeeder::class);
         $this->call(DemoProductsSeeder::class);
+        $this->call(TrainingSeeder::class);
+        $this->call(SolarPackageSeeder::class);
     }
 
     protected function seedOwner(): void
@@ -77,11 +79,15 @@ class DatabaseSeeder extends Seeder
         $defaults = [
             ['key' => 'business.name', 'value' => 'Envoy Electric', 'group' => 'business'],
             ['key' => 'business.email', 'value' => 'hello@envoyelectric.com', 'group' => 'business'],
-            ['key' => 'business.phone', 'value' => '+234 800 000 0000', 'group' => 'business'],
-            ['key' => 'business.address', 'value' => 'Lagos, Nigeria', 'group' => 'business'],
+            ['key' => 'business.phone', 'value' => '+234 809 708 9259', 'group' => 'business'],
+            ['key' => 'business.address', 'value' => 'Shop 1, Peace Avenue Junction, opp Goddy Royal Hotel, Futa Southgate Road, Akure', 'group' => 'business'],
             ['key' => 'currency.symbol', 'value' => '₦', 'group' => 'business'],
             ['key' => 'tax.rate', 'value' => '0', 'group' => 'sales'],
             ['key' => 'inventory.allow_negative', 'value' => '0', 'group' => 'inventory'],
+            ['key' => 'bank.account_name', 'value' => 'Envoy Electricals', 'group' => 'bank'],
+            ['key' => 'bank.account_number', 'value' => '5168265608', 'group' => 'bank'],
+            ['key' => 'bank.bank_name', 'value' => 'Moniepoint MFB', 'group' => 'bank'],
+            ['key' => 'bank.instructions', 'value' => 'Transfer the exact order amount and quote your order reference (ORD-...) as the narration. Our team verifies bank transfers before confirming your order.', 'group' => 'bank'],
         ];
 
         foreach ($defaults as $setting) {

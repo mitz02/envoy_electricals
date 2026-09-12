@@ -10,6 +10,7 @@ const props = defineProps({
     fields: { type: Object, required: true },
     values: { type: Object, required: true },
     mediaCount: { type: Number, default: 0 },
+    groupLabels: { type: Object, default: () => null },
 });
 
 const form = useForm({ values: { ...props.values } });
@@ -18,10 +19,11 @@ function save() {
     form.post('/admin/website', { preserveScroll: true });
 }
 
-const groupLabels = {
+const labelMap = props.groupLabels ?? {
     business: 'Business Details',
     website: 'Website Content',
     sales: 'Sales & Inventory',
+    bank: 'Bank Payment Details',
 };
 
 function inputType(kind) {
@@ -47,7 +49,7 @@ function inputType(kind) {
             :key="groupKey"
             class="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xs"
         >
-            <h2 class="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">{{ groupLabels[groupKey] || groupKey }}</h2>
+            <h2 class="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">{{ labelMap[groupKey] || groupKey }}</h2>
             <div class="space-y-4">
                 <div v-for="(kind, key) in group" :key="key">
                     <label class="flex items-center justify-between text-sm font-medium text-slate-700">

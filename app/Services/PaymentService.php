@@ -21,12 +21,13 @@ class PaymentService
         ?int $customerId,
         ?int $supplierId,
         ?string $reference,
-        int $userId,
+        ?int $userId,
         string $gateway = Payment::GATEWAY_LOCAL,
         ?string $gatewayReference = null,
         string $status = Payment::STATUS_SUCCESS,
         ?string $remarks = null,
         ?string $paymentDate = null,
+        ?int $traineeId = null,
     ): ?Payment {
         if ($amount <= 0) {
             return null;
@@ -41,7 +42,9 @@ class PaymentService
             'payment_method' => $paymentMethod ?? ($gateway === Payment::GATEWAY_PAYSTACK ? 'paystack' : null),
             'document_type' => $documentType,
             'document_id' => $documentId,
-            'customer_id' => $customerId,
+            // Enrollment payments track the trainee, not a customer record.
+            'customer_id' => $traineeId !== null ? null : $customerId,
+            'trainee_id' => $traineeId ?? null,
             'supplier_id' => $supplierId,
             'type' => $type,
             'reference' => $reference ?? $refId,

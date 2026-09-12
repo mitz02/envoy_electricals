@@ -1,10 +1,13 @@
 <?php
 
 use App\Http\Controllers\Admin\AssetController;
+use App\Http\Controllers\Admin\CertificateController;
 use App\Http\Controllers\Admin\CustomerController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\EnrollmentController;
 use App\Http\Controllers\Admin\ExpenseController;
 use App\Http\Controllers\Admin\MarketingController;
+use App\Http\Controllers\Admin\OrderController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\ProjectController;
@@ -20,7 +23,10 @@ use App\Http\Controllers\Admin\SolarPackageController;
 use App\Http\Controllers\Admin\SolarLeadController;
 use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\Admin\SupplierController;
+use App\Http\Controllers\Admin\TraineeController;
+use App\Http\Controllers\Admin\TrainingController;
 use App\Http\Controllers\Admin\WebsiteController;
+use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\PaystackWebhookController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\StorefrontController;
@@ -69,13 +75,28 @@ Route::get('/contact', function () {
 Route::get('/shop', [StorefrontController::class, 'shop'])->name('shop');
 Route::get('/shop/{product}', [StorefrontController::class, 'product'])->name('products.show');
 
+Route::get('/cart', [CheckoutController::class, 'cart'])->name('cart');
+Route::get('/checkout', [CheckoutController::class, 'checkout'])->name('checkout');
+Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store');
+Route::get('/orders/{order:ref_id}/pay', [CheckoutController::class, 'pay'])->name('orders.pay');
+Route::post('/orders/{order:ref_id}/paystack', [CheckoutController::class, 'paystack'])->name('orders.paystack');
+Route::post('/orders/{order:ref_id}/offline', [CheckoutController::class, 'offline'])->name('orders.offline');
+
 Route::get('/packages', [StorefrontController::class, 'packages'])->name('packages');
 Route::get('/packages/{solarPackage}', [StorefrontController::class, 'packageShow'])->name('packages.show');
+Route::post('/packages/{solarPackage}/paystack', [StorefrontController::class, 'packagePaystack'])->name('packages.paystack');
+Route::get('/packages/{solarPackage}/payment/callback', [StorefrontController::class, 'packagePaymentCallback'])->name('packages.payment.callback');
+Route::post('/packages/{solarPackage}/offline', [StorefrontController::class, 'packageOffline'])->name('packages.offline');
 
 Route::get('/calculator', [StorefrontController::class, 'calculator'])->name('calculator');
 Route::post('/calculator', [StorefrontController::class, 'calculatorStore'])->name('calculator.store');
 
 Route::get('/projects', [StorefrontController::class, 'projects'])->name('projects');
+
+Route::get('/training', [StorefrontController::class, 'training'])->name('training');
+Route::get('/training/{training}', [StorefrontController::class, 'trainingShow'])->name('training.show');
+Route::post('/training/{training}/paystack', [StorefrontController::class, 'trainingPaystack'])->name('training.paystack');
+Route::get('/training/{training}/payment/callback', [StorefrontController::class, 'trainingPaymentCallback'])->name('training.payment.callback');
 
 Route::post('/feedback', [StorefrontController::class, 'feedback'])->name('feedback.store');
 Route::post('/newsletter', [StorefrontController::class, 'newsletter'])->name('newsletter.store');
@@ -105,11 +126,17 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::post('purchases/{purchase}/void', [PurchaseController::class, 'destroy'])->middleware('permission:purchases.void')->name('purchases.void');
 
     Route::resource('customers', CustomerController::class);
+    Route::post('customers/quick', [CustomerController::class, 'quickCreate'])->name('customers.quick');
     Route::resource('suppliers', SupplierController::class)->except(['create', 'edit']);
 
     Route::get('payments', [PaymentController::class, 'index'])->middleware('permission:payments.view')->name('payments.index');
     Route::post('payments', [PaymentController::class, 'store'])->middleware('permission:payments.record')->name('payments.store');
     Route::post('payments/paystack', [PaymentController::class, 'paystack'])->middleware('permission:payments.record')->name('payments.paystack');
+
+    Route::get('orders', [OrderController::class, 'index'])->middleware('permission:orders.view')->name('orders.index');
+    Route::get('orders/{order}', [OrderController::class, 'show'])->middleware('permission:orders.view')->name('orders.show');
+    Route::post('orders/{order}/pay/{payment}', [OrderController::class, 'confirmPayment'])->middleware('permission:orders.manage')->name('orders.confirm-payment');
+    Route::post('orders/{order}/deliver', [OrderController::class, 'deliver'])->middleware('permission:orders.manage')->name('orders.deliver');
 
     Route::resource('expenses', ExpenseController::class)->except(['show']);
 
@@ -143,6 +170,31 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::get('staff/{staff}/edit', [StaffController::class, 'edit'])->middleware('permission:staff.manage')->name('staff.edit');
     Route::put('staff/{staff}', [StaffController::class, 'update'])->middleware('permission:staff.manage')->name('staff.update');
     Route::delete('staff/{staff}', [StaffController::class, 'destroy'])->middleware('permission:staff.manage')->name('staff.destroy');
+
+    // ---- Academy: training programs, trainees, enrollments & certificates ----
+    Route::get('training', [TrainingController::class, 'index'])->middleware('permission:training.view')->name('training.index');
+    Route::get('training/create', [TrainingController::class, 'create'])->middleware('permission:training.manage')->name('training.create');
+    Route::post('training', [TrainingController::class, 'store'])->middleware('permission:training.manage')->name('training.store');
+    Route::get('training/{training}', [TrainingController::class, 'show'])->middleware('permission:training.view')->name('training.show');
+    Route::get('training/{training}/edit', [TrainingController::class, 'edit'])->middleware('permission:training.manage')->name('training.edit');
+    Route::put('training/{training}', [TrainingController::class, 'update'])->middleware('permission:training.manage')->name('training.update');
+    Route::delete('training/{training}', [TrainingController::class, 'destroy'])->middleware('permission:training.manage')->name('training.destroy');
+
+    Route::get('trainees', [TraineeController::class, 'index'])->middleware('permission:training.view')->name('trainees.index');
+    Route::get('trainees/create', [TraineeController::class, 'create'])->middleware('permission:training.manage')->name('trainees.create');
+    Route::post('trainees', [TraineeController::class, 'store'])->middleware('permission:training.manage')->name('trainees.store');
+    Route::get('trainees/{trainee}', [TraineeController::class, 'show'])->middleware('permission:training.view')->name('trainees.show');
+    Route::get('trainees/{trainee}/edit', [TraineeController::class, 'edit'])->middleware('permission:training.manage')->name('trainees.edit');
+    Route::put('trainees/{trainee}', [TraineeController::class, 'update'])->middleware('permission:training.manage')->name('trainees.update');
+    Route::delete('trainees/{trainee}', [TraineeController::class, 'destroy'])->middleware('permission:training.manage')->name('trainees.destroy');
+
+    Route::post('trainees/{trainee}/enroll', [EnrollmentController::class, 'store'])->middleware('permission:training.manage')->name('trainees.enroll');
+    Route::post('enrollments/{enrollment}/progress', [EnrollmentController::class, 'progress'])->middleware('permission:training.manage')->name('enrollments.progress');
+    Route::post('enrollments/{enrollment}/withdraw', [EnrollmentController::class, 'withdraw'])->middleware('permission:training.manage')->name('enrollments.withdraw');
+    Route::delete('enrollments/{enrollment}', [EnrollmentController::class, 'destroy'])->middleware('permission:training.manage')->name('enrollments.destroy');
+
+    Route::get('certificates', [CertificateController::class, 'index'])->middleware('permission:training.view')->name('certificates.index');
+    Route::post('certificates/{certificate}/void', [CertificateController::class, 'void'])->middleware('permission:training.manage')->name('certificates.void');
 
     Route::get('payroll', [PayrollController::class, 'index'])->middleware('permission:payroll.view')->name('payroll.index');
     Route::get('payroll/create', [PayrollController::class, 'create'])->middleware('permission:payroll.manage')->name('payroll.create');
@@ -252,3 +304,4 @@ Route::middleware('auth')->group(function () {
 });
 
 require __DIR__.'/auth.php';
+require __DIR__.'/portal.php';

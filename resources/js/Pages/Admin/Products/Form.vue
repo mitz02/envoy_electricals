@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive } from 'vue';
+import { computed, onBeforeUnmount, reactive, ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
@@ -41,15 +41,103 @@ const form = useForm({
     is_visible_online: props.product?.is_visible_online ?? true,
     allow_online_purchase: props.product?.allow_online_purchase ?? true,
     opening_quantity: 0,
+    images: [],
+    remove_images: [],
+    featured_image_id: null,
+    featured_new_index: null,
 });
 
 const canSeeCost = computed(() => !isEdit.value || has('products.price'));
 
-function submit() {
-    if (isEdit.value) {
-        form.put(`/admin/products/${props.product.id}`);
+/* ---------- Product images ---------- */
+
+const existingImages = ref((props.product?.images ?? []).map((img) => ({ ...img })));
+const newImages = ref([]);
+const removedImages = ref([]);
+const isDragOver = ref(false);
+const imageInput = ref(null);
+
+const initialFeatured =
+    existingImages.value.find((img) => img.is_featured) ?? existingImages.value[0];
+const coverKey = ref(initialFeatured ? `existing:${initialFeatured.id}` : '');
+
+function imageSrc(path) {
+    return path?.startsWith('/images/') ? path : `/storage/${path}`;
+}
+
+function addFiles(files) {
+    [...files]
+        .filter((f) => f.type?.startsWith('image/'))
+        .forEach((file) => newImages.value.push({ file, url: URL.createObjectURL(file) }));
+    settleCover();
+}
+
+function onFilesPicked(event) {
+    addFiles([...(event.target.files || [])]);
+    event.target.value = '';
+}
+
+function onDrop(event) {
+    event.preventDefault();
+    isDragOver.value = false;
+    addFiles([...(event.dataTransfer?.files || [])]);
+}
+
+function removeNew(index) {
+    const [removed] = newImages.value.splice(index, 1);
+    if (removed?.url) {
+        URL.revokeObjectURL(removed.url);
+    }
+    if (coverKey.value.startsWith('new:') && Number(coverKey.value.split(':')[1]) > index) {
+        coverKey.value = `new:${Number(coverKey.value.split(':')[1]) - 1}`;
+    }
+    settleCover();
+}
+
+function removeExisting(id) {
+    removedImages.value.push(id);
+    existingImages.value = existingImages.value.filter((img) => img.id !== id);
+    settleCover();
+}
+
+function setCover(key) {
+    coverKey.value = key;
+}
+
+function settleCover() {
+    if (coverKey.value.startsWith('existing:') && existingImages.value.some((img) => img.id === Number(coverKey.value.split(':')[1]))) {
+        return;
+    }
+    if (coverKey.value.startsWith('new:') && Number(coverKey.value.split(':')[1]) < newImages.value.length) {
+        return;
+    }
+
+    if (existingImages.value.length) {
+        coverKey.value = `existing:${existingImages.value[0].id}`;
+    } else if (newImages.value.length) {
+        coverKey.value = 'new:0';
     } else {
-        form.post('/admin/products');
+        coverKey.value = '';
+    }
+}
+
+const isCoverExisting = (id) => coverKey.value === `existing:${id}`;
+const isCoverNew = (index) => coverKey.value === `new:${index}`;
+
+onBeforeUnmount(() => {
+    newImages.value.forEach((img) => img.url && URL.revokeObjectURL(img.url));
+});
+
+function submit() {
+    form.images = newImages.value.map((n) => n.file);
+    form.remove_images = removedImages.value;
+    form.featured_image_id = coverKey.value.startsWith('existing:') ? Number(coverKey.value.split(':')[1]) : null;
+    form.featured_new_index = coverKey.value.startsWith('new:') ? Number(coverKey.value.split(':')[1]) : null;
+
+    if (isEdit.value) {
+        form.put(`/admin/products/${props.product.id}`, { forceFormData: true });
+    } else {
+        form.post('/admin/products', { forceFormData: true });
     }
 }
 </script>
@@ -118,6 +206,112 @@ function submit() {
                     <div class="mt-4">
                         <label class="mb-1 block text-sm font-medium text-slate-700">Specifications</label>
                         <textarea v-model="form.specifications" rows="3" class="w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" />
+                    </div>
+                </div>
+
+                <!-- Product images (multiple allowed) -->
+                <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
+                    <div class="mb-4 flex items-center justify-between">
+                        <h2 class="text-sm font-semibold text-slate-900">Product Images</h2>
+                        <span class="text-xs text-slate-400">Up to 10 images · one cover</span>
+                    </div>
+
+                    <div
+                        class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-8 text-center transition"
+                        :class="isDragOver ? 'border-[#0D1527] bg-[#0D1527]/5' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'"
+                        @click="imageInput?.click()"
+                        @dragover.prevent="isDragOver = true"
+                        @dragleave.prevent="isDragOver = false"
+                        @drop.prevent="onDrop"
+                    >
+                        <span class="flex h-11 w-11 items-center justify-center rounded-full bg-[#0D1527]/5 text-[#0D1527]">
+                            <i class="bi bi-images text-xl"></i>
+                        </span>
+                        <p class="text-sm font-medium text-slate-700">
+                            Click to upload or drag &amp; drop
+                        </p>
+                        <p class="text-xs text-slate-400">PNG, JPG or WEBP · up to 10MB each</p>
+                        <input
+                            ref="imageInput"
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            multiple
+                            class="hidden"
+                            @change="onFilesPicked"
+                        />
+                    </div>
+
+                    <div v-if="form.errors.images" class="mt-2 text-xs text-red-600">{{ form.errors.images }}</div>
+
+                    <div
+                        v-if="existingImages.length || newImages.length"
+                        class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4"
+                    >
+                        <!-- Existing images -->
+                        <div
+                            v-for="img in existingImages"
+                            :key="'existing-' + img.id"
+                            class="group relative overflow-hidden rounded-xl border border-slate-200"
+                        >
+                            <img :src="imageSrc(img.path)" :alt="img.alt || 'Product image'" class="h-24 w-full object-cover" />
+                            <div class="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent px-2 pb-1.5 pt-4 text-white">
+                                <button
+                                    v-if="!isCoverExisting(img.id)"
+                                    type="button"
+                                    class="flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold backdrop-blur-sm transition hover:bg-white/40"
+                                    @click="setCover(`existing:${img.id}`)"
+                                >
+                                    <i class="bi bi-star"></i> Cover
+                                </button>
+                                <span
+                                    v-else
+                                    class="flex items-center gap-1 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-bold text-amber-950"
+                                >
+                                    <i class="bi bi-star-fill"></i> Cover
+                                </span>
+                            </div>
+                            <button
+                                type="button"
+                                class="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition hover:bg-red-600 group-hover:opacity-100"
+                                title="Remove image"
+                                @click="removeExisting(img.id)"
+                            >
+                                <i class="bi bi-x-lg text-sm"></i>
+                            </button>
+                        </div>
+
+                        <!-- New uploads -->
+                        <div
+                            v-for="(img, index) in newImages"
+                            :key="'new-' + index"
+                            class="group relative overflow-hidden rounded-xl border border-slate-200"
+                        >
+                            <img :src="img.url" alt="New upload" class="h-24 w-full object-cover" />
+                            <div class="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent px-2 pb-1.5 pt-4 text-white">
+                                <button
+                                    v-if="!isCoverNew(index)"
+                                    type="button"
+                                    class="flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold backdrop-blur-sm transition hover:bg-white/40"
+                                    @click="setCover(`new:${index}`)"
+                                >
+                                    <i class="bi bi-star"></i> Cover
+                                </button>
+                                <span
+                                    v-else
+                                    class="flex items-center gap-1 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-bold text-amber-950"
+                                >
+                                    <i class="bi bi-star-fill"></i> Cover
+                                </span>
+                            </div>
+                            <button
+                                type="button"
+                                class="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition hover:bg-red-600 group-hover:opacity-100"
+                                title="Remove image"
+                                @click="removeNew(index)"
+                            >
+                                <i class="bi bi-x-lg text-sm"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
 

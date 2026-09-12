@@ -10,8 +10,8 @@ const navLinks = [
     { label: 'Shop', href: '/shop' },
     { label: 'Solar Packages', href: '/packages' },
     { label: 'Free Calculator', href: '/calculator' },
-    { label: 'Projects', href: '/projects' },
     { label: 'About Us', href: '/about' },
+    { label: 'Training', href: '/portal' },
 ];
 </script>
 
@@ -40,8 +40,8 @@ const navLinks = [
 
                 <div class="flex items-center gap-3 sm:gap-4 shrink-0">
                     <Link
-                        href="/shop"
-                        title="Shop"
+                        href="/cart"
+                        title="Cart"
                         class="relative w-10 h-10 rounded-full border border-slate-300 flex items-center justify-center text-slate-900 hover:border-yellow-400 hover:bg-yellow-400 hover:text-slate-950 transition-all duration-200"
                     >
                         <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -107,7 +107,7 @@ const navLinks = [
                 </div>
                 <div class="text-xs text-white/50 leading-relaxed pt-6 border-t border-white/10">
                     <p class="font-semibold text-white/70">Let's build your green future.</p>
-                    <p class="mt-1">Sales: +234 800 000 0000<br />heil@solar</p>
+                    <p class="mt-1">Sales: +234 809 708 9259<br />heil@solar</p>
                 </div>
             </div>
         </div>
@@ -139,6 +139,7 @@ const navLinks = [
                             <li><Link href="/packages" class="hover:text-white transition">Solar Packages</Link></li>
                             <li><Link href="/calculator" class="hover:text-white transition">Savings Calculator</Link></li>
                             <li><Link href="/projects" class="hover:text-white transition">Our Projects</Link></li>
+                            <li><Link href="/portal" class="hover:text-white transition">Training Portal</Link></li>
                             <li><Link href="/contact" class="hover:text-white transition">Contact</Link></li>
                         </ul>
                     </div>
@@ -148,7 +149,7 @@ const navLinks = [
                             <li>Solar Installation</li>
                             <li>Inverter & Battery Systems</li>
                             <li>Electrical Products Sales</li>
-                            <li>Technician Training</li>
+                            <li><Link href="/portal" class="hover:text-white transition">Technician Training</Link></li>
                             <li>Maintenance & Support</li>
                         </ul>
                     </div>
@@ -157,11 +158,11 @@ const navLinks = [
                         <ul class="space-y-4 text-sm text-slate-400">
                             <li class="flex items-start gap-3">
                                 <i class="bi bi-geo-alt text-yellow-400 mt-0.5"></i>
-                                <span>Victoria Island,<br />Lagos, Nigeria</span>
+                                <span>Shop 1, Peace Avenue Junction,<br />opp Goddy Royal Hotel, Futa Southgate Road, Akure</span>
                             </li>
                             <li class="flex items-center gap-3">
                                 <i class="bi bi-telephone text-yellow-400"></i>
-                                <a href="tel:+2348000000000" class="hover:text-white transition">+234 800 000 0000</a>
+                                <a href="tel:+2348097089259" class="hover:text-white transition">+234 809 708 9259</a>
                             </li>
                             <li class="flex items-center gap-3">
                                 <i class="bi bi-envelope text-yellow-400"></i>

@@ -1,53 +1,68 @@
 ﻿<script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
-import { Head } from '@inertiajs/vue3';
+import { Head, useForm } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 
 defineOptions({ layout: PublicLayout });
 
 const isContactModalOpen = ref(false);
 
-const form = ref({ name: '', email: '', phone: '', message: '' });
-const sending = ref(false);
+const form = useForm({
+    customer_name: '',
+    customer_email: '',
+    phone: '',
+    comment: '',
+    experience: '',
+    suggestion: '',
+});
+
+const callbackForm = useForm({
+    name: '',
+    phone: '',
+});
+
 const submitted = ref(false);
 const callbackSubmitted = ref(false);
 
 function submitForm() {
-    if (!form.value.name || !form.value.email || !form.value.message) return;
-    sending.value = true;
-    setTimeout(() => {
-        sending.value = false;
-        submitted.value = true;
-    }, 900);
+    form.post('/feedback', {
+        onSuccess: () => {
+            submitted.value = true;
+            form.reset();
+        },
+    });
 }
 
 function submitCallback() {
-    if (!form.value.name || !form.value.phone) return;
-    sending.value = true;
-    setTimeout(() => {
-        sending.value = false;
-        callbackSubmitted.value = true;
-    }, 900);
+    callbackForm.post('/feedback', {
+        onSuccess: () => {
+            callbackSubmitted.value = true;
+            callbackForm.reset();
+        },
+    }, {
+        data: {
+            comment: `Callback request: ${callbackForm.value.phone}`,
+        },
+    });
 }
 
 function resetForm() {
     submitted.value = false;
-    form.value = { name: '', email: '', phone: '', message: '' };
 }
 
 const infoCards = [
     {
         icon: 'M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11zM10 10a2 2 0 1 1 4 0 2 2 0 0 1-4 0z',
         title: 'Office Address',
-        lines: ['14 Victoria Crescent Road', 'Victoria Island, Lagos, Nigeria'],
+        lines: ['Shop 1, Peace Avenue Junction,', 'opp Goddy Royal Hotel, Futa Southgate Road, Akure'],
         href: null,
     },
     {
         icon: 'M2 4l3 0 2 7-2.5 1.5a15 15 0 0 0 5 5L11 15l7 2 0 3a2 2 0 0 1-2 2A16 16 0 0 1 0 6a2 2 0 0 1 2-2z',
         title: 'Telephone',
         lines: [],
-        href: 'tel:+2348000000000',
-        linkText: '+234 800 000 0000',
+        href: 'tel:+2348097089259',
+        linkText: '+234 809 708 9259',
     },
     {
         icon: 'M3 8 11 16 19 8M5 5h14a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z',
@@ -74,7 +89,7 @@ const supportCards = [
         body: 'Quick questions about products, pricing or quotes? Chat with our sales team directly.',
         badge: false,
         badgeText: null,
-        link: 'https://wa.me/2348000000000',
+        link: 'https://wa.me/2348097089259',
         linkText: 'Chat with Support',
     },
     {
@@ -83,7 +98,7 @@ const supportCards = [
         body: 'Schedule a free site assessment with our engineers and get an accurate system design.',
         badge: false,
         badgeText: null,
-        link: 'tel:+2348000000000',
+        link: 'tel:+2348097089259',
         linkText: 'Call Our Advisor',
     },
 ];
@@ -220,7 +235,7 @@ onUnmounted(() => {
                             <div>
                                 <label class="block text-[13px] font-bold text-slate-900 mb-2">Full Name *</label>
                                 <input
-                                    v-model="form.name"
+                                    v-model="form.customer_name"
                                     type="text"
                                     required
                                     placeholder="Enter full name"
@@ -230,7 +245,7 @@ onUnmounted(() => {
                             <div>
                                 <label class="block text-[13px] font-bold text-slate-900 mb-2">Email Address *</label>
                                 <input
-                                    v-model="form.email"
+                                    v-model="form.customer_email"
                                     type="email"
                                     required
                                     placeholder="Enter email"
@@ -252,7 +267,7 @@ onUnmounted(() => {
                         <div>
                             <label class="block text-[13px] font-bold text-slate-900 mb-2">Message *</label>
                             <textarea
-                                v-model="form.message"
+                                v-model="form.comment"
                                 rows="6"
                                 required
                                 placeholder="Tell us about your project, power needs, or questions..."
@@ -263,10 +278,10 @@ onUnmounted(() => {
                         <div class="flex flex-col sm:flex-row sm:items-center gap-4">
                             <button
                                 type="submit"
-                                :disabled="sending"
+                                :disabled="form.processing"
                                 class="inline-flex items-center justify-center gap-2.5 bg-gradient-to-r from-yellow-400 to-amber-400 hover:brightness-105 text-slate-950 font-bold text-[15px] px-8 py-3.5 rounded-xl rounded-tr-none shadow-[4px_4px_0_#0D1527] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_#0D1527] disabled:opacity-60 transition-all duration-150"
                             >
-                                <svg v-if="sending" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5m0 0h-4m4 0V3M20 12a8 8 0 0 1-14 5m0 0v4m0-4h4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                <svg v-if="form.processing" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5m0 0h-4m4 0V3M20 12a8 8 0 0 1-14 5m0 0v4m0-4h4" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                 <template v-else>
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                     Send Message
@@ -282,7 +297,7 @@ onUnmounted(() => {
                         </span>
                         <h3 class="text-2xl font-black text-slate-950">Message Sent!</h3>
                         <p class="mt-3 text-slate-500 text-sm max-w-sm mx-auto">
-                            Thank you {{ form.name.split(' ')[0] }} — your message is in. Our team will reply within 24 hours.
+                            Thank you {{ form.customer_name.split(' ')[0] }} — your message is in. Our team will reply within 24 hours.
                         </p>
                         <button
                             type="button"
@@ -352,13 +367,13 @@ onUnmounted(() => {
                     <span class="w-8 h-[2px] bg-[#40e0d0]"></span>
                 </span>
                 <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-950">Find Our Showroom</h2>
-                <p class="mt-3 text-slate-500 text-sm sm:text-base">Located in the heart of Victoria Island. Walk-ins are welcome during business hours.</p>
+                <p class="mt-3 text-slate-500 text-sm sm:text-base">Located on Peace Avenue, Akure. Walk-ins are welcome during business hours.</p>
             </div>
 
             <div class="reveal grid grid-cols-1 lg:grid-cols-12 bg-white rounded-3xl overflow-hidden shadow-[0_2px_14px_rgba(0,0,0,0.06)]">
                 <div class="lg:col-span-7 min-h-[320px] bg-[#0D1527]">
                     <iframe
-                        src="https://maps.google.com/maps?q=Victoria%20Island%2C%20Lagos%2C%20Nigeria&z=14&output=embed"
+                        src="https://maps.google.com/maps?q=Peace%20Avenue%2C%20Akure%2C%20Nigeria&z=14&output=embed"
                         class="w-full h-full min-h-[320px]"
                         style="border: 0; filter: grayscale(20%);"
                         loading="lazy"
@@ -371,7 +386,7 @@ onUnmounted(() => {
                     <div class="absolute -top-16 -right-16 w-56 h-56 rounded-full bg-yellow-400/[0.10] blur-3xl pointer-events-none"></div>
                     <h3 class="relative text-2xl font-extrabold text-white">Envoy Electricals</h3>
                     <p class="relative text-sm text-slate-400 leading-relaxed mt-3 mb-7">
-                        14 Victoria Crescent Road, Victoria Island, Lagos, Nigeria.
+                        Shop 1, Peace Avenue Junction, opp Goddy Royal Hotel, Futa Southgate Road, Akure.
                     </p>
                     <div class="relative space-y-4">
                         <div class="flex items-center gap-3 text-sm text-slate-200">
@@ -388,7 +403,7 @@ onUnmounted(() => {
                         </div>
                     </div>
                     <a
-                        href="https://maps.google.com/?q=Victoria+Island+Lagos+Nigeria"
+                        href="https://maps.google.com/?q=Peace+Avenue+Akure+Nigeria"
                         target="_blank"
                         rel="noopener"
                         class="relative mt-8 inline-flex items-center justify-center gap-2 bg-gradient-to-r from-yellow-400 to-amber-400 hover:brightness-105 text-slate-950 font-bold text-sm px-6 py-3 rounded-xl transition-all"
@@ -441,7 +456,7 @@ onUnmounted(() => {
 
     <!-- ===================== WHATSAPP FLOAT ===================== -->
     <a
-        href="https://wa.me/2348000000000"
+        href="https://wa.me/2348097089259"
         target="_blank"
         rel="noopener"
         title="Chat on WhatsApp"
@@ -471,7 +486,7 @@ onUnmounted(() => {
                 <div>
                     <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Full Name *</label>
                     <input
-                        v-model="form.name"
+                        v-model="callbackForm.name"
                         type="text"
                         required
                         placeholder="Your name"
@@ -481,7 +496,7 @@ onUnmounted(() => {
                 <div>
                     <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Phone Number *</label>
                     <input
-                        v-model="form.phone"
+                        v-model="callbackForm.phone"
                         type="tel"
                         required
                         placeholder="+234 ..."
@@ -490,11 +505,11 @@ onUnmounted(() => {
                 </div>
                 <button
                     type="submit"
-                    :disabled="sending"
+                    :disabled="callbackForm.processing"
                     class="w-full inline-flex items-center justify-center gap-2.5 bg-gradient-to-r from-yellow-400 to-amber-400 hover:brightness-105 disabled:opacity-60 text-slate-950 font-bold px-7 py-3.5 rounded-xl transition-all"
                 >
-                    <svg v-if="sending" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5m0 0h-4m4 0V3M20 12a8 8 0 0 1-14 5m0 0v4m0-4h4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    <span>{{ sending ? 'Sending...' : 'Request Callback' }}</span>
+                    <svg v-if="callbackForm.processing" class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5m0 0h-4m4 0V3M20 12a8 8 0 0 1-14 5m0 0v4m0-4h4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span>{{ callbackForm.processing ? 'Sending...' : 'Request Callback' }}</span>
                 </button>
             </form>
 

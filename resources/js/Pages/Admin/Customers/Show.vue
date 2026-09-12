@@ -26,6 +26,19 @@ const { has } = useCan();
             action-label="Edit"
         />
 
+        <div
+            v-if="Number(totals.outstanding) > 0"
+            class="mb-4 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium leading-relaxed text-red-700"
+            role="alert"
+        >
+            <i class="bi bi-exclamation-triangle-fill mt-0.5 text-red-500"></i>
+            <span>
+                This customer has an outstanding balance of
+                <strong>{{ naira(totals.outstanding) }}</strong>
+                across unpaid invoices.
+            </span>
+        </div>
+
         <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <div class="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Lifetime Purchases</p>

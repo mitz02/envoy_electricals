@@ -119,6 +119,13 @@ function statusBadge(status) {
                         <p class="text-xs uppercase tracking-wide text-slate-400">Billed to</p>
                         <p class="text-sm font-semibold text-slate-800">{{ sale.customer?.name ?? 'Walk-in Customer' }}</p>
                         <p v-if="sale.customer?.phone" class="text-xs text-slate-500">{{ sale.customer.phone }}</p>
+                        <p
+                            v-if="sale.customer && Number(sale.customer.outstanding) > Number(sale.balance)"
+                            class="mt-1.5 inline-flex items-center gap-1.5 rounded-lg bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800"
+                        >
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                            Also owes {{ naira(Number(sale.customer.outstanding) - Number(sale.balance)) }} from other invoices
+                        </p>
                         <p class="mt-2 text-xs text-slate-500">Salesperson: {{ sale.salesperson?.name ?? '—' }}</p>
                     </div>
 

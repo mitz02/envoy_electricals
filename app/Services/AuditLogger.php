@@ -14,11 +14,12 @@ class AuditLogger
         ?int $entityId = null,
         ?string $description = null,
         ?array $oldValues = null,
-        ?array $newValues = null
+        ?array $newValues = null,
+        ?int $userId = null
     ): void {
         try {
             AuditLog::create([
-                'user_id' => Auth::id(),
+                'user_id' => $userId ?? Auth::id(),
                 'action' => $action,
                 'entity' => $entity,
                 'entity_id' => $entityId,

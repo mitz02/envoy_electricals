@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Generates sequential, human-readable reference IDs for every important entity.
@@ -33,6 +32,10 @@ class ReferenceGenerator
         'project_payment' => 'PPAY',
         'project_expense' => 'PEXP',
         'payroll' => 'PRL',
+        'trainee' => 'TRN',
+        'training' => 'TRG',
+        'enrollment' => 'ENR',
+        'certificate' => 'CERT',
     ];
 
     public static function generate(string $type, ?string $year = null): string
@@ -61,6 +64,10 @@ class ReferenceGenerator
             'project_payment' => 'project_payments',
             'project_expense' => 'project_expenses',
             'payroll' => 'payroll',
+            'trainee' => 'trainees',
+            'training' => 'trainings',
+            'enrollment' => 'enrollments',
+            'certificate' => 'certificates',
             default => null,
         };
 
@@ -76,23 +83,23 @@ class ReferenceGenerator
         }
 
         // Products use a continuous no-year sequence (EV-PROD-000001, EV-PROD-000002, ...).
-        $yearly = in_array($type, ['sale', 'purchase', 'expense', 'project', 'payment', 'stock_movement', 'customer', 'supplier', 'staff', 'payroll']);
+        $yearly = in_array($type, ['sale', 'purchase', 'expense', 'project', 'payment', 'stock_movement', 'customer', 'supplier', 'staff', 'payroll', 'trainee', 'training', 'enrollment', 'certificate']);
 
         if ($yearly && $table) {
-            // Use a dedicated sequence stored cleanly: count existing refs with this year prefix.
+            // Monotonic sequence: advance from the highest reference ever seen
+            // (including soft-deleted rows) so numbers are never re-issued.
+            // External parties (e.g. Paystack) reject reused transaction refs,
+            // so references must only ever increase across the DB's lifetime.
             $prefixWithYear = $prefix . '-' . $year . '-';
             $like = $prefixWithYear . '%';
 
-            // Only apply a soft-delete filter on models that actually use SoftDeletes.
-            $query = DB::table($table)->where('ref_id', 'like', $like);
-            if (Schema::hasColumn($table, 'deleted_at')) {
-                $query->whereNull('deleted_at');
+            $last = DB::table($table)->where('ref_id', 'like', $like)->max('ref_id');
+
+            $seq = 1;
+            if ($last) {
+                preg_match('/(\d+)$/', (string) $last, $m);
+                $seq = ((int) ($m[1] ?? 0)) + 1;
             }
-
-            // SQLite and MySQL both support LIKE here.
-            $count = $query->count();
-
-            $seq = $count + 1;
 
             return sprintf('%s-%s-%06d', $prefix, $year, $seq);
         }

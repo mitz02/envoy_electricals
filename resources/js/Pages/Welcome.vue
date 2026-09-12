@@ -371,15 +371,15 @@ const faqs = [
                             :class="route().current('calculator') ? 'w-full' : 'w-0 group-hover:w-full'"
                         ></span>
                     </Link>
-                    <a
-                        href="#training"
+                    <Link
+                        href="/training"
                         class="group relative py-1 text-sm font-semibold transition-colors duration-200 text-slate-700 hover:text-slate-950"
                     >
                         Training
                         <span
                             class="absolute left-0 -bottom-0.5 h-0.5 rounded-full bg-gradient-to-r from-[#FACC15] to-[#016cbb] transition-all duration-300 w-0 group-hover:w-full"
                         ></span>
-                    </a>
+                    </Link>
                     <Link
                         :href="route('shop')"
                         class="group relative py-1 text-sm font-semibold transition-colors duration-200"
@@ -497,13 +497,13 @@ const faqs = [
                         >
                             Renewable Offers
                         </a>
-                        <a
-                            href="#training"
+                        <Link
+                            href="/training"
                             @click="isMobileMenuOpen = false"
                             class="block text-lg font-semibold text-white/90 hover:text-yellow-400 transition"
                         >
                             Training
-                        </a>
+                        </Link>
                         <a
                             href="#shop"
                             @click="isMobileMenuOpen = false"
@@ -1867,7 +1867,7 @@ const faqs = [
                                 </span>
                                 <div>
                                     <p class="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Phone</p>
-                                    <p class="text-[13px] text-slate-300">+234 812 345 6789</p>
+                                    <p class="text-[13px] text-slate-300">+234 809 708 9259</p>
                                 </div>
                             </li>
                             <li class="flex items-start gap-3">
@@ -1885,7 +1885,7 @@ const faqs = [
                                 </span>
                                 <div>
                                     <p class="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Address</p>
-                                    <p class="text-[13px] text-slate-300 leading-relaxed">Victoria Island,<br>Lagos, Nigeria</p>
+                                    <p class="text-[13px] text-slate-300 leading-relaxed">Shop 1, Peace Avenue Junction,<br>opp Goddy Royal Hotel, Futa Southgate Road, Akure</p>
                                 </div>
                             </li>
                         </ul>

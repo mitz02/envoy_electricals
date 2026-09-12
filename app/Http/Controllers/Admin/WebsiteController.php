@@ -32,6 +32,12 @@ class WebsiteController extends Controller
             'tax.rate' => 'number',
             'inventory.allow_negative' => 'boolean',
         ],
+        'bank' => [
+            'bank.account_name' => 'text',
+            'bank.account_number' => 'text',
+            'bank.bank_name' => 'text',
+            'bank.instructions' => 'textarea',
+        ],
     ];
 
     public function index(): \Inertia\Response
@@ -40,6 +46,12 @@ class WebsiteController extends Controller
             'fields' => $this->fields,
             'values' => $this->loadValues(),
             'mediaCount' => Media::count(),
+            'groupLabels' => [
+                'business' => 'Business Details',
+                'website' => 'Website Content',
+                'sales' => 'Sales & Inventory',
+                'bank' => 'Bank Payment Details',
+            ],
         ]);
     }
 

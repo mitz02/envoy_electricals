@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { bumpCart } from '@/lib/cart';
+import { addItem } from '@/lib/cart';
 import { naira, stockStatusLabel } from '@/lib/format';
 
 defineOptions({ layout: PublicLayout });
@@ -34,7 +34,7 @@ function changeQuantity(delta) {
 }
 
 function addToCart() {
-    bumpCart();
+    addItem(props.product, quantity.value);
 }
 
 function relatedImage(p) {

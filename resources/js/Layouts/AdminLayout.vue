@@ -11,6 +11,7 @@ const showingSidebar = ref(false);
 const searchQuery = ref('');
 const isFinanceOpen = ref(true);
 const isMarketingOpen = ref(false);
+const isAcademyOpen = ref(true);
 const { has } = useCan();
 
 const page = usePage();
@@ -92,6 +93,20 @@ function logout() {
                             <i class="bi bi-cart-check-fill text-sm shrink-0"></i>
                             <span>Sales & POS</span>
                         </div>
+                    </Link>
+
+                    <!-- Online Orders -->
+                    <Link
+                        v-if="has('orders.view')"
+                        href="/admin/orders"
+                        :class="isCurrentRoute('/admin/orders')
+                            ? 'bg-yellow-400/10 text-yellow-400 font-semibold'
+                            : 'text-slate-300 hover:bg-white/10 hover:text-white font-medium'"
+                        class="relative flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm transition-all duration-150"
+                    >
+                        <span v-if="isCurrentRoute('/admin/orders')" class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-yellow-400" />
+                        <i class="bi bi-bag-fill text-sm shrink-0"></i>
+                        <span>Online Orders</span>
                     </Link>
 
                     <!-- Products -->
@@ -283,6 +298,49 @@ function logout() {
                         <i class="bi bi-person-badge-fill text-sm shrink-0"></i>
                         <span>Staff Management</span>
                     </Link>
+
+                    <!-- Academy (Training) Accordion -->
+                    <div v-if="has('training.view')" class="pt-2">
+                        <button
+                            @click="isAcademyOpen = !isAcademyOpen"
+                            class="flex w-full items-center justify-between rounded-xl px-3.5 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500 hover:text-slate-300"
+                        >
+                            <span class="flex items-center gap-2">
+                                <i class="bi bi-mortarboard-fill text-sm shrink-0"></i>
+                                Academy
+                            </span>
+                            <svg :class="isAcademyOpen ? 'rotate-180' : ''" class="h-3.5 w-3.5 shrink-0 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+
+                        <div v-show="isAcademyOpen" class="mt-1 space-y-1 pl-4">
+                            <Link
+                                href="/admin/training"
+                                :class="isCurrentRoute('/admin/training') ? 'text-yellow-400 font-semibold' : 'text-slate-400 hover:text-white'"
+                                class="flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-xs font-medium"
+                            >
+                                <span class="h-1.5 w-1.5 rounded-full" :class="isCurrentRoute('/admin/training') ? 'bg-yellow-400' : 'bg-slate-600'" />
+                                <span>Training Programs</span>
+                            </Link>
+                            <Link
+                                href="/admin/trainees"
+                                :class="isCurrentRoute('/admin/trainees') ? 'text-yellow-400 font-semibold' : 'text-slate-400 hover:text-white'"
+                                class="flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-xs font-medium"
+                            >
+                                <span class="h-1.5 w-1.5 rounded-full" :class="isCurrentRoute('/admin/trainees') ? 'bg-yellow-400' : 'bg-slate-600'" />
+                                <span>Trainees</span>
+                            </Link>
+                            <Link
+                                href="/admin/certificates"
+                                :class="isCurrentRoute('/admin/certificates') ? 'text-yellow-400 font-semibold' : 'text-slate-400 hover:text-white'"
+                                class="flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-xs font-medium"
+                            >
+                                <span class="h-1.5 w-1.5 rounded-full" :class="isCurrentRoute('/admin/certificates') ? 'bg-yellow-400' : 'bg-slate-600'" />
+                                <span>Certificates</span>
+                            </Link>
+                        </div>
+                    </div>
 
                     <!-- Finances Accordion -->
                     <div class="pt-2">

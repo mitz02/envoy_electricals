@@ -70,6 +70,8 @@ class RolesAndPermissionsSeeder extends Seeder
             ['orders', 'orders.view', 'View online orders'],
             ['orders', 'orders.manage', 'Manage online orders'],
             ['feedback', 'feedback.manage', 'Manage feedback'],
+            ['training', 'training.view', 'View training programs & trainees'],
+            ['training', 'training.manage', 'Manage training, enrollments & certificates'],
         ];
 
         DB::table('permissions')->truncate();
@@ -93,6 +95,7 @@ class RolesAndPermissionsSeeder extends Seeder
         $technician = Role::create(['name' => 'Technician', 'slug' => 'technician', 'description' => 'View assigned projects, update progress, upload media.']);
         $accountant = Role::create(['name' => 'Accountant', 'slug' => 'accountant', 'description' => 'Sales, purchases, expenses, payments, financial reports.']);
         $content = Role::create(['name' => 'Content Manager', 'slug' => 'content', 'description' => 'Website content, media, testimonials, newsletters.']);
+        $trainee = Role::create(['name' => 'Trainee', 'slug' => 'trainee', 'description' => 'Academy trainee with portal access only.']);
 
         $manager->permissions()->sync($this->ids([
             'dashboard.view', 'products.view', 'products.create', 'products.edit',
@@ -102,6 +105,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'projects.create', 'projects.edit', 'projects.delete', 'projects.materials',
             'projects.payments', 'projects.expenses', 'reports.view',
             'payments.view', 'payments.record', 'staff.view', 'payroll.view',
+            'training.view', 'training.manage',
         ]));
 
         $sales->permissions()->sync($this->ids([

@@ -53,6 +53,9 @@ class HandleInertiaRequests extends Middleware
             'business' => cache()->remember('settings.business', 3600, function () {
                 return \App\Models\Setting::where('group', 'business')->pluck('value', 'key');
             }),
+            'bank' => cache()->remember('settings.bank', 3600, function () {
+                return \App\Models\Setting::where('group', 'bank')->pluck('value', 'key');
+            }),
             'currency' => \App\Models\Setting::where('key', 'currency.symbol')->value('value') ?? '₦',
             'tax_rate' => (float) (\App\Models\Setting::where('key', 'tax.rate')->value('value') ?? 0),
         ];
