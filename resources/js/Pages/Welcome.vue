@@ -64,7 +64,7 @@ const heroSlides = [
         titleLine2: 'THE SUN',
         subtitle:
             'We design, install, and maintain high-performance solar systems that turn sunlight into reliable, affordable power — built to last for decades.',
-        cta: { label: 'Explore Solutions', href: '#solutions' },
+        cta: { label: 'Explore Solutions', href: '/packages' },
         image: '/images/landing/hero_ng_1.jpg',
     },
     {
@@ -73,7 +73,7 @@ const heroSlides = [
         titleLine2: 'EVERYTHING',
         subtitle:
             "Smart inverters, sleek panels, and battery storage in perfect sync — clean energy so seamless you'll forget the grid ever existed.",
-        cta: { label: 'Shop the Range', href: '#shop' },
+        cta: { label: 'Shop the Range', href: '/shop' },
         image: '/images/landing/hero_ng_2.jpg',
     },
     {

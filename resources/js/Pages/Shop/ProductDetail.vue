@@ -285,10 +285,6 @@ function parseLegacySpecs(text) {
 
                             <!-- Promo chips -->
                             <div class="mt-4 flex flex-wrap gap-2">
-                                <span class="inline-flex items-center gap-1.5 rounded-full border border-[#40e0d0]/40 bg-[#40e0d0]/10 px-3 py-1.5 text-[11px] font-bold text-[#1a6b63]">
-                                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>
-                                    Pay on Delivery
-                                </span>
                                 <span class="inline-flex items-center gap-1.5 rounded-full border border-yellow-400/40 bg-yellow-400/10 px-3 py-1.5 text-[11px] font-bold text-[#8a6d00]">
                                     <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>
                                     100% Genuine

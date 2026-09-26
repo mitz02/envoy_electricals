@@ -236,7 +236,7 @@ function applyPreset(p) {
                 </select>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-8">
+            <div class="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-8 px-2 sm:px-6 lg:px-16">
 
                 <!-- ======================= SIDEBAR ======================= -->
                 <aside class="hidden lg:block">
@@ -404,7 +404,7 @@ function applyPreset(p) {
                     </div>
 
                     <!-- Product grid — matching landing page card style -->
-                    <div class="mt-6 grid grid-cols-2 md:grid-cols-3 gap-5 sm:gap-6">
+                    <div class="mt-6 grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-5 w-full">
                         <Link
                             v-for="product in products.data"
                             :key="product.id"
@@ -445,12 +445,18 @@ function applyPreset(p) {
 
                             <!-- Body -->
                             <div class="flex flex-1 flex-col p-4 sm:p-5">
-                                <h3 class="line-clamp-2 text-sm font-bold text-slate-900">{{ product.name }}</h3>
-                                <div class="mt-auto flex items-end justify-between pt-4">
+                                <!-- Price at the top -->
+                                <div class="mb-auto">
                                     <span class="text-lg font-black text-[#40e0d0]">{{ naira(product.selling_price) }}</span>
+                                </div>
+                                
+                                <h3 class="line-clamp-2 text-sm font-bold text-slate-900">{{ product.name }}</h3>
+                                
+                                <!-- View button at the bottom -->
+                                <div class="mt-auto pt-4">
                                     <Link
                                         :href="`/shop/${product.id}`"
-                                        class="inline-flex items-center gap-1.5 rounded-xl bg-[#0D1527] px-3 h-9 text-xs font-bold text-white transition-all duration-200 hover:bg-yellow-400 hover:text-slate-950"
+                                        class="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#0D1527] px-3 h-9 text-xs font-bold text-white transition-all duration-200 hover:bg-yellow-400 hover:text-slate-950"
                                         title="View Product"
                                     >
                                         View
