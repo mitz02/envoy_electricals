@@ -418,6 +418,143 @@ onMounted(() => {
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
             <!-- ======================= RIGHT: RESULTS (TOP ON MOBILE) ======================= -->
             <div class="lg:hidden space-y-6 mb-8" aria-labelledby="results-heading">
+                <!-- Mobile Appliances Input Section -->
+                <section class="reveal bg-white rounded-2xl rounded-tr-none shadow-[0_2px_14px_rgba(0,0,0,0.06)] overflow-hidden" style="transition-delay: 0ms">
+                    <div class="flex items-center justify-between gap-4 border-b border-slate-100 px-5 sm:px-7 py-5">
+                        <div class="flex items-center gap-4">
+                            <span class="grid h-11 w-11 place-items-center rounded-2xl rounded-tr-none bg-yellow-400/10 text-yellow-500 text-lg font-black">1</span>
+                            <div>
+                                <h2 class="text-base sm:text-lg font-extrabold text-slate-950 leading-tight">Your Appliances</h2>
+                                <p class="text-xs text-slate-400">Every device you power, with hours of daily use.</p>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            class="shrink-0 inline-flex items-center gap-1.5 rounded-xl rounded-tr-none bg-yellow-400 px-4 py-2.5 text-xs font-bold text-slate-950 hover:bg-yellow-300 hover:-translate-y-0.5 transition-all duration-200 shadow-sm"
+                            @click="addAppliance"
+                        >
+                            <i class="bi bi-plus-lg"></i> Add appliance
+                        </button>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full min-w-[620px] border-collapse">
+                            <thead>
+                                <tr class="bg-[#0D1527] text-left text-[10.5px] font-bold uppercase tracking-widest text-slate-300">
+                                    <th class="px-3 py-3 rounded-tl-xl whitespace-nowrap">Appliance</th>
+                                    <th class="px-3 py-3">Watts (W)</th>
+                                    <th class="px-3 py-3">Qty</th>
+                                    <th class="px-3 py-3">Hrs/Day</th>
+                                    <th class="px-3 py-3">Total Load</th>
+                                    <th class="px-3 py-3">Daily Energy</th>
+                                    <th class="px-3 py-3 rounded-tr-xl"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr
+                                    v-for="(a, i) in appliances"
+                                    :key="a.id"
+                                    :class="rowErrors(a).length ? 'bg-red-50/60' : 'bg-white'"
+                                    class="border-b border-slate-100 transition-colors"
+                                >
+                                    <td class="px-3 py-3">
+                                        <div class="relative">
+                                            <input
+                                                v-model="a.name"
+                                                type="text"
+                                                list="appliance-options"
+                                                placeholder="Select or type appliance…"
+                                                class="w-full min-w-[130px] rounded-lg rounded-tr-none border-[1.5px] border-[#d9d7d0] bg-[#fbfbf9] px-2.5 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:border-yellow-500 focus:ring-4 focus:ring-yellow-400/15 focus:bg-white transition-all"
+                                            />
+                                            <datalist id="appliance-options">
+                                                <option v-for="d in applianceDefs" :key="d.name" :value="d.name"></option>
+                                            </datalist>
+                                            <button
+                                                type="button"
+                                                @click="a.name = ''"
+                                                class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500"
+                                                title="Clear"
+                                            >
+                                                <i class="bi bi-x-lg text-sm"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td class="px-3 py-3">
+                                        <input
+                                            v-model.number="a.watts"
+                                            type="number"
+                                            min="1"
+                                            :class="num(a.watts) <= 0 ? 'border-red-400 ring-4 ring-red-400/20' : 'border-[#d9d7d0]'"
+                                            class="w-20 rounded-lg rounded-tr-none border-[1.5px] bg-[#fbfbf9] px-2.5 py-2 text-sm text-right font-semibold text-slate-800 focus:outline-none focus:border-yellow-500 focus:ring-4 focus:ring-yellow-400/15 focus:bg-white transition-all"
+                                        />
+                                        <p v-if="num(a.watts) <= 0" class="mt-1 text-[10px] font-semibold text-red-500">> 0</p>
+                                    </td>
+                                    <td class="px-3 py-3">
+                                        <input
+                                            v-model.number="a.quantity"
+                                            type="number"
+                                            min="1"
+                                            :class="num(a.quantity) < 1 ? 'border-red-400 ring-4 ring-red-400/20' : 'border-[#d9d7d0]'"
+                                            class="w-16 rounded-lg rounded-tr-none border-[1.5px] bg-[#fbfbf9] px-3 py-2 text-sm text-center font-semibold text-slate-800 focus:outline-none focus:border-yellow-500 focus:ring-4 focus:ring-yellow-400/15 focus:bg-white transition-all"
+                                        />
+                                        <p v-if="num(a.quantity) < 1" class="mt-1 text-[10px] font-semibold text-red-500">≥ 1</p>
+                                    </td>
+                                    <td class="px-3 py-3">
+                                        <input
+                                            v-model.number="a.hours"
+                                            type="number"
+                                            min="0"
+                                            max="24"
+                                            :class="num(a.hours) < 0 || num(a.hours) > 24 ? 'border-red-400 ring-4 ring-red-400/20' : 'border-[#d9d7d0]'"
+                                            class="w-16 rounded-lg rounded-tr-none border-[1.5px] bg-[#fbfbf9] px-3 py-2 text-sm text-center font-semibold text-slate-800 focus:outline-none focus:border-yellow-500 focus:ring-4 focus:ring-yellow-400/15 focus:bg-white transition-all"
+                                        />
+                                        <p v-if="num(a.hours) < 0 || num(a.hours) > 24" class="mt-1 text-[10px] font-semibold text-red-500">0–24</p>
+                                    </td>
+                                    <td class="px-3 py-3">
+                                        <span class="text-sm font-bold text-slate-900">{{ fmtNum(rowLoadW(a)) }} W</span>
+                                    </td>
+                                    <td class="px-3 py-3">
+                                        <span class="text-sm font-bold text-[#40e0d0]">{{ fmtNum(rowDailyWh(a)) }} Wh</span>
+                                        <span class="block text-[10.5px] font-semibold text-slate-400">{{ rowKwh(a).toFixed(2) }} kWh</span>
+                                    </td>
+                                    <td class="px-3 py-3 text-right">
+                                        <button
+                                            type="button"
+                                            :disabled="appliances.length === 1"
+                                            class="grid h-8 w-8 place-items-center rounded-lg rounded-tr-none border border-slate-200 text-slate-400 hover:border-red-300 hover:text-red-500 disabled:opacity-30 transition-colors"
+                                            title="Remove appliance"
+                                            @click="removeAppliance(i)"
+                                        >
+                                            <i class="bi bi-trash3 text-sm"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                            <tfoot>
+                                <tr class="bg-[#FAF8F2]">
+                                    <td class="px-3 py-4 text-xs font-bold uppercase tracking-widest text-slate-500 whitespace-nowrap">Totals</td>
+                                    <td></td>
+                                    <td></td>
+                                    <td></td>
+                                    <td class="px-3 py-4 text-sm font-black text-slate-950">{{ fmtNum(totalLoadW) }} W</td>
+                                    <td class="px-3 py-4 text-sm font-black text-[#40e0d0]">
+                                        {{ fmtNum(totalDailyWh) }} Wh
+                                        <span class="block text-[10.5px] font-semibold text-slate-400">{{ totalDailyKwh.toFixed(2) }} kWh</span>
+                                    </td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <div v-if="appliances.length === 0" class="py-12 text-center">
+                        <p class="text-sm text-slate-400">No appliances yet — tap "Add appliance" to build your load list.</p>
+                    </div>
+                    <p v-if="hasInvalidRows" class="border-t border-red-100 bg-red-50 px-5 sm:px-7 py-3 text-xs font-semibold text-red-600">
+                        Fix the highlighted fields above before saving your design.
+                    </p>
+                </section>
+
                 <!-- Live dashboard -->
                 <section id="results" class="reveal rounded-3xl rounded-tr-none bg-gradient-to-br from-[#0D1527] via-[#12203C] to-[#1A365D] text-white p-5 shadow-2xl overflow-hidden relative">
                     <div class="absolute -top-24 -right-20 w-64 h-64 rounded-full bg-yellow-400/10 blur-3xl pointer-events-none"></div>
