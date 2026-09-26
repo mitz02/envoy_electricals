@@ -13,12 +13,17 @@ class Trainee extends Model
     use SoftDeletes;
 
     const STATUS_PENDING = 'pending';
+
     const STATUS_ACTIVE = 'active';
+
     const STATUS_GRADUATED = 'graduated';
+
     const STATUS_WITHDRAWN = 'withdrawn';
 
     const TYPE_STAFF = 'staff';
+
     const TYPE_APPRENTICE = 'apprentice';
+
     const TYPE_TRAINEE = 'trainee';
 
     protected $fillable = [

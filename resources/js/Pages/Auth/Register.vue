@@ -35,7 +35,9 @@ const registerFeatures = [
         subtitle="Save favourites, track quotes and check out faster — all in one place."
         :features="registerFeatures"
     >
-        <Head title="Register" />
+        <Head title="Register">
+            <meta name="robots" content="noindex, nofollow" />
+        </Head>
 
         <!-- Header -->
         <div class="mb-8">
@@ -167,5 +169,6 @@ const registerFeatures = [
             Already have an account?
             <Link :href="route('login')" class="font-bold text-[#40e0d0] hover:text-amber-500 transition-colors">Sign in instead</Link>
         </div>
-    </GuestLayout>
+
+        </GuestLayout>
 </template>

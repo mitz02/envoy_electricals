@@ -1,9 +1,9 @@
-﻿<script setup>
+<script setup>
 import { computed } from 'vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
 import Pagination from '@/Components/Pagination.vue';
-import { naira, stockStatusLabel, badgeClass } from '@/lib/format';
+import { naira, maskNaira, stockStatusLabel, badgeClass } from '@/lib/format';
 
 defineOptions({ layout: AdminLayout });
 
@@ -50,7 +50,7 @@ function applyStatus(status) {
         <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <button class="rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm hover:bg-slate-50" @click="applyStatus('')">
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Total Stock Value</p>
-                <p class="mt-2 text-2xl font-bold text-slate-900">{{ naira(summary.total_value) }}</p>
+                <p class="mt-2 text-2xl font-bold text-slate-900">{{ maskNaira('inventory_value', summary.total_value) }}</p>
             </button>
             <button class="rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm hover:bg-slate-50" @click="applyStatus('low')">
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Low Stock</p>
@@ -68,7 +68,7 @@ function applyStatus(status) {
 
         <div class="mt-6 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
             <form class="flex gap-3" method="get">
-                <input :default-value="props.filters.search" name="search" type="search" placeholder="Search by name or SKUâ€¦" class="flex-1 rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" />
+                <input :default-value="props.filters.search" name="search" type="search" placeholder="Search by name or SKU…" class="flex-1 rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" />
                 <button type="submit" class="rounded-lg bg-[#0D1527] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0D1527]/90">Search</button>
             </form>
         </div>
@@ -91,8 +91,8 @@ function applyStatus(status) {
                             <td class="px-4 py-3 font-medium text-slate-900">{{ p.name }}</td>
                             <td class="px-4 py-3 font-mono text-xs text-slate-500">{{ p.sku }}</td>
                             <td class="px-4 py-3 text-center font-semibold text-slate-700">{{ p.current_quantity }}</td>
-                            <td class="px-4 py-3 text-right text-slate-600">{{ naira(p.average_cost) }}</td>
-                            <td class="px-4 py-3 text-right font-semibold text-slate-900">{{ naira(p.current_quantity * p.average_cost) }}</td>
+                            <td class="px-4 py-3 text-right text-slate-600">{{ maskNaira('cost_price', p.average_cost) }}</td>
+                            <td class="px-4 py-3 text-right font-semibold text-slate-900">{{ maskNaira('inventory_value', p.current_quantity * p.average_cost) }}</td>
                             <td class="px-4 py-3 text-center"><span :class="badgeClass(stockStatus(p).cls)">{{ stockStatus(p).label }}</span></td>
                         </tr>
                         <tr v-if="!products.data.length">

@@ -6,6 +6,7 @@ use App\Models\Role;
 use App\Models\Trainee;
 use App\Models\User;
 use App\Services\AcademyService;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -15,7 +16,7 @@ class PortalAuthTest extends TestCase
 
     protected function portalUser(string $email = 'ada@portal.test'): User
     {
-        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $this->seed(RolesAndPermissionsSeeder::class);
 
         $trainee = app(AcademyService::class)->createTrainee([
             'name' => 'Ada Trainee',
@@ -90,7 +91,7 @@ class PortalAuthTest extends TestCase
         $this->assertAuthenticatedAs($user);
 
         $this->post('/portal/logout')
-            ->assertRedirect(route('portal.landing'));
+            ->assertRedirect('/login');
 
         $this->assertGuest();
     }

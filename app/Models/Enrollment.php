@@ -8,8 +8,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Enrollment extends Model
 {
     const STATUS_ENROLLED = 'enrolled';
+
     const STATUS_IN_PROGRESS = 'in_progress';
+
     const STATUS_COMPLETED = 'completed';
+
     const STATUS_WITHDRAWN = 'withdrawn';
 
     protected $fillable = [

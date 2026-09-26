@@ -2,12 +2,15 @@
 
 namespace Database\Seeders;
 
+use App\Models\Brand;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\ProductImage;
+use App\Models\Store;
 use App\Services\ReferenceGenerator;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class DemoProductsSeeder extends Seeder
 {
@@ -97,18 +100,25 @@ class DemoProductsSeeder extends Seeder
         ];
 
         DB::transaction(function () use ($products, $imagesByCategory) {
-            foreach ($products as [$sku, $name, $categorySlug, $brand, $cost, $sell, $qty, $reorder, $featured, $available]) {
+            foreach ($products as [$sku, $name, $categorySlug, $brandName, $cost, $sell, $qty, $reorder, $featured, $available]) {
                 $category = ProductCategory::where('slug', $categorySlug)->first();
+
+                $brand = Brand::firstOrCreate(
+                    ['name' => $brandName],
+                    ['slug' => Str::slug($brandName).'-'.Str::lower(Str::random(5)), 'is_active' => true],
+                );
+
+                $existing = Product::where('sku', $sku)->first();
 
                 $product = Product::updateOrCreate(
                     ['sku' => $sku],
                     [
-                        'ref_id' => ReferenceGenerator::generate('product'),
+                        'ref_id' => $existing?->ref_id ?? ReferenceGenerator::generate('product'),
                         'name' => $name,
                         'category_id' => $category->id ?? null,
-                        'brand' => $brand,
-                        'description' => 'Genuine '.$brand.' product supplied by Envoy Electric. '.$name.'. Quality-checked, fully warranted, and ready for nationwide delivery.',
-                        'specifications' => $brand.' '.$name,
+                        'brand_id' => $brand->id,
+                        'description' => 'Genuine '.$brandName.' product supplied by Envoy Electric. '.$name.'. Quality-checked, fully warranted, and ready for nationwide delivery.',
+                        'specifications' => $brandName.' '.$name,
                         'unit' => 'pcs',
                         'cost_price' => $cost,
                         'selling_price' => $sell,
@@ -130,6 +140,22 @@ class DemoProductsSeeder extends Seeder
                         'is_featured' => true,
                         'sort_order' => 0,
                     ]);
+                }
+
+                $stores = Store::all();
+                foreach ($stores as $store) {
+                    $storeQty = $store->is_default ? $qty : max(0, (int) round($qty * 0.4));
+                    DB::table('product_store')->updateOrInsert(
+                        ['product_id' => $product->id, 'store_id' => $store->id],
+                        [
+                            'current_quantity' => $storeQty,
+                            'reorder_level' => $reorder,
+                            'average_cost' => $cost,
+                            'selling_price' => $sell,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]
+                    );
                 }
             }
         });

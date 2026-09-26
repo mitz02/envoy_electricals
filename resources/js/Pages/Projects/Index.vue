@@ -1,8 +1,11 @@
 <script setup>
 import { ref } from 'vue';
+import { Head } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 
 defineOptions({ layout: PublicLayout });
+
+const origin = window.location.origin;
 
 const props = defineProps({
     projects: { type: Array, required: true },
@@ -41,6 +44,10 @@ function naira(v) {
 </script>
 
 <template>
+    <Head title="Solar Installation Projects & Case Studies in Nigeria | Envoy Electricals">
+        <meta name="description" content="Real solar and electrical projects delivered by Envoy Electricals across Nigeria — residential, commercial and industrial installations with photos and results." />
+        <link rel="canonical" :href="origin + '/projects'" />
+    </Head>
     <header class="bg-[#0D1527] text-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
             <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight">Our Solar Projects</h1>

@@ -1,4 +1,4 @@
-﻿<script setup>
+<script setup>
 import { useForm, Link } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
@@ -79,7 +79,7 @@ const conditionBadge = {
 
     <!-- Filters -->
     <div class="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs sm:flex-row">
-        <input v-model="form.search" type="search" placeholder="Search name, serial number, location, refâ€¦" class="flex-1 rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" @keyup.enter="applyFilters" />
+        <input v-model="form.search" type="search" placeholder="Search name, serial number, location, ref…" class="flex-1 rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" @keyup.enter="applyFilters" />
         <select v-model="form.status" class="rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20">
             <option value="">All statuses</option>
             <option v-for="s in statuses" :key="s" :value="s">{{ s.charAt(0).toUpperCase() + s.slice(1) }}</option>
@@ -111,10 +111,10 @@ const conditionBadge = {
                     <tr v-for="a in assets.data" :key="a.id" class="hover:bg-slate-50">
                         <td class="px-4 py-3">
                             <Link :href="`/admin/assets/${a.id}`" class="font-medium text-slate-900 hover:text-slate-600">{{ a.name }}</Link>
-                            <p class="text-xs text-slate-400">{{ a.ref_id }}<span v-if="a.serial_number"> Â· {{ a.serial_number }}</span></p>
+                            <p class="text-xs text-slate-400">{{ a.ref_id }}<span v-if="a.serial_number"> · {{ a.serial_number }}</span></p>
                         </td>
-                        <td class="px-4 py-3 text-slate-600">{{ a.category || 'â€”' }}</td>
-                        <td class="px-4 py-3 text-slate-600">{{ a.location || 'â€”' }}</td>
+                        <td class="px-4 py-3 text-slate-600">{{ a.category || '—' }}</td>
+                        <td class="px-4 py-3 text-slate-600">{{ a.location || '—' }}</td>
                         <td class="px-4 py-3 text-right text-slate-700">{{ naira(a.purchase_cost) }}</td>
                         <td class="px-4 py-3 text-right font-semibold text-slate-900">{{ naira(a.current_value) }}</td>
                         <td class="px-4 py-3 text-center">

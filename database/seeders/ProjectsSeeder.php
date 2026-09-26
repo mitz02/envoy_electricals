@@ -42,7 +42,7 @@ class ProjectsSeeder extends Seeder
             $john = Customer::updateOrCreate(
                 ['phone' => '+234 801 234 5678'],
                 [
-                    'ref_id' => 'CUS-' . now()->format('Y') . '-000001',
+                    'ref_id' => 'CUS-'.now()->format('Y').'-000001',
                     'name' => 'Mr John Adeyemi',
                     'email' => 'john@example.com',
                     'address' => '12 Admiralty Way, Lekki Phase 1',
@@ -54,7 +54,7 @@ class ProjectsSeeder extends Seeder
             $mall = Customer::updateOrCreate(
                 ['phone' => '+234 809 555 0199'],
                 [
-                    'ref_id' => 'CUS-' . now()->format('Y') . '-000002',
+                    'ref_id' => 'CUS-'.now()->format('Y').'-000002',
                     'name' => 'Ikeja City Mall',
                     'email' => 'facilities@ikcmall.ng',
                     'address' => 'Obafemi Awolowo Way, Ikeja',
@@ -169,7 +169,7 @@ class ProjectsSeeder extends Seeder
         $product = Product::updateOrCreate(
             ['sku' => $sku],
             [
-                'ref_id' => 'EV-PROD-' . str_pad((string) (Product::count() + 1), 6, '0', STR_PAD_LEFT),
+                'ref_id' => 'EV-PROD-'.str_pad((string) (Product::count() + 1), 6, '0', STR_PAD_LEFT),
                 'name' => $name,
                 'category_id' => $category?->id,
                 'unit' => 'pcs',

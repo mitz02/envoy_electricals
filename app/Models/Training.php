@@ -14,7 +14,9 @@ class Training extends Model
     use SoftDeletes;
 
     const LEVEL_BEGINNER = 'beginner';
+
     const LEVEL_INTERMEDIATE = 'intermediate';
+
     const LEVEL_ADVANCED = 'advanced';
 
     protected $fillable = [

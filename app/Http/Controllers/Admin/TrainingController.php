@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Enrollment;
 use App\Models\Training;
 use App\Services\AuditLogger;
+use App\Services\ReferenceGenerator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -67,11 +69,15 @@ class TrainingController extends Controller
     {
         $data = $this->validated($request);
 
+        unset($data['image_path']);
+
         $training = Training::create([
             ...$data,
-            'ref_id' => \App\Services\ReferenceGenerator::generate('training'),
+            'ref_id' => ReferenceGenerator::generate('training'),
             'created_by' => $request->user()->id,
         ]);
+
+        $this->syncCover($request, $training);
 
         $this->syncCurriculum($training, $request->array('weeks'));
 
@@ -168,7 +174,11 @@ class TrainingController extends Controller
     {
         $data = $this->validated($request);
 
+        unset($data['image_path']);
+
         $training->update($data);
+
+        $this->syncCover($request, $training);
 
         $this->syncCurriculum($training, $request->array('weeks'));
 
@@ -191,7 +201,8 @@ class TrainingController extends Controller
         return $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-            'image_path' => ['nullable', 'url', 'max:2048'],
+            'image_path' => ['nullable', 'string', 'max:2048'],
+            'cover_file' => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:10240'],
             'prerequisites' => ['nullable', 'string'],
             'objectives' => ['nullable', 'string'],
             'learning_outcomes' => ['nullable', 'string'],
@@ -217,6 +228,31 @@ class TrainingController extends Controller
     }
 
     /**
+     * Store or replace the cover image from an uploaded file. Falls back to the
+     * previously saved cover when no new file is supplied.
+     */
+    protected function syncCover(Request $request, Training $training): void
+    {
+        if (! $request->hasFile('cover_file')) {
+            return;
+        }
+
+        $existing = $training->image_path;
+
+        $training->update([
+            'image_path' => asset('storage/'.$request->file('cover_file')->store('training-images', 'public')),
+        ]);
+
+        if ($existing && str_contains($existing, '/storage/')) {
+            $relative = substr($existing, strpos($existing, '/storage/') + strlen('/storage/'));
+
+            if ($relative && Storage::disk('public')->exists($relative)) {
+                Storage::disk('public')->delete($relative);
+            }
+        }
+    }
+
+    /**
      * Store or replace the structured curriculum (weeks and lessons).
      */
     protected function syncCurriculum(Training $training, array $weeks): void
@@ -226,7 +262,7 @@ class TrainingController extends Controller
         foreach ($weeks as $index => $week) {
             $weekModel = $training->weeks()->create([
                 'week_number' => data_get($week, 'week_number', $index + 1),
-                'title' => $week['title'] ?? 'Week ' . ($index + 1),
+                'title' => $week['title'] ?? 'Week '.($index + 1),
                 'summary' => data_get($week, 'summary'),
             ]);
 
@@ -234,7 +270,7 @@ class TrainingController extends Controller
 
             foreach ($lessons as $pos => $lesson) {
                 $weekModel->lessons()->create([
-                    'title' => $lesson['title'] ?? 'Lesson ' . ($pos + 1),
+                    'title' => $lesson['title'] ?? 'Lesson '.($pos + 1),
                     'description' => data_get($lesson, 'description'),
                     'objectives' => data_get($lesson, 'objectives'),
                     'duration_minutes' => data_get($lesson, 'duration_minutes'),

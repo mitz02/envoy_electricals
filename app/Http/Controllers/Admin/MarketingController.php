@@ -8,12 +8,15 @@ use App\Models\Newsletter;
 use App\Models\NewsletterSubscriber;
 use App\Models\Testimonial;
 use App\Services\AuditLogger;
+use App\Services\NewsletterService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class MarketingController extends Controller
 {
-    public function index(): \Inertia\Response
+    public function index(): Response
     {
         return Inertia::render('Admin/Marketing/Index', [
             'summary' => [
@@ -32,7 +35,7 @@ class MarketingController extends Controller
 
     // ---------- Subscribers ----------
 
-    public function subscribers(Request $request): \Inertia\Response
+    public function subscribers(Request $request): Response
     {
         $subscribers = NewsletterSubscriber::query()
             ->when($request->search, fn ($q, $s) => $q->where(function ($q) use ($s) {
@@ -47,6 +50,27 @@ class MarketingController extends Controller
             'subscribers' => $subscribers,
             'filters' => $request->only(['search', 'status']),
         ]);
+    }
+
+    public function storeSubscriber(Request $request)
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email', 'max:255'],
+            'name' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $subscriber = NewsletterSubscriber::updateOrCreate(
+            ['email' => mb_strtolower($data['email'])],
+            ['name' => $data['name'] ?? null, 'status' => 'subscribed']
+        );
+
+        $auditMessage = $subscriber->wasRecentlyCreated
+            ? "Added subscriber {$subscriber->email}"
+            : "Re-subscribed {$subscriber->email}";
+
+        AuditLogger::log('created', 'newsletter_subscriber', $subscriber->id, $auditMessage);
+
+        return redirect()->back()->with('success', 'Subscriber added.');
     }
 
     public function toggleSubscriber(NewsletterSubscriber $subscriber)
@@ -72,7 +96,7 @@ class MarketingController extends Controller
 
     // ---------- Newsletters ----------
 
-    public function newsletters(Request $request): \Inertia\Response
+    public function newsletters(Request $request): Response
     {
         $newsletters = Newsletter::query()
             ->with('creator:id,name')
@@ -87,7 +111,7 @@ class MarketingController extends Controller
         ]);
     }
 
-    public function newsletterCreate(): \Inertia\Response
+    public function newsletterCreate(): Response
     {
         return Inertia::render('Admin/Marketing/Newsletters/Form', [
             'newsletter' => null,
@@ -96,16 +120,12 @@ class MarketingController extends Controller
 
     public function newsletterStore(Request $request)
     {
-        $data = $request->validate([
-            'subject' => ['required', 'string', 'max:255'],
-            'content' => ['required', 'string'],
-            'status' => ['required', 'in:draft,scheduled'],
-            'scheduled_at' => ['nullable', 'date'],
-        ]);
+        $data = $this->validateNewsletter($request);
 
         $newsletter = Newsletter::create([
             ...$data,
             'scheduled_at' => $data['scheduled_at'] ?? null,
+            'image_path' => $this->storeNewsletterImage($request),
             'created_by' => $request->user()->id,
         ]);
 
@@ -114,18 +134,44 @@ class MarketingController extends Controller
         return redirect()->route('admin.marketing.newsletters.show', $newsletter->id)->with('success', 'Newsletter saved.');
     }
 
-    public function newsletterShow(Newsletter $newsletter): \Inertia\Response
+    protected function validateNewsletter(Request $request): array
+    {
+        return $request->validate([
+            'subject' => ['required', 'string', 'max:255'],
+            'content' => ['required', 'string'],
+            'status' => ['required', 'in:draft,scheduled'],
+            'scheduled_at' => ['nullable', 'date', 'required_if:status,scheduled'],
+            'image' => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:5120'],
+        ]);
+    }
+
+    protected function storeNewsletterImage(Request $request): ?string
+    {
+        if (! $request->hasFile('image')) {
+            return null;
+        }
+
+        return $request->file('image')->store('newsletters', 'public');
+    }
+
+    public function newsletterShow(Newsletter $newsletter): Response
     {
         $newsletter->load('creator:id,name');
 
         return Inertia::render('Admin/Marketing/Newsletters/Show', [
             'newsletter' => $newsletter,
             'subscriber_count' => NewsletterSubscriber::where('status', 'subscribed')->count(),
+            'mail_from' => [
+                'name' => config('mail.from.name', config('app.name', 'Envoy Electricals')),
+                'address' => config('mail.from.address', 'hello@example.com'),
+            ],
         ]);
     }
 
-    public function newsletterEdit(Newsletter $newsletter): \Inertia\Response
+    public function newsletterEdit(Newsletter $newsletter): Response
     {
+        abort_if($newsletter->status === 'sent', 409, 'This newsletter was already sent and can no longer be edited.');
+
         return Inertia::render('Admin/Marketing/Newsletters/Form', [
             'newsletter' => $newsletter,
         ]);
@@ -133,33 +179,71 @@ class MarketingController extends Controller
 
     public function newsletterUpdate(Request $request, Newsletter $newsletter)
     {
-        $data = $request->validate([
-            'subject' => ['required', 'string', 'max:255'],
-            'content' => ['required', 'string'],
-            'status' => ['required', 'in:draft,scheduled'],
-            'scheduled_at' => ['nullable', 'date'],
-        ]);
+        abort_if($newsletter->status === 'sent', 409, 'This newsletter was already sent and can no longer be edited.');
 
-        $newsletter->update($data);
+        $data = $this->validateNewsletter($request);
+
+        if ($request->hasFile('image')) {
+            $this->deleteNewsletterImage($newsletter->image_path);
+            $data['image_path'] = $this->storeNewsletterImage($request);
+        }
+
+        $newsletter->update([
+            ...$data,
+            'scheduled_at' => $data['scheduled_at'] ?? null,
+            'sent_at' => null,
+        ]);
 
         AuditLogger::log('updated', 'newsletter', $newsletter->id, "Updated newsletter: {$newsletter->subject}");
 
         return redirect()->route('admin.marketing.newsletters.show', $newsletter->id)->with('success', 'Newsletter updated.');
     }
 
+    protected function deleteNewsletterImage(?string $path): void
+    {
+        if (! $path) {
+            return;
+        }
+
+        try {
+            Storage::disk('public')->delete($path);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
     public function newsletterSend(Newsletter $newsletter)
     {
         abort_if($newsletter->status === 'sent', 409, 'This newsletter was already sent.');
 
-        $newsletter->update([
-            'status' => 'sent',
-            'sent_at' => now(),
-            'scheduled_at' => null,
-        ]);
+        $subscriberCount = NewsletterSubscriber::where('status', 'subscribed')->count();
 
-        AuditLogger::log('sent', 'newsletter', $newsletter->id, "Marked newsletter as sent: {$newsletter->subject}");
+        if ($subscriberCount === 0) {
+            return redirect()->route('admin.marketing.newsletters.show', $newsletter->id)
+                ->with('error', 'Cannot send — there are no active subscribers yet. Add subscribers first.');
+        }
 
-        return redirect()->route('admin.marketing.newsletters.show', $newsletter->id)->with('success', 'Newsletter marked as sent to all subscribed recipients.');
+        $result = app(NewsletterService::class)->send($newsletter);
+
+        if ($result['delivered'] === 0) {
+            $message = 'Delivery failed for all '.($result['failed']).' subscriber(s). Check the mail configuration and try again.';
+
+            AuditLogger::log('send_failed', 'newsletter', $newsletter->id, $message);
+
+            return redirect()->route('admin.marketing.newsletters.show', $newsletter->id)
+                ->with('error', $message);
+        }
+
+        $message = "Newsletter sent to {$result['delivered']} of {$result['total']} subscriber(s).";
+
+        if ($result['failed'] > 0) {
+            $message .= " {$result['failed']} failed (".implode(', ', array_slice($result['failures'], 0, 5)).').';
+        }
+
+        AuditLogger::log('sent', 'newsletter', $newsletter->id, $message);
+
+        return redirect()->route('admin.marketing.newsletters.show', $newsletter->id)
+            ->with('success', $message);
     }
 
     public function newsletterDestroy(Newsletter $newsletter)
@@ -174,7 +258,7 @@ class MarketingController extends Controller
 
     // ---------- Testimonials ----------
 
-    public function testimonials(Request $request): \Inertia\Response
+    public function testimonials(Request $request): Response
     {
         $testimonials = Testimonial::query()
             ->with('feedback')
@@ -190,7 +274,7 @@ class MarketingController extends Controller
         ]);
     }
 
-    public function testimonialCreate(): \Inertia\Response
+    public function testimonialCreate(): Response
     {
         return Inertia::render('Admin/Marketing/Testimonials/Form', [
             'testimonial' => null,
@@ -219,7 +303,7 @@ class MarketingController extends Controller
         return redirect()->route('admin.marketing.testimonials.index')->with('success', 'Testimonial created.');
     }
 
-    public function testimonialEdit(Testimonial $testimonial): \Inertia\Response
+    public function testimonialEdit(Testimonial $testimonial): Response
     {
         return Inertia::render('Admin/Marketing/Testimonials/Form', [
             'testimonial' => $testimonial,
@@ -252,7 +336,7 @@ class MarketingController extends Controller
     {
         $testimonial->update(['is_published' => ! $testimonial->is_published]);
 
-        AuditLogger::log('updated', 'testimonial', $testimonial->id, ($testimonial->is_published ? 'Published' : 'Unpublished') . ' testimonial from ' . $testimonial->author_name);
+        AuditLogger::log('updated', 'testimonial', $testimonial->id, ($testimonial->is_published ? 'Published' : 'Unpublished').' testimonial from '.$testimonial->author_name);
 
         return redirect()->back()->with('success', $testimonial->is_published ? 'Testimonial published.' : 'Testimonial hidden.');
     }
@@ -269,7 +353,7 @@ class MarketingController extends Controller
 
     // ---------- Feedback ----------
 
-    public function feedback(Request $request): \Inertia\Response
+    public function feedback(Request $request): Response
     {
         $feedback = Feedback::query()
             ->when($request->search, fn ($q, $s) => $q->where(function ($q) use ($s) {
@@ -286,7 +370,7 @@ class MarketingController extends Controller
         ]);
     }
 
-    public function feedbackShow(Feedback $feedback): \Inertia\Response
+    public function feedbackShow(Feedback $feedback): Response
     {
         $feedback->load('user:id,name');
 
@@ -307,7 +391,7 @@ class MarketingController extends Controller
         if ($data['status'] === 'approved' && ! $feedback->testimonial()->exists() && $feedback->comment) {
             Testimonial::create([
                 'feedback_id' => $feedback->id,
-                'author_name' => $feedback->customer_name ?: 'Envoy Electric Customer',
+                'author_name' => $feedback->customer_name ?: 'Envoy Electricals Customer',
                 'author_role' => 'Customer',
                 'content' => $feedback->comment,
                 'rating' => $feedback->rating,

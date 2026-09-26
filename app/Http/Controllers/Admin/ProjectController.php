@@ -8,14 +8,16 @@ use App\Models\Product;
 use App\Models\Project;
 use App\Models\User;
 use App\Services\ProjectService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class ProjectController extends Controller
 {
     public function __construct(protected ProjectService $projects) {}
 
-    public function index(Request $request): \Inertia\Response
+    public function index(Request $request): Response
     {
         $projects = Project::query()
             ->with(['customer', 'assignedUser'])
@@ -49,12 +51,12 @@ class ProjectController extends Controller
         ]);
     }
 
-    public function create(): \Inertia\Response
+    public function create(): Response
     {
         return $this->formData(project: null, view: 'Admin/Projects/Form');
     }
 
-    public function store(Request $request): \Illuminate\Http\RedirectResponse
+    public function store(Request $request): RedirectResponse
     {
         $data = $this->validated($request);
 
@@ -63,7 +65,7 @@ class ProjectController extends Controller
         return redirect()->route('admin.projects.show', $project)->with('success', 'Project created.');
     }
 
-    public function show(Project $project): \Inertia\Response
+    public function show(Project $project): Response
     {
         $project->load([
             'customer',
@@ -82,12 +84,12 @@ class ProjectController extends Controller
         ]);
     }
 
-    public function edit(Project $project): \Inertia\Response
+    public function edit(Project $project): Response
     {
         return $this->formData(project: $project, view: 'Admin/Projects/Form');
     }
 
-    public function update(Request $request, Project $project): \Illuminate\Http\RedirectResponse
+    public function update(Request $request, Project $project): RedirectResponse
     {
         $data = $this->validated($request);
 
@@ -96,16 +98,16 @@ class ProjectController extends Controller
         return redirect()->route('admin.projects.show', $project)->with('success', 'Project updated.');
     }
 
-    public function status(Request $request, Project $project): \Illuminate\Http\RedirectResponse
+    public function status(Request $request, Project $project): RedirectResponse
     {
-        $data = $request->validate(['status' => ['required', 'in:' . implode(',', Project::STATUSES)]]);
+        $data = $request->validate(['status' => ['required', 'in:'.implode(',', Project::STATUSES)]]);
 
         $this->projects->updateStatus($project, $data['status'], (int) $request->user()->id);
 
         return back()->with('success', "Project marked as {$data['status']}.");
     }
 
-    public function destroy(Request $request, Project $project): \Illuminate\Http\RedirectResponse
+    public function destroy(Request $request, Project $project): RedirectResponse
     {
         $this->projects->destroy($project, (int) $request->user()->id);
 
@@ -121,16 +123,15 @@ class ProjectController extends Controller
             'customer_address' => ['nullable', 'string', 'max:255'],
             'location' => ['nullable', 'string', 'max:255'],
             'contract_value' => ['required', 'numeric', 'min:0'],
-            'status' => ['required', 'in:' . implode(',', Project::STATUSES)],
+            'status' => ['required', 'in:'.implode(',', Project::STATUSES)],
             'start_date' => ['nullable', 'date'],
             'expected_completion_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'assigned_user_id' => ['nullable', 'exists:users,id'],
-            'technician_user_id' => ['nullable', 'exists:users,id'],
             'notes' => ['nullable', 'string'],
         ]);
     }
 
-    protected function formData(?Project $project, string $view): \Inertia\Response
+    protected function formData(?Project $project, string $view): Response
     {
         return Inertia::render($view, [
             'project' => $project,

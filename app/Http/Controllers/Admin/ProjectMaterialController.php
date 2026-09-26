@@ -6,13 +6,15 @@ use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Models\ProjectMaterial;
 use App\Services\ProjectService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class ProjectMaterialController extends Controller
 {
     public function __construct(protected ProjectService $projects) {}
 
-    public function store(Request $request, Project $project): \Illuminate\Http\RedirectResponse
+    public function store(Request $request, Project $project): RedirectResponse
     {
         $data = $request->validate([
             'product_id' => ['required', 'exists:products,id'],
@@ -26,18 +28,18 @@ class ProjectMaterialController extends Controller
         return back()->with('success', 'Material added to project.');
     }
 
-    public function issue(Request $request, Project $project, ProjectMaterial $material): \Illuminate\Http\RedirectResponse
+    public function issue(Request $request, Project $project, ProjectMaterial $material): RedirectResponse
     {
         try {
             $this->projects->issueMaterial($project, $material, (int) $request->user()->id);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return back()->withErrors($e->validator)->with('error', 'Material could not be issued.');
         }
 
         return back()->with('success', 'Material issued to inventory.');
     }
 
-    public function destroy(Request $request, Project $project, ProjectMaterial $material): \Illuminate\Http\RedirectResponse
+    public function destroy(Request $request, Project $project, ProjectMaterial $material): RedirectResponse
     {
         if ($material->issued_to_inventory) {
             $message = 'Material removed and stock returned to inventory.';

@@ -5,16 +5,22 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Supplier;
 use App\Services\ReferenceGenerator;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class SupplierController extends Controller
 {
-    public function index(Request $request): \Inertia\Response
+    public function index(Request $request): Response
     {
         $suppliers = Supplier::query()
-            ->when($request->search, fn ($q, $s) => $q->where('name', 'like', "%{$s}%")
-                ->orWhere('phone', 'like', "%{$s}%")->orWhere('email', 'like', "%{$s}%"))
+            ->when($request->search, fn ($q, $s) => $q->where(function ($q) use ($s) {
+                $q->where('name', 'like', "%{$s}%")
+                    ->orWhere('phone', 'like', "%{$s}%")
+                    ->orWhere('email', 'like', "%{$s}%");
+            }))
             ->withSum(['purchases as total_purchases' => fn ($q) => $q->where('status', 'completed')], 'total')
             ->orderBy('name')
             ->paginate(15)
@@ -26,7 +32,7 @@ class SupplierController extends Controller
         ]);
     }
 
-    public function store(Request $request): \Illuminate\Http\RedirectResponse
+    public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -37,12 +43,14 @@ class SupplierController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
-        Supplier::create([...$data, 'ref_id' => ReferenceGenerator::generate('supplier')]);
+        $supplier = Supplier::create([...$data, 'ref_id' => ReferenceGenerator::generate('supplier')]);
 
-        return back()->with('success', 'Supplier added.');
+        return redirect()
+            ->route('admin.suppliers.index', ['search' => $supplier->name])
+            ->with('success', 'Supplier added.');
     }
 
-    public function update(Request $request, Supplier $supplier): \Illuminate\Http\RedirectResponse
+    public function update(Request $request, Supplier $supplier): RedirectResponse
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -55,10 +63,12 @@ class SupplierController extends Controller
 
         $supplier->update($data);
 
-        return back()->with('success', 'Supplier updated.');
+        return redirect()
+            ->route('admin.suppliers.index', ['search' => $supplier->name])
+            ->with('success', 'Supplier updated.');
     }
 
-    public function show(Supplier $supplier): \Inertia\Response
+    public function show(Supplier $supplier): Response
     {
         $supplier->load(['purchases' => fn ($q) => $q->latest('purchase_date')->take(10)]);
 
@@ -67,10 +77,28 @@ class SupplierController extends Controller
         ]);
     }
 
-    public function destroy(Supplier $supplier): \Illuminate\Http\RedirectResponse
+    public function destroy(Supplier $supplier): RedirectResponse
     {
         $supplier->delete();
 
         return back()->with('success', 'Supplier deleted.');
+    }
+
+    public function quickCreate(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:100'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'address' => ['nullable', 'string'],
+            'contact_person' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $supplier = Supplier::create([
+            ...$data,
+            'ref_id' => ReferenceGenerator::generate('supplier'),
+        ]);
+
+        return response()->json(['supplier' => $supplier]);
     }
 }

@@ -28,7 +28,6 @@ const form = useForm({
     start_date: props.project?.start_date ?? '',
     expected_completion_date: props.project?.expected_completion_date ?? '',
     assigned_user_id: props.project?.assigned_user_id ?? '',
-    technician_user_id: props.project?.technician_user_id ?? '',
     notes: props.project?.notes ?? '',
 });
 
@@ -60,11 +59,11 @@ function roleLabel(user) {
         <FlashMessages />
         <PageHeader :title="isEdit ? `Edit ${project.ref_id} — ${project.name}` : 'New Project'" :subtitle="isEdit ? `Started ${formatDate(project.start_date)}` : 'Create a solar or electrical installation project.'" />
 
-        <form class="max-w-4xl space-y-5" @submit.prevent="submit">
+        <form class="space-y-5" @submit.prevent="submit">
             <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
                 <h2 class="mb-4 text-sm font-semibold text-slate-900">Project Information</h2>
-                <div class="grid gap-4 sm:grid-cols-2">
-                    <div class="sm:col-span-2">
+                <div class="grid gap-4">
+                    <div>
                         <label class="mb-1 block text-sm font-medium text-slate-700">Project name <span class="text-red-500">*</span></label>
                         <input v-model="form.name" type="text" class="w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" />
                         <div v-if="form.errors.name" class="mt-1 text-xs text-red-600">{{ form.errors.name }}</div>
@@ -81,7 +80,7 @@ function roleLabel(user) {
                         <label class="mb-1 block text-sm font-medium text-slate-700">Location</label>
                         <input v-model="form.location" type="text" class="w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" />
                     </div>
-                    <div class="sm:col-span-2">
+                    <div>
                         <label class="mb-1 block text-sm font-medium text-slate-700">Customer address</label>
                         <input v-model="form.customer_address" type="text" class="w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" />
                     </div>
@@ -115,17 +114,10 @@ function roleLabel(user) {
                         </select>
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-slate-700">Technician</label>
-                        <select v-model="form.technician_user_id" class="w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20">
-                            <option value="">— Unassigned —</option>
-                            <option v-for="u in users" :key="u.id" :value="u.id">{{ u.name }}{{ roleLabel(u) }}</option>
-                        </select>
-                    </div>
-                    <div class="sm:col-span-2">
                         <label class="mb-1 block text-sm font-medium text-slate-700">Description</label>
                         <textarea v-model="form.description" rows="3" class="w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" />
                     </div>
-                    <div class="sm:col-span-2">
+                    <div>
                         <label class="mb-1 block text-sm font-medium text-slate-700">Notes</label>
                         <textarea v-model="form.notes" rows="3" class="w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" />
                     </div>

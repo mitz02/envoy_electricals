@@ -6,12 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Project;
 use App\Models\ProjectMedia;
 use App\Services\AuditLogger;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class ProjectMediaController extends Controller
 {
-    public function store(Request $request, Project $project): \Illuminate\Http\RedirectResponse
+    public function store(Request $request, Project $project): RedirectResponse
     {
         $data = $request->validate([
             'files' => ['required', 'array', 'min:1'],
@@ -21,7 +22,7 @@ class ProjectMediaController extends Controller
             'published' => ['nullable', 'boolean'],
         ]);
 
-        $folder = 'project-media/' . $project->ref_id;
+        $folder = 'project-media/'.$project->ref_id;
         $uploaded = 0;
 
         foreach ($request->file('files') as $file) {
@@ -46,10 +47,10 @@ class ProjectMediaController extends Controller
         AuditLogger::log('uploaded', 'project_media', $project->id,
             "Uploaded {$uploaded} media item(s) to project {$project->ref_id}");
 
-        return back()->with('success', $uploaded . ' media item(s) uploaded.');
+        return back()->with('success', $uploaded.' media item(s) uploaded.');
     }
 
-    public function publish(Request $request, Project $project, ProjectMedia $media): \Illuminate\Http\RedirectResponse
+    public function publish(Request $request, Project $project, ProjectMedia $media): RedirectResponse
     {
         if ($media->project_id !== $project->id) {
             abort(404);
@@ -58,12 +59,12 @@ class ProjectMediaController extends Controller
         $media->update(['published' => $request->boolean('published')]);
 
         AuditLogger::log('project_media_publish', 'project_media', $media->id,
-            ($media->published ? 'Published' : 'Unpublished') . " media on project {$project->ref_id}");
+            ($media->published ? 'Published' : 'Unpublished')." media on project {$project->ref_id}");
 
         return back()->with('success', $media->published ? 'Media published to website.' : 'Media unpublished.');
     }
 
-    public function destroy(Request $request, Project $project, ProjectMedia $media): \Illuminate\Http\RedirectResponse
+    public function destroy(Request $request, Project $project, ProjectMedia $media): RedirectResponse
     {
         if ($media->project_id !== $project->id) {
             abort(404);

@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Models\Payment;
-use App\Models\Supplier;
+use App\Models\Store;
 
 class PaymentService
 {
@@ -28,10 +28,18 @@ class PaymentService
         ?string $remarks = null,
         ?string $paymentDate = null,
         ?int $traineeId = null,
+        ?int $storeId = null,
     ): ?Payment {
         if ($amount <= 0) {
             return null;
         }
+
+        $resolvedStoreId = $storeId
+            ?? session('admin_store_id')
+            ?? auth()->user()?->store_id
+            ?? Store::where('is_default', true)->value('id')
+            ?? Store::value('id')
+            ?? 1;
 
         $refId = ReferenceGenerator::generate('payment');
 
@@ -42,6 +50,7 @@ class PaymentService
             'payment_method' => $paymentMethod ?? ($gateway === Payment::GATEWAY_PAYSTACK ? 'paystack' : null),
             'document_type' => $documentType,
             'document_id' => $documentId,
+            'store_id' => $resolvedStoreId,
             // Enrollment payments track the trainee, not a customer record.
             'customer_id' => $traineeId !== null ? null : $customerId,
             'trainee_id' => $traineeId ?? null,

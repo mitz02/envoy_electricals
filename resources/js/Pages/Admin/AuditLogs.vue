@@ -1,4 +1,4 @@
-﻿<script setup>
+<script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
 import PageHeader from '@/Components/PageHeader.vue';
@@ -53,7 +53,7 @@ function actionColor(action) {
                                 <span v-if="log.ip" class="ml-2 block text-xs text-slate-400">IP {{ log.ip }}</span>
                             </td>
                             <td class="px-4 py-3">
-                                <p class="text-xs text-slate-600">{{ log.description || 'â€”' }}</p>
+                                <p class="text-xs text-slate-600">{{ log.description || '—' }}</p>
                                 <details v-if="log.changes" class="mt-1">
                                     <summary class="cursor-pointer text-xs font-medium text-slate-400 hover:text-slate-600">changes</summary>
                                     <pre class="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-2 text-[10px] text-slate-500">{{ JSON.stringify(log.changes, null, 2) }}</pre>

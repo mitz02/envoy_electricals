@@ -6,13 +6,14 @@ use App\Models\Order;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\Role;
-use App\Models\Setting;
 use App\Models\User;
 use App\Services\InventoryService;
 use App\Services\PaymentService;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class CheckoutFlowTest extends TestCase
@@ -21,7 +22,7 @@ class CheckoutFlowTest extends TestCase
 
     protected function owner(): User
     {
-        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $this->seed(RolesAndPermissionsSeeder::class);
 
         return User::factory()->create([
             'role_id' => Role::where('slug', 'owner')->first()->id,
@@ -31,9 +32,9 @@ class CheckoutFlowTest extends TestCase
     protected function onlineProduct(string $name, float $price = 15000, int $stock = 10): Product
     {
         $product = Product::create([
-            'ref_id' => 'CK-PROD-' . mt_rand(10000, 99999),
+            'ref_id' => 'CK-PROD-'.mt_rand(10000, 99999),
             'name' => $name,
-            'sku' => 'CK-' . strtoupper(substr(md5($name . mt_rand()), 0, 8)),
+            'sku' => 'CK-'.strtoupper(substr(md5($name.mt_rand()), 0, 8)),
             'unit' => 'piece',
             'selling_price' => $price,
             'is_visible_online' => true,
@@ -62,18 +63,18 @@ class CheckoutFlowTest extends TestCase
         return Order::latest('id')->first();
     }
 
-    private function dataPage(\Illuminate\Testing\TestResponse $response): array
+    private function dataPage(TestResponse $response): array
     {
         if (preg_match('/data-page="([^"]*)"/', $response->getContent(), $m)) {
             return json_decode(html_entity_decode($m[1], ENT_QUOTES), true) ?? [];
         }
 
-        $this->fail('Unable to parse Inertia data-page attribute. Status: ' . $response->getStatusCode() . ' Exception: ' . ($response->exception ? $response->exception->getMessage() : 'none'));
+        $this->fail('Unable to parse Inertia data-page attribute. Status: '.$response->getStatusCode().' Exception: '.($response->exception ? $response->exception->getMessage() : 'none'));
     }
 
     public function test_checkout_creates_order_with_server_prices(): void
     {
-        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $this->seed(RolesAndPermissionsSeeder::class);
         $product = $this->onlineProduct('Inverter 5kVA', 200000);
 
         $this->post('/checkout', [
@@ -102,9 +103,35 @@ class CheckoutFlowTest extends TestCase
         ]);
     }
 
+    public function test_guest_can_checkout_without_an_account(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $product = $this->onlineProduct('Inverter 5kVA', 15000);
+
+        $this->post('/checkout', [
+            'customer_name' => 'Guest Shopper',
+            'customer_phone' => '08012345678',
+            'delivery_address' => '14 Akin Street, Ikeja, Lagos',
+            'items' => [
+                ['product_id' => $product->id, 'quantity' => 1],
+            ],
+        ])->assertRedirect();
+
+        $order = Order::latest('id')->first();
+        $this->assertNotNull($order);
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'user_id' => null,
+            'customer_email' => null,
+            'status' => 'pending',
+        ]);
+
+        $this->get('/orders/'.$order->ref_id.'/pay')->assertOk();
+    }
+
     public function test_checkout_rejects_insufficient_stock(): void
     {
-        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $this->seed(RolesAndPermissionsSeeder::class);
         $product = $this->onlineProduct('Small Inverter', 50000, 1);
 
         $this->post('/checkout', [
@@ -119,22 +146,18 @@ class CheckoutFlowTest extends TestCase
         $this->assertDatabaseCount('orders', 0);
     }
 
-    public function test_pay_page_shows_order_balance_and_bank_details(): void
+    public function test_pay_page_shows_order_balance(): void
     {
-        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
-        Setting::create(['key' => 'bank.account_number', 'value' => '5168265608', 'group' => 'bank']);
-        Setting::create(['key' => 'bank.bank_name', 'value' => 'Moniepoint MFB', 'group' => 'bank']);
+        $this->seed(RolesAndPermissionsSeeder::class);
 
         $order = $this->placeOrder();
 
-        $response = $this->get('/orders/' . $order->ref_id . '/pay');
+        $response = $this->get('/orders/'.$order->ref_id.'/pay');
         $response->assertOk();
 
         $page = $this->dataPage($response);
         $this->assertSame($order->ref_id, $page['props']['order']['ref_id']);
         $this->assertSame(15000.0, (float) $page['props']['balance']);
-        $this->assertSame('5168265608', $page['props']['bank']['bank.account_number']);
-        $this->assertSame('Moniepoint MFB', $page['props']['bank']['bank.bank_name']);
     }
 
     public function test_paystack_link_creates_pending_order_payment(): void
@@ -149,7 +172,7 @@ class CheckoutFlowTest extends TestCase
 
         $order = $this->placeOrder();
 
-        $response = $this->postJson('/orders/' . $order->ref_id . '/paystack');
+        $response = $this->postJson('/orders/'.$order->ref_id.'/paystack');
         $response->assertOk()->assertJsonPath('authorization_url', 'https://checkout.paystack.com/order123');
 
         $this->assertDatabaseHas('payments', [
@@ -215,35 +238,9 @@ class CheckoutFlowTest extends TestCase
         $this->assertSame('paid', $order->fresh()->status);
     }
 
-    public function test_offline_payment_pending_then_admin_confirms(): void
-    {
-        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
-        $order = $this->placeOrder();
-
-        $this->post('/orders/' . $order->ref_id . '/offline')->assertRedirect();
-
-        $pending = Payment::where('document_type', 'order')
-            ->where('document_id', $order->id)
-            ->where('gateway', Payment::GATEWAY_LOCAL)
-            ->where('status', Payment::STATUS_PENDING)
-            ->first();
-
-        $this->assertNotNull($pending);
-        $this->assertSame('bank_transfer', $pending->payment_method);
-        $this->assertSame('pending', $order->fresh()->status);
-
-        $owner = $this->owner();
-
-        $this->actingAs($owner)->post("/admin/orders/{$order->id}/pay/{$pending->id}")->assertRedirect();
-
-        $this->assertSame(Payment::STATUS_SUCCESS, $pending->fresh()->status);
-        $this->assertSame('paid', $order->fresh()->status);
-        $this->assertSame($pending->ref_id, $order->fresh()->payment_reference);
-    }
-
     public function test_admin_orders_index_lists_orders_and_requires_auth(): void
     {
-        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $this->seed(RolesAndPermissionsSeeder::class);
         $owner = $this->owner();
         $order = $this->placeOrder();
 

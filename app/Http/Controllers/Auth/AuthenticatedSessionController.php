@@ -33,7 +33,30 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        $user = $request->user();
+
+        // Determine redirect based on user type.
+        // A staff/super-admin user may also hold a trainee record, so the
+        // staff role takes priority: they always land on the admin dashboard.
+        if ($user->role && $user->role->slug === 'buyer') {
+            // Website buyers sign in via /login and land on their account.
+            return redirect(route('buyer.dashboard', absolute: false));
+        }
+
+        if ($user->role && $user->role->slug !== 'trainee') {
+            return redirect(route('admin.dashboard', absolute: false));
+        }
+
+        // Explicitly load trainee relationship to ensure it's available.
+        $user->load('trainee');
+
+        if ($user->trainee) {
+            // Trainee/apprentice -> redirect to portal dashboard
+            return redirect(route('portal.dashboard', absolute: false));
+        }
+
+        // Admin/staff -> redirect to admin dashboard
+        return redirect(route('admin.dashboard', absolute: false));
     }
 
     /**

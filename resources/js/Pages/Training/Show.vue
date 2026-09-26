@@ -1,34 +1,20 @@
 <script setup>
-import { usePage, router } from '@inertiajs/vue3';
+import { usePage, router, Link, Head } from '@inertiajs/vue3';
 import { ref, computed, onMounted } from 'vue';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 
 defineOptions({ layout: PublicLayout });
 
+const origin = window.location.origin;
+
 const props = defineProps({
     training: { type: Object, required: true },
     paystackConfigured: { type: Boolean, default: false },
-    bankDetails: { type: Object, default: () => ({}) },
-    whatsappNumber: { type: String, default: '' },
 });
 
 const hasUser = !!usePage().props.auth?.user;
 const isProcessing = ref(false);
 const paymentError = ref(null);
-
-const bank = computed(() => props.bankDetails || {});
-
-const waNumber = props.whatsappNumber || '2348097089259';
-
-const waLink = computed(() => {
-    const lines = [
-        `Hello Envoy Academy! I just enrolled in "${props.training.title}".`,
-        `Amount: ${formatPrice(props.training.price)}`,
-        `Name: ${usePage().props.auth?.user?.name || ''}`,
-        'Please find my proof of payment below.',
-    ];
-    return `https://wa.me/${waNumber}?text=${encodeURIComponent(lines.filter(Boolean).join('\n'))}`;
-});
 
 const paymentOpen = ref(false);
 const chosenPay = ref('');
@@ -53,10 +39,6 @@ function closePayment() {
 function choose(mode) {
     chosenPay.value = mode;
     enrollError.value = '';
-}
-
-function csrfToken() {
-    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 }
 
 const levelStyles = {
@@ -116,48 +98,10 @@ const handleEnroll = async () => {
     }
 };
 
-const enrollOffline = async () => {
-    enrollBusy.value = true;
-    enrollError.value = '';
-
-    try {
-        const response = await fetch(`/portal/enroll/${props.training.id}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken(),
-                'Accept': 'application/json',
-            },
-            credentials: 'same-origin',
-            body: JSON.stringify({ mode: 'offline' }),
-        });
-
-        const data = await parseJson(response);
-
-        if (!response.ok) {
-            throw new Error(unknownFetchError(response) || data?.message || 'Offline enrollment failed');
-        }
-
-        if (response.url.includes('/portal/')) {
-            window.location.href = '/portal/dashboard';
-            return;
-        }
-
-        window.location.href = '/portal/dashboard';
-    } catch (error) {
-        enrollError.value = error.message;
-        enrollBusy.value = false;
-    }
-};
-
 const confirmPayment = () => {
-    if (!chosenPay.value) return;
-    if (chosenPay.value === 'online') {
-        paymentOpen.value = false;
-        initiatePaystackPayment();
-    } else if (chosenPay.value === 'offline') {
-        enrollOffline();
-    }
+    if (chosenPay.value !== 'online') return;
+    paymentOpen.value = false;
+    initiatePaystackPayment();
 };
 
 const initiatePaystackPayment = async () => {
@@ -222,9 +166,42 @@ const enrollDirectly = async () => {
         isProcessing.value = false;
     }
 };
+
+const courseUrl = computed(() => `${origin}/training/${props.training.id}`);
+
+const pageMetaDescription = computed(() =>
+    String(props.training.description || props.training.title || '').slice(0, 160),
+);
+
+const courseSchema = computed(() => JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'Course',
+    name: props.training.title,
+    description: String(props.training.description || props.training.title || '').slice(0, 300),
+    coursePrerequisites: Array.isArray(props.training.prerequisites) ? props.training.prerequisites.join(', ') : props.training.prerequisites || undefined,
+    startDate: props.training.start_date || undefined,
+    duration: props.training.duration_weeks ? `P${props.training.duration_weeks}W` : undefined,
+    provider: { '@type': 'Organization', name: 'Envoy Electricals', sameAs: origin },
+    offers: {
+        '@type': 'Offer',
+        url: courseUrl.value,
+        priceCurrency: 'NGN',
+        price: String(Number(props.training.price || 0).toFixed(2)),
+        availability: 'https://schema.org/InStock',
+    },
+}));
 </script>
 
 <template>
+    <Head :title="`${training.title} — Solar Training Program | Envoy Solar Academy`">
+        <meta name="description" :content="pageMetaDescription" />
+        <link rel="canonical" :href="courseUrl" />
+        <meta property="og:type" content="article" />
+        <meta property="og:title" :content="`${training.title} — Envoy Solar Academy`" />
+        <meta property="og:description" :content="pageMetaDescription" />
+        <meta property="og:url" :href="courseUrl" />
+        <component is="script" type="application/ld+json">{{ courseSchema }}</component>
+    </Head>
     <div class="min-h-screen bg-[#FAF8F2] font-sans text-slate-800 antialiased">
         <!-- Program Header -->
         <section class="relative bg-gradient-to-b from-slate-50 to-white">
@@ -576,59 +553,26 @@ const enrollDirectly = async () => {
                             </span>
                         </button>
 
-                        <button
-                            @click="choose('offline')"
-                            :disabled="enrollBusy"
-                            class="flex items-center gap-4 rounded-2xl border-[1.5px] px-4 py-3.5 text-left transition disabled:cursor-not-allowed disabled:opacity-50"
-                            :class="chosenPay === 'offline' ? 'border-amber-400 bg-amber-50 shadow-[0_0_0_3px_rgba(251,191,36,0.18)]' : 'border-slate-200 bg-white hover:border-amber-300'"
+                        <Link
+                            :href="`/training/${props.training.id}/pay/bank-transfer`"
+                            class="flex items-center gap-4 rounded-2xl border-[1.5px] border-amber-200 bg-amber-50/60 px-4 py-3.5 text-left transition hover:border-amber-300 hover:shadow-[0_0_0_3px_rgba(251,191,36,0.15)]"
                         >
                             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
                                 <i class="bi bi-bank"></i>
                             </span>
                             <span class="min-w-0">
-                                <span class="block text-sm font-black text-[#0D1527]">Enroll & pay offline</span>
-                                <span class="block text-xs text-slate-500">Bank transfer — your seat is reserved and we confirm once payment clears.</span>
+                                <span class="block text-sm font-black text-[#0D1527]">Pay by Bank Transfer</span>
+                                <span class="block text-xs text-slate-500">A dedicated transfer page with our account details, reference and WhatsApp proof.</span>
                             </span>
-                            <span class="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2" :class="chosenPay === 'offline' ? 'border-amber-400 bg-amber-400 text-[#0D1527]' : 'border-slate-300'">
-                                <i v-if="chosenPay === 'offline'" class="bi bi-check text-xs font-black"></i>
+                            <span class="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0D1527] text-amber-400">
+                                <i class="bi bi-arrow-right text-sm"></i>
                             </span>
-                        </button>
+                        </Link>
                     </div>
 
                     <p v-if="!paystackConfigured" class="mt-3 flex items-center gap-1.5 text-xs font-semibold text-amber-700">
-                        <i class="bi bi-info-circle"></i> Online payment isn't available right now — please choose offline.
+                        <i class="bi bi-info-circle"></i> Online payment isn't available right now — please use bank transfer.
                     </p>
-
-                    <div v-if="chosenPay === 'offline'" class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                        <p class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-amber-700">
-                            <i class="bi bi-bank2"></i> Bank transfer details
-                        </p>
-                        <dl class="mt-2 space-y-1 text-sm">
-                            <div>
-                                <dt class="inline text-slate-500">Account name: </dt>
-                                <dd class="inline font-bold text-[#0D1527]">{{ bank.account_name || 'Envoy Electricals' }}</dd>
-                            </div>
-                            <div>
-                                <dt class="inline text-slate-500">Account number: </dt>
-                                <dd class="inline font-mono font-black text-[#0D1527]">{{ bank.account_number || '5168265608' }}</dd>
-                            </div>
-                            <div>
-                                <dt class="inline text-slate-500">Bank: </dt>
-                                <dd class="inline font-bold text-[#0D1527]">{{ bank.bank_name || 'Moniepoint MFB' }}</dd>
-                            </div>
-                        </dl>
-                        <p v-if="bank.instructions" class="mt-2 text-xs leading-relaxed text-slate-600">{{ bank.instructions }}</p>
-
-                        <a
-                            :href="waLink"
-                            target="_blank"
-                            rel="noopener"
-                            class="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-700 transition-all hover:bg-emerald-100 hover:shadow-[0_6px_20px_rgba(16,185,129,0.25)]"
-                        >
-                            <i class="bi bi-whatsapp text-lg leading-none"></i>
-                            Send proof of payment via WhatsApp
-                        </a>
-                    </div>
 
                     <p v-if="enrollError" class="mt-4 rounded-xl bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-600">{{ enrollError }}</p>
 
@@ -639,12 +583,10 @@ const enrollDirectly = async () => {
                             class="inline-flex flex-1 items-center justify-center gap-2.5 rounded-full bg-[#0D1527] px-5 py-3.5 text-sm font-bold text-white transition-all hover:bg-slate-800 hover:shadow-[0_10px_24px_-8px_rgba(13,21,39,0.5)] disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             <i v-if="enrollBusy" class="bi bi-arrow-repeat animate-spin"></i>
-                            <span v-else-if="chosenPay === 'online'" class="flex items-center gap-2">
+                            <span v-else class="flex items-center gap-2">
                                 Continue to Paystack
                                 <span class="flex h-6 w-6 items-center justify-center rounded-full bg-yellow-400 text-[#0D1527]"><i class="bi bi-arrow-right text-xs font-black"></i></span>
                             </span>
-                            <span v-else-if="chosenPay === 'offline'">Enroll & pay offline</span>
-                            <span v-else>Choose a payment option</span>
                         </button>
                         <button @click="closePayment" class="rounded-full px-4 py-3.5 text-sm font-bold text-slate-500 transition hover:text-[#0D1527]">Cancel</button>
                     </div>

@@ -1,5 +1,5 @@
-﻿<script setup>
-import { ref, watch } from 'vue';
+<script setup>
+import { ref, watch, computed } from 'vue';
 import { useForm, Link } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
@@ -71,6 +71,20 @@ const statusBadge = {
 };
 
 const availableStatuses = () => (activeTab.value === 'calculations' ? props.calc_statuses : props.quotation_statuses);
+
+// Pipeline stats
+const pipelineStats = computed(() => {
+    const calc = props.calculations.data;
+    return {
+        new: calc.filter(c => c.lead_status === 'new').length,
+        contacted: calc.filter(c => c.lead_status === 'contacted').length,
+        quoted: calc.filter(c => c.lead_status === 'quoted').length,
+        approved: calc.filter(c => c.lead_status === 'approved').length,
+        installation: calc.filter(c => c.lead_status === 'installation').length,
+        completed: calc.filter(c => c.lead_status === 'completed').length,
+        lost: calc.filter(c => c.lead_status === 'lost').length,
+    };
+});
 </script>
 
 <template>
@@ -79,6 +93,50 @@ const availableStatuses = () => (activeTab.value === 'calculations' ? props.calc
         title="Solar Leads"
         subtitle="Calculator submissions and quotations from the website."
     />
+
+    <!-- Flow Explanation -->
+    <div class="mb-6 p-4 rounded-xl bg-blue-50 border border-blue-100">
+        <div class="flex items-start gap-3">
+            <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                <i class="bi bi-info-circle text-blue-600 text-sm" />
+            </div>
+            <div class="text-sm text-blue-800 space-y-1">
+                <p class="font-semibold">How Solar Leads Work:</p>
+                <p><strong>Calculator Leads:</strong> Customers submit their power needs via the website calculator. You see their estimated load, recommended system, and price.</p>
+                <p><strong>Pipeline:</strong> New → Contacted → Quoted → Approved → Installation → Completed</p>
+                <p><strong>Creating a Quotation:</strong> Open a lead, click "Create Quotation", select a Solar Package, and send it. The lead auto-moves to "Quoted".</p>
+                <p><strong>Quotations Tab:</strong> Formal quotes sent to customers. Track their status: new → contacted → quoted → approved/declined → converted.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pipeline Visualization (Calculator Leads only) -->
+    <div v-if="activeTab === 'calculations'" class="mb-4 overflow-x-auto">
+        <div class="flex items-center gap-2 min-w-max px-2 pb-2">
+            <div
+                v-for="(status, idx) in [
+                    { key: 'new', label: 'New', color: 'bg-slate-400' },
+                    { key: 'contacted', label: 'Contacted', color: 'bg-sky-400' },
+                    { key: 'quoted', label: 'Quoted', color: 'bg-blue-400' },
+                    { key: 'approved', label: 'Approved', color: 'bg-emerald-400' },
+                    { key: 'installation', label: 'Installation', color: 'bg-amber-400' },
+                    { key: 'completed', label: 'Completed', color: 'bg-emerald-600' },
+                    { key: 'lost', label: 'Lost', color: 'bg-slate-500' },
+                ]"
+                :key="status.key"
+            >
+                <div class="flex flex-col items-center">
+                    <div class="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl border-2 flex items-center justify-center text-white font-bold text-sm" :class="status.color">
+                        {{ pipelineStats[status.key] }}
+                    </div>
+                    <p class="mt-1 text-xs font-medium text-slate-600 text-center">{{ status.label }}</p>
+                </div>
+                <div v-if="idx < 6" class="hidden sm:flex items-center mx-1 text-slate-300">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Tabs -->
     <div class="mb-4 flex items-center gap-1 rounded-xl border border-slate-200/80 bg-white p-1 shadow-xs w-fit">
@@ -100,7 +158,7 @@ const availableStatuses = () => (activeTab.value === 'calculations' ? props.calc
 
     <!-- Filters -->
     <div class="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs sm:flex-row">
-        <input v-model="form.search" type="search" placeholder="Search customer name, phone, email, location, refâ€¦" class="flex-1 rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" @keyup.enter="applyFilters" />
+        <input v-model="form.search" type="search" placeholder="Search customer name, phone, email, location, ref…" class="flex-1 rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" @keyup.enter="applyFilters" />
         <select v-model="form.status" class="rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20">
             <option value="">All statuses</option>
             <option v-for="s in availableStatuses()" :key="s" :value="s">{{ s }}</option>
@@ -127,10 +185,10 @@ const availableStatuses = () => (activeTab.value === 'calculations' ? props.calc
                         <tr v-for="c in calculations.data" :key="c.id" class="hover:bg-slate-50">
                             <td class="px-4 py-3">
                                 <Link :href="`/admin/solar-leads/${c.id}`" class="font-medium text-slate-900 hover:text-slate-600">{{ c.customer_name || 'Anonymous' }}</Link>
-                                <p class="text-xs text-slate-400">{{ c.ref_id }}<span v-if="c.customer_phone"> Â· {{ c.customer_phone }}</span></p>
+                                <p class="text-xs text-slate-400">{{ c.ref_id }}<span v-if="c.customer_phone"> · {{ c.customer_phone }}</span></p>
                             </td>
-                            <td class="px-4 py-3 text-slate-600">{{ c.recommended_inverter || 'â€”' }}</td>
-                            <td class="px-4 py-3 text-right font-semibold text-slate-900">{{ c.estimated_price ? naira(c.estimated_price) : 'â€”' }}</td>
+                            <td class="px-4 py-3 text-slate-600">{{ c.recommended_inverter || '—' }}</td>
+                            <td class="px-4 py-3 text-right font-semibold text-slate-900">{{ c.estimated_price ? naira(c.estimated_price) : '—' }}</td>
                             <td class="px-4 py-3">
                                 <select
                                     :value="c.lead_status"
@@ -179,10 +237,10 @@ const availableStatuses = () => (activeTab.value === 'calculations' ? props.calc
                         <tr v-for="q in quotations.data" :key="q.id" class="hover:bg-slate-50">
                             <td class="px-4 py-3">
                                 <Link :href="`/admin/solar-leads/quotations/${q.id}`" class="font-medium text-slate-900 hover:text-slate-600">{{ q.customer_name || 'Anonymous' }}</Link>
-                                <p class="text-xs text-slate-400">{{ q.ref_id }}<span v-if="q.customer_phone"> Â· {{ q.customer_phone }}</span></p>
+                                <p class="text-xs text-slate-400">{{ q.ref_id }}<span v-if="q.customer_phone"> · {{ q.customer_phone }}</span></p>
                             </td>
-                            <td class="px-4 py-3 text-slate-600">{{ q.recommended_system || 'â€”' }}</td>
-                            <td class="px-4 py-3 text-right font-semibold text-slate-900">{{ q.estimated_price ? naira(q.estimated_price) : 'â€”' }}</td>
+                            <td class="px-4 py-3 text-slate-600">{{ q.recommended_system || '—' }}</td>
+                            <td class="px-4 py-3 text-right font-semibold text-slate-900">{{ q.estimated_price ? naira(q.estimated_price) : '—' }}</td>
                             <td class="px-4 py-3">
                                 <select
                                     :value="q.status"

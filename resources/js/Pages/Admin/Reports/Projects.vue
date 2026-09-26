@@ -1,10 +1,10 @@
-﻿<script setup>
+<script setup>
 import { Link } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
 import PageHeader from '@/Components/PageHeader.vue';
 import Pagination from '@/Components/Pagination.vue';
-import { naira, formatDate, badgeClass } from '@/lib/format';
+import { naira, maskNaira, formatDate, badgeClass } from '@/lib/format';
 
 defineOptions({ layout: AdminLayout });
 
@@ -71,8 +71,8 @@ const statusColors = {
             </div>
             <div class="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Cost / Gross Profit</p>
-                <p class="mt-2 text-2xl font-bold text-slate-900">{{ naira(summary.project_cost) }}</p>
-                <p class="text-xs font-semibold text-emerald-700">{{ naira(summary.gross_profit) }} profit</p>
+                <p class="mt-2 text-2xl font-bold text-slate-900">{{ maskNaira('project_cost', summary.project_cost) }}</p>
+                <p class="text-xs font-semibold text-emerald-700">{{ maskNaira('gross_profit', summary.gross_profit) }} profit</p>
             </div>
         </div>
 
@@ -82,7 +82,7 @@ const statusColors = {
                 <div v-if="by_status.length" class="space-y-3">
                     <div v-for="s in by_status" :key="s.status" class="flex items-center justify-between border-b border-slate-100 pb-2 last:border-0">
                         <span :class="badgeClass(statusColors[s.status])">{{ s.status.replace('_', ' ') }}</span>
-                        <span class="text-sm font-semibold text-slate-900">{{ s.count }} Â· {{ naira(s.profit) }}</span>
+                        <span class="text-sm font-semibold text-slate-900">{{ s.count }} · {{ maskNaira('gross_profit', s.profit) }}</span>
                     </div>
                 </div>
                 <p v-else class="py-8 text-center text-sm text-slate-400">No project data.</p>
@@ -106,15 +106,15 @@ const statusColors = {
                             <tr v-for="p in projects.data" :key="p.id" class="hover:bg-slate-50">
                                 <td class="px-4 py-3">
                                     <Link :href="`/admin/projects/${p.id}`" class="font-medium text-slate-900 hover:text-slate-600">{{ p.name }}</Link>
-                                    <p class="text-xs text-slate-400">{{ p.ref_id }} Â· {{ p.customer?.name || 'No customer' }}</p>
+                                    <p class="text-xs text-slate-400">{{ p.ref_id }} · {{ p.customer?.name || 'No customer' }}</p>
                                 </td>
                                 <td class="px-4 py-3">
                                     <span :class="badgeClass(statusColors[p.status])">{{ p.status.replace('_', ' ') }}</span>
                                 </td>
                                 <td class="px-4 py-3 text-right text-slate-900">{{ naira(p.contract_value) }}</td>
                                 <td class="px-4 py-3 text-right text-emerald-700">{{ naira(p.amount_received) }}</td>
-                                <td class="px-4 py-3 text-right text-slate-700">{{ naira(p.project_cost) }}</td>
-                                <td class="px-4 py-3 text-right font-semibold" :class="p.gross_profit >= 0 ? 'text-emerald-700' : 'text-red-700'">{{ naira(p.gross_profit) }}</td>
+                                <td class="px-4 py-3 text-right text-slate-700">{{ maskNaira('project_cost', p.project_cost) }}</td>
+                                <td class="px-4 py-3 text-right font-semibold" :class="p.gross_profit >= 0 ? 'text-emerald-700' : 'text-red-700'">{{ maskNaira('gross_profit', p.gross_profit) }}</td>
                                 <td class="px-4 py-3 text-right" :class="p.balance > 0 ? 'font-medium text-amber-700' : 'text-slate-500'">{{ naira(p.balance) }}</td>
                             </tr>
                             <tr v-if="!projects.data.length">

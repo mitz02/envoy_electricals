@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Traits\HasStoreScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,14 +10,20 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Project extends Model
 {
-    use SoftDeletes;
+    use HasStoreScope, SoftDeletes;
 
     public const STATUS_DRAFT = 'draft';
+
     public const STATUS_QUOTATION = 'quotation';
+
     public const STATUS_APPROVED = 'approved';
+
     public const STATUS_IN_PROGRESS = 'in_progress';
+
     public const STATUS_INSTALLATION = 'installation';
+
     public const STATUS_COMPLETED = 'completed';
+
     public const STATUS_CANCELLED = 'cancelled';
 
     public const ACTIVE_STATUSES = [
@@ -37,7 +44,7 @@ class Project extends Model
 
     protected $fillable = [
         'ref_id', 'name', 'description', 'customer_id', 'customer_address',
-        'location', 'contract_value', 'material_cost', 'labour_cost',
+        'location', 'store_id', 'contract_value', 'material_cost', 'labour_cost',
         'transport_cost', 'other_cost', 'project_cost', 'amount_received',
         'balance', 'gross_profit', 'start_date', 'expected_completion_date',
         'completion_date', 'status', 'assigned_user_id', 'technician_user_id',
@@ -93,5 +100,10 @@ class Project extends Model
     public function media(): HasMany
     {
         return $this->hasMany(ProjectMedia::class);
+    }
+
+    public function store(): BelongsTo
+    {
+        return $this->belongsTo(Store::class);
     }
 }

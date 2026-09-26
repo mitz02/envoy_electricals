@@ -13,178 +13,214 @@ use App\Models\Purchase;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\Staff;
+use App\Models\Store;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class DashboardController extends Controller
 {
-    public function __invoke(Request $request): \Inertia\Response
+    public function __invoke(Request $request): Response
     {
         $today = Carbon::today();
-        $monthStart = $today->copy()->startOfMonth();
-        $prevMonthStart = $today->copy()->subMonth()->startOfMonth();
-        $prevMonthEnd = $today->copy()->subMonth()->endOfMonth();
+        $storeId = session('admin_store_id');
+        $isAllStores = ! $storeId;
 
-        // 1. Sales & Revenue
-        $todaySales = (float) Sale::where('status', 'completed')->whereDate('sale_date', $today)->sum('total');
-        $todayOrdersCount = Sale::where('status', 'completed')->whereDate('sale_date', $today)->count();
+        // Helper to apply store scope
+        $scope = fn ($query) => $storeId ? $query->where('store_id', $storeId) : $query;
 
-        $monthSales = (float) Sale::where('status', 'completed')->whereDate('sale_date', '>=', $monthStart)->sum('total');
-        $prevMonthSales = (float) Sale::where('status', 'completed')
-            ->whereDate('sale_date', '>=', $prevMonthStart)
-            ->whereDate('sale_date', '<=', $prevMonthEnd)
-            ->sum('total');
-        $salesGrowth = $prevMonthSales > 0 ? round((($monthSales - $prevMonthSales) / $prevMonthSales) * 100, 1) : 18.2;
-
-        $monthCollected = (float) Sale::where('status', 'completed')->whereDate('sale_date', '>=', $monthStart)->sum('amount_paid');
-        $prevMonthCollected = (float) Sale::where('status', 'completed')
-            ->whereDate('sale_date', '>=', $prevMonthStart)
-            ->whereDate('sale_date', '<=', $prevMonthEnd)
-            ->sum('amount_paid');
-        $collectedGrowth = $prevMonthCollected > 0 ? round((($monthCollected - $prevMonthCollected) / $prevMonthCollected) * 100, 1) : 12.5;
-
-        // 2. Cost, Expenses & Profitability
-        $monthCost = (float) Sale::where('status', 'completed')
-            ->whereDate('sale_date', '>=', $monthStart)
-            ->whereHas('items')
-            ->withSum('items as cost', 'unit_cost')
-            ->get()
-            ->sum('cost');
-        $monthGrossProfit = round($monthSales - $monthCost, 2);
-        $monthExpenses = (float) Expense::where('status', 'recorded')->whereDate('expense_date', '>=', $monthStart)->sum('amount');
-        $monthNetProfit = round($monthGrossProfit - $monthExpenses, 2);
-        $profitMargin = $monthSales > 0 ? round(($monthGrossProfit / $monthSales) * 100, 1) : 28.5;
-
-        // 3. Receivables & Payables (Debt Management)
-        $receivables = round((float) Sale::where('status', 'completed')->where('balance', '>', 0)->sum('balance'), 2);
-        $payables = round((float) Purchase::where('status', 'completed')->where('balance', '>', 0)->sum('balance'), 2);
-
-        // 4. Orders Count
-        $monthOrders = Sale::where('status', 'completed')->whereDate('sale_date', '>=', $monthStart)->count();
-
-        // 5. Inventory Valuation & Stock Health
-        $inventoryValue = round((float) Product::query()->sum(DB::raw('current_quantity * average_cost')), 2);
-        $totalProducts = Product::count();
-        $lowStock = Product::query()->where('current_quantity', '>', 0)
-            ->whereRaw('current_quantity <= reorder_level')->count();
-        $outOfStock = Product::where('current_quantity', '<=', 0)->count();
-
-        // 6. Solar & Electrical Projects
-        $activeProjects = Project::whereNotIn('status', ['completed', 'cancelled', 'draft'])->count();
-        $completedProjects = Project::where('status', 'completed')->count();
-        $projectProfit = round((float) Project::whereNotIn('status', ['cancelled'])->sum('gross_profit'), 2);
-        $totalProjectValue = round((float) Project::whereNotIn('status', ['cancelled'])->sum('contract_value'), 2);
-
-        // 7. Staff & Payroll
-        $activeStaff = Staff::where('is_active', true)->count();
-        $monthPayroll = round((float) Payroll::paid()->where('payment_date', '>=', $monthStart)->sum('amount_paid'), 2);
-
-        // 8. Assets
-        $assetsValue = round((float) Asset::where('status', '!=', Asset::STATUS_DISPOSED)->sum('current_value'), 2);
-
-        // 9. Customer Segments Breakdown
-        $retailersCount = Customer::where('customer_type', 'retailer')->count();
-        $distributorsCount = Customer::where('customer_type', 'distributor')->count();
-        $wholesalersCount = Customer::where('customer_type', 'wholesaler')->count();
-        $totalCust = Customer::count();
-
-        $customerBreakdown = [
-            [
-                'label' => 'Retail Customers',
-                'count' => $retailersCount ?: 142,
-                'color' => 'blue',
-                'share' => $totalCust > 0 ? round(($retailersCount / $totalCust) * 100) : 58,
-            ],
-            [
-                'label' => 'Solar Install Clients',
-                'count' => $distributorsCount ?: 48,
-                'color' => 'emerald',
-                'share' => $totalCust > 0 ? round(($distributorsCount / $totalCust) * 100) : 28,
-            ],
-            [
-                'label' => 'Wholesale / Contractors',
-                'count' => $wholesalersCount ?: 26,
-                'color' => 'amber',
-                'share' => $totalCust > 0 ? round(($wholesalersCount / $totalCust) * 100) : 14,
-            ],
+        // ---- Selected reporting period (drives the KPI range) ----
+        $periods = [
+            'today' => ['label' => 'Today',        'start' => fn (Carbon $t) => $t->copy()],
+            'week' => ['label' => 'Last 7 days',  'start' => fn (Carbon $t) => $t->copy()->subDays(6)],
+            'month' => ['label' => 'This Month',   'start' => fn (Carbon $t) => $t->copy()->startOfMonth()],
+            '30days' => ['label' => 'Last 30 days', 'start' => fn (Carbon $t) => $t->copy()->subDays(29)],
+            'year' => ['label' => 'This Year',    'start' => fn (Carbon $t) => $t->copy()->startOfYear()],
         ];
 
-        // 10. Weekday Sales Volume
-        $weekdayTotals = [
-            'Sun' => 450000,
-            'Mon' => 1250000,
-            'Tue' => 2850000,
-            'Wed' => 1650000,
-            'Thu' => 1420000,
-            'Fri' => 1980000,
-            'Sat' => 890000,
-        ];
-
-        $salesByWeekday = Sale::where('status', 'completed')
-            ->whereDate('sale_date', '>=', $today->copy()->subDays(60))
-            ->get()
-            ->groupBy(fn ($s) => $s->sale_date->format('D'));
-
-        foreach (['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as $day) {
-            if (isset($salesByWeekday[$day]) && $salesByWeekday[$day]->count() > 0) {
-                $weekdayTotals[$day] = round($salesByWeekday[$day]->sum('total'));
-            }
+        $periodKey = (string) $request->query('period');
+        if (! array_key_exists($periodKey, $periods)) {
+            $periodKey = 'month';
         }
 
-        $maxWeekdayValue = max($weekdayTotals);
-        $peakDay = 'Tue';
-        foreach ($weekdayTotals as $day => $val) {
-            if ($val === $maxWeekdayValue) {
+        $rangeStart = $periods[$periodKey]['start']($today);
+        $rangeLabel = $periods[$periodKey]['label'];
+
+        $elapsedDays = (int) $rangeStart->diffInDays($today) + 1;
+        $prevRangeStart = $rangeStart->copy()->subDays($elapsedDays);
+        $prevRangeEnd = $rangeStart->copy()->subDay();
+
+        // ---- Sales & revenue ----
+        $salesBetween = fn ($from, $to) => (float) $scope(Sale::where('status', 'completed'))
+            ->whereBetween('sale_date', [$from, $to])
+            ->sum('total');
+
+        $rangeSales = $salesBetween($rangeStart, $today);
+        $prevRangeSales = $salesBetween($prevRangeStart, $prevRangeEnd);
+
+        $todaySales = $salesBetween($today, $today);
+        $todayOrdersCount = $scope(Sale::where('status', 'completed'))->whereDate('sale_date', $today)->count();
+        $rangeOrdersCount = $scope(Sale::where('status', 'completed'))->whereBetween('sale_date', [$rangeStart, $today])->count();
+
+        $rangeCollected = (float) $scope(Sale::where('status', 'completed'))
+            ->whereBetween('sale_date', [$rangeStart, $today])
+            ->sum('amount_paid');
+        $prevRangeCollected = (float) $scope(Sale::where('status', 'completed'))
+            ->whereBetween('sale_date', [$prevRangeStart, $prevRangeEnd])
+            ->sum('amount_paid');
+
+        $growth = fn (float $current, float $previous) => $previous > 0
+            ? round((($current - $previous) / $previous) * 100, 1)
+            : ($current > 0 ? 100 : 0);
+
+        $salesGrowth = $growth($rangeSales, $prevRangeSales);
+        $collectedGrowth = $growth($rangeCollected, $prevRangeCollected);
+
+        // ---- Cost of goods, expenses & profit ----
+        $rangeCost = (float) SaleItem::query()
+            ->whereHas('sale', fn ($q) => $scope($q->where('status', 'completed'))
+                ->whereBetween('sale_date', [$rangeStart, $today]))
+            ->sum(DB::raw('unit_cost * quantity'));
+
+        $rangeGrossProfit = round($rangeSales - $rangeCost, 2);
+        $rangeExpenses = (float) $scope(Expense::where('status', 'recorded'))
+            ->whereBetween('expense_date', [$rangeStart, $today])
+            ->sum('amount');
+        $rangeNetProfit = round($rangeGrossProfit - $rangeExpenses, 2);
+        $profitMargin = $rangeSales > 0 ? round(($rangeGrossProfit / $rangeSales) * 100, 1) : 0;
+
+        // ---- Receivables & payables ----
+        $receivables = round((float) $scope(Sale::where('status', 'completed'))->where('balance', '>', 0)->sum('balance'), 2);
+        $payables = round((float) $scope(Purchase::where('status', 'completed'))->where('balance', '>', 0)->sum('balance'), 2);
+
+        // ---- Inventory & stock health ----
+        if ($isAllStores) {
+            $inventoryValue = round((float) Product::sum(DB::raw('current_quantity * average_cost')), 2);
+            $totalProducts = Product::count();
+            $lowStock = Product::where('current_quantity', '>', 0)
+                ->whereRaw('current_quantity <= reorder_level')
+                ->count();
+            $outOfStock = Product::where('current_quantity', '<=', 0)->count();
+        } else {
+            $inventoryValue = round((float) DB::table('product_store')
+                ->where('store_id', $storeId)
+                ->sum(DB::raw('current_quantity * average_cost')), 2);
+            $totalProducts = DB::table('product_store')
+                ->where('store_id', $storeId)
+                ->distinct('product_id')
+                ->count('product_id');
+            $lowStock = DB::table('product_store')
+                ->where('store_id', $storeId)
+                ->where('current_quantity', '>', 0)
+                ->whereRaw('current_quantity <= reorder_level')
+                ->count();
+            $outOfStock = DB::table('product_store')
+                ->where('store_id', $storeId)
+                ->where('current_quantity', '<=', 0)
+                ->count();
+        }
+
+        // ---- Solar & electrical projects ----
+        $activeProjects = $scope(Project::whereNotIn('status', ['completed', 'cancelled', 'draft']))->count();
+        $completedProjects = $scope(Project::where('status', 'completed'))->count();
+        $projectProfit = round((float) $scope(Project::whereNotIn('status', ['cancelled']))->sum('gross_profit'), 2);
+        $totalProjectValue = round((float) $scope(Project::whereNotIn('status', ['cancelled']))->sum('contract_value'), 2);
+
+        // ---- Staff, payroll & assets ----
+        $activeStaff = $scope(Staff::where('is_active', true))->count();
+        $rangePayroll = round((float) Payroll::paid()->whereHas('staff', fn ($q) => $scope($q))->where('payment_date', '>=', $rangeStart)->sum('amount_paid'), 2);
+        $assetsValue = round((float) $scope(Asset::where('status', '!=', Asset::STATUS_DISPOSED))->sum('current_value'), 2);
+
+        // ---- Customer segments (walk_in / regular / corporate) ----
+        $totalCustomers = $scope(Customer::query())->count();
+        $segmentCounts = $scope(Customer::query())
+            ->selectRaw('customer_type, COUNT(*) as c')
+            ->groupBy('customer_type')
+            ->pluck('c', 'customer_type');
+
+        $customerBreakdown = collect([
+            ['key' => 'walk_in',   'label' => 'Walk-in Customers', 'color' => 'blue'],
+            ['key' => 'regular',   'label' => 'Regular Customers', 'color' => 'emerald'],
+            ['key' => 'corporate', 'label' => 'Corporate Clients', 'color' => 'amber'],
+        ])->map(function (array $segment) use ($segmentCounts, $totalCustomers) {
+            $count = (int) ($segmentCounts[$segment['key']] ?? 0);
+
+            return [
+                'label' => $segment['label'],
+                'count' => $count,
+                'color' => $segment['color'],
+                'share' => $totalCustomers > 0 ? round(($count / $totalCustomers) * 100) : 0,
+            ];
+        })->values()->all();
+
+        // ---- Weekday sales volume (last 60 days) ----
+        $weekdaySales = ['Sun' => 0, 'Mon' => 0, 'Tue' => 0, 'Wed' => 0, 'Thu' => 0, 'Fri' => 0, 'Sat' => 0];
+
+        $scope(Sale::where('status', 'completed'))
+            ->whereBetween('sale_date', [$today->copy()->subDays(60), $today])
+            ->orderBy('sale_date')
+            ->get(['sale_date', 'total'])
+            ->each(function ($sale) use (&$weekdaySales) {
+                $weekdaySales[$sale->sale_date->format('D')] += (float) $sale->total;
+            });
+
+        $maxWeekdayValue = max($weekdaySales);
+        $peakDay = null;
+        foreach ($weekdaySales as $day => $val) {
+            if ($val > 0 && $val === $maxWeekdayValue) {
                 $peakDay = $day;
                 break;
             }
         }
 
-        $weekdayData = collect($weekdayTotals)->map(function ($val, $day) use ($peakDay, $maxWeekdayValue) {
+        $weekdayData = collect($weekdaySales)->map(function ($val, $day) use ($peakDay, $maxWeekdayValue) {
             return [
                 'day' => $day,
-                'value' => $val,
-                'is_peak' => $day === $peakDay,
-                'height_pct' => $maxWeekdayValue > 0 ? round(($val / $maxWeekdayValue) * 100) : 30,
+                'value' => round($val),
+                'is_peak' => $day === $peakDay && $val > 0,
+                'height_pct' => $maxWeekdayValue > 0 ? round(($val / $maxWeekdayValue) * 100) : 0,
             ];
         })->values()->all();
 
-        // 11. 30-Day Spline Curve Trend
-        $dailyPoints = 30;
+        // ---- 30-day sales trend (current vs same window last month) ----
+        $trendStart = $today->copy()->subDays(29);
+        $prevTrendStart = $trendStart->copy()->subDays(30);
+        $prevTrendEnd = $trendStart->copy()->subDay();
+
+        $currentByDate = $scope(Sale::where('status', 'completed'))
+            ->whereBetween('sale_date', [$trendStart, $today])
+            ->get(['sale_date', 'total'])
+            ->groupBy(fn ($s) => $s->sale_date->toDateString())
+            ->map(fn ($group) => (float) $group->sum('total'));
+
+        $prevByDate = $scope(Sale::where('status', 'completed'))
+            ->whereBetween('sale_date', [$prevTrendStart, $prevTrendEnd])
+            ->get(['sale_date', 'total'])
+            ->groupBy(fn ($s) => $s->sale_date->toDateString())
+            ->map(fn ($group) => (float) $group->sum('total'));
+
         $trendCurve = [];
-        for ($i = $dailyPoints - 1; $i >= 0; $i--) {
+        for ($i = 29; $i >= 0; $i--) {
             $date = $today->copy()->subDays($i);
             $prevDate = $date->copy()->subMonth();
-
-            $currentSales = (float) Sale::where('status', 'completed')
-                ->whereDate('sale_date', $date)
-                ->sum('total');
-
-            $previousSales = (float) Sale::where('status', 'completed')
-                ->whereDate('sale_date', $prevDate)
-                ->sum('total');
-
-            $baseMultiplier = 250000 + (sin($i * 0.45) * 120000) + (cos($i * 0.25) * 180000) + ($i * 12000);
-            $finalCurrent = $currentSales > 0 ? $currentSales : max(round($baseMultiplier + rand(-40000, 60000)), 120000);
-            $finalPrevious = $previousSales > 0 ? $previousSales : max(round(($baseMultiplier * 0.78) + rand(-30000, 40000)), 90000);
 
             $trendCurve[] = [
                 'day' => $date->format('j'),
                 'date_label' => $date->format('M j, Y'),
                 'short_label' => $date->format('j M'),
-                'current' => $finalCurrent,
-                'previous' => $finalPrevious,
+                'current' => (float) ($currentByDate[$date->toDateString()] ?? 0),
+                'previous' => (float) ($prevByDate[$prevDate->toDateString()] ?? 0),
             ];
         }
 
-        // 12. Repeat Customer Rate
-        $repeatCustomers = Customer::has('sales', '>=', 2)->count();
-        $repeatCustomerRate = $totalCust > 0 ? round(($repeatCustomers / $totalCust) * 100) : 68;
+        // ---- Repeat customer rate ----
+        $repeatCustomers = $scope(Customer::has('sales', '>=', 2))->count();
+        $repeatCustomerRate = $totalCustomers > 0 ? round(($repeatCustomers / $totalCustomers) * 100) : 0;
 
-        // 13. Active Solar & Electrical Projects
-        $recentProjects = Project::with('customer')
+        // ---- Recent feeds (real records only) ----
+        $recentProjects = $scope(Project::with('customer'))
             ->latest('start_date')
             ->take(5)
             ->get()
@@ -200,58 +236,7 @@ class DashboardController extends Controller
                 'start_date' => $p->start_date?->format('d M, Y') ?? 'N/A',
             ]);
 
-        // Fallback realistic solar projects if DB is empty
-        if ($recentProjects->isEmpty()) {
-            $recentProjects = collect([
-                [
-                    'id' => 1,
-                    'ref_id' => 'PROJ-2026-00001',
-                    'name' => '10kVA Solar Hybrid Commercial Setup',
-                    'status' => 'in_progress',
-                    'contract_value' => 6850000,
-                    'gross_profit' => 1950000,
-                    'balance' => 1200000,
-                    'customer' => 'Apex Microfinance Bank',
-                    'start_date' => '02 Feb, 2026',
-                ],
-                [
-                    'id' => 2,
-                    'ref_id' => 'PROJ-2026-00002',
-                    'name' => '5kVA Residential Solar Backup System',
-                    'status' => 'installation',
-                    'contract_value' => 3450000,
-                    'gross_profit' => 880000,
-                    'balance' => 0,
-                    'customer' => 'Chief Emeka Okonkwo',
-                    'start_date' => '05 Feb, 2026',
-                ],
-                [
-                    'id' => 3,
-                    'ref_id' => 'PROJ-2026-00003',
-                    'name' => '3.5kVA Inverter & Lithium Battery Retrofit',
-                    'status' => 'approved',
-                    'contract_value' => 2100000,
-                    'gross_profit' => 540000,
-                    'balance' => 500000,
-                    'customer' => 'Dr. Mrs. Funke Adeyemi',
-                    'start_date' => '08 Feb, 2026',
-                ],
-                [
-                    'id' => 4,
-                    'ref_id' => 'PROJ-2026-00004',
-                    'name' => 'Complete Duplex Conduit & Panel Installation',
-                    'status' => 'completed',
-                    'contract_value' => 4200000,
-                    'gross_profit' => 1250000,
-                    'balance' => 0,
-                    'customer' => 'Engr. Tunde Bakare',
-                    'start_date' => '15 Jan, 2026',
-                ],
-            ]);
-        }
-
-        // 14. Recent Sales Transactions
-        $recentSales = Sale::with(['customer', 'salesperson'])
+        $recentSales = $scope(Sale::with(['customer', 'salesperson']))
             ->where('status', 'completed')
             ->latest('sale_date')
             ->take(6)
@@ -267,8 +252,7 @@ class DashboardController extends Controller
                 'payment_method' => $sale->payment_method ?? 'Transfer',
             ]);
 
-        // 15. Recent Purchases
-        $recentPurchases = Purchase::with('supplier')
+        $recentPurchases = $scope(Purchase::with('supplier'))
             ->where('status', 'completed')
             ->latest('purchase_date')
             ->take(5)
@@ -282,8 +266,7 @@ class DashboardController extends Controller
                 'balance' => $p->balance,
             ]);
 
-        // 16. Recent Expenses
-        $recentExpenses = Expense::with('category')
+        $recentExpenses = $scope(Expense::with('category'))
             ->where('status', 'recorded')
             ->latest('expense_date')
             ->take(5)
@@ -297,106 +280,66 @@ class DashboardController extends Controller
                 'amount' => $e->amount,
             ]);
 
-        // 17. Top Fast-Moving Solar & Electrical Products
-        $topProductsQuery = SaleItem::query()
-            ->whereHas('sale', fn ($q) => $q->where('status', 'completed')->whereDate('sale_date', '>=', $monthStart))
+        // ---- Top fast-moving products (this period) ----
+        $topProducts = SaleItem::query()
+            ->whereHas('sale', fn ($q) => $scope($q->where('status', 'completed'))->whereBetween('sale_date', [$rangeStart, $today]))
             ->with(['product.category'])
             ->select('product_id')
             ->selectRaw('SUM(quantity) as qty, SUM(total) as revenue')
             ->groupBy('product_id')
             ->orderByDesc('revenue')
             ->take(5)
-            ->get();
+            ->get()
+            ->map(function ($row) use ($storeId) {
+                $product = $row->product;
+                $stock = 0;
+                $reorder = 0;
+                $sellingPrice = 0;
 
-        $topProducts = $topProductsQuery->map(function ($r) {
-            $p = $r->product;
-            return [
-                'id' => $p?->ref_id ?? ('EV-PROD-'.str_pad($r->product_id, 6, '0', STR_PAD_LEFT)),
-                'name' => $p?->name ?? 'Hybrid Solar Inverter 5.5kVA',
-                'category' => $p?->category?->name ?? 'Solar Inverter',
-                'qty' => (int) $r->qty,
-                'revenue' => round((float) $r->revenue, 2),
-                'price' => $p?->selling_price ?? 450000,
-                'stock' => $p?->current_quantity ?? 14,
-                'reorder' => $p?->reorder_level ?? 5,
-                'sku' => $p?->sku ?? 'INV-5500-HYB',
-            ];
-        });
+                if ($storeId && $product) {
+                    $pivot = $product->stores()->where('store_id', $storeId)->first();
+                    if ($pivot) {
+                        $stock = $pivot->pivot->current_quantity ?? 0;
+                        $reorder = $pivot->pivot->reorder_level ?? 0;
+                        $sellingPrice = $pivot->pivot->selling_price ?? $product->selling_price;
+                    }
+                } else {
+                    $stock = $product?->current_quantity ?? 0;
+                    $reorder = $product?->reorder_level ?? 0;
+                    $sellingPrice = $product?->selling_price ?? 0;
+                }
 
-        // Fallback default realistic Envoy Electric products if DB is fresh
-        if ($topProducts->isEmpty()) {
-            $topProducts = collect([
-                [
-                    'id' => 'EV-SOL-00010',
-                    'name' => 'Felicity Solar Hybrid Inverter 5.5kVA / 48V',
-                    'category' => 'Solar Inverters',
-                    'qty' => 18,
-                    'revenue' => 14850000,
-                    'price' => 825000,
-                    'stock' => 12,
-                    'reorder' => 4,
-                    'sku' => 'FEL-HYB-5500',
-                ],
-                [
-                    'id' => 'EV-SOL-00018',
-                    'name' => 'Lithium LiFePO4 Wall-Mount Battery 10.2kWh',
-                    'category' => 'Solar Batteries',
-                    'qty' => 14,
-                    'revenue' => 28700000,
-                    'price' => 2050000,
-                    'stock' => 8,
-                    'reorder' => 3,
-                    'sku' => 'BAT-LFP-10K',
-                ],
-                [
-                    'id' => 'EV-SOL-00024',
-                    'name' => 'Jinko Mono Perc 550W Tier-1 Solar Panel',
-                    'category' => 'Solar Panels',
-                    'qty' => 120,
-                    'revenue' => 12600000,
-                    'price' => 105000,
-                    'stock' => 64,
-                    'reorder' => 20,
-                    'sku' => 'PNL-550-JNK',
-                ],
-                [
-                    'id' => 'EV-ELE-00042',
-                    'name' => 'Coleman 16mm Pure Copper 4-Core Armoured Cable (100m)',
-                    'category' => 'Cables & Wiring',
-                    'qty' => 22,
-                    'revenue' => 7920000,
-                    'price' => 360000,
-                    'stock' => 15,
-                    'reorder' => 5,
-                    'sku' => 'CBL-ARM-16MM',
-                ],
-                [
-                    'id' => 'EV-SOL-00031',
-                    'name' => 'SRNE Smart MPPT Solar Charge Controller 80A / 150V',
-                    'category' => 'Solar Accessories',
-                    'qty' => 26,
-                    'revenue' => 4290000,
-                    'price' => 165000,
-                    'stock' => 18,
-                    'reorder' => 6,
-                    'sku' => 'CTRL-SRNE-80A',
-                ],
-            ]);
-        }
+                return [
+                    'id' => $product?->ref_id ?? 'EV-PROD-'.str_pad((string) $row->product_id, 6, '0', STR_PAD_LEFT),
+                    'name' => $product?->name ?? 'Product #'.$row->product_id,
+                    'category' => $product?->category?->name ?? 'General',
+                    'qty' => (int) $row->qty,
+                    'revenue' => round((float) $row->revenue, 2),
+                    'price' => $sellingPrice,
+                    'stock' => $stock,
+                    'reorder' => $reorder,
+                    'sku' => $product?->sku ?? '',
+                ];
+            })
+            ->values();
 
         $allowedProfit = $request->user()->hasPermission('reports.profit');
 
         return Inertia::render('Admin/Dashboard', [
+            'period' => $periodKey,
             'stats' => [
+                'period' => $periodKey,
+                'period_label' => $rangeLabel,
                 'today_sales' => $todaySales,
                 'today_orders_count' => $todayOrdersCount,
-                'month_sales' => $monthSales,
+                'month_sales' => $rangeSales,
+                'range_orders_count' => $rangeOrdersCount,
                 'sales_growth' => $salesGrowth,
-                'month_collected' => $monthCollected,
+                'month_collected' => $rangeCollected,
                 'collected_growth' => $collectedGrowth,
-                'month_expenses' => $monthExpenses,
-                'month_gross_profit' => $allowedProfit ? $monthGrossProfit : null,
-                'month_net_profit' => $allowedProfit ? $monthNetProfit : null,
+                'month_expenses' => $rangeExpenses,
+                'month_gross_profit' => $allowedProfit ? $rangeGrossProfit : null,
+                'month_net_profit' => $allowedProfit ? $rangeNetProfit : null,
                 'profit_margin' => $profitMargin,
                 'receivables' => $allowedProfit ? $receivables : null,
                 'payables' => $allowedProfit ? $payables : null,
@@ -409,7 +352,7 @@ class DashboardController extends Controller
                 'project_profit' => $allowedProfit ? $projectProfit : null,
                 'total_project_value' => $totalProjectValue,
                 'active_staff' => $activeStaff,
-                'month_payroll' => $allowedProfit ? $monthPayroll : null,
+                'month_payroll' => $allowedProfit ? $rangePayroll : null,
                 'assets_value' => $allowedProfit ? $assetsValue : null,
             ],
             'trend_curve' => $trendCurve,

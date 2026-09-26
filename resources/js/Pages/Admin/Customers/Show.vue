@@ -56,6 +56,16 @@ const { has } = useCan();
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Contact</p>
                 <p class="mt-2 text-sm font-semibold text-slate-700">{{ customer.phone || 'No phone' }}</p>
                 <p class="text-xs text-slate-400">{{ customer.email || 'No email' }}</p>
+                <p class="mt-2">
+                    <span v-if="customer.store" class="inline-flex items-center gap-1 rounded-full bg-[#40e0d0]/10 px-2.5 py-0.5 text-xs font-semibold text-[#0D1527]">
+                        <i class="bi bi-shop text-[10px]"></i>
+                        {{ customer.store.name }}
+                    </span>
+                    <span v-else class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500">
+                        <i class="bi bi-globe2 text-[10px]"></i>
+                        Unassigned
+                    </span>
+                </p>
             </div>
         </div>
 

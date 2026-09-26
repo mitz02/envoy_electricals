@@ -9,6 +9,7 @@ use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class WebsiteController extends Controller
 {
@@ -40,7 +41,7 @@ class WebsiteController extends Controller
         ],
     ];
 
-    public function index(): \Inertia\Response
+    public function index(): Response
     {
         return Inertia::render('Admin/Website/Settings', [
             'fields' => $this->fields,
@@ -76,7 +77,7 @@ class WebsiteController extends Controller
 
     // ---------- Media Library ----------
 
-    public function media(Request $request): \Inertia\Response
+    public function media(Request $request): Response
     {
         $media = Media::query()
             ->with('uploader:id,name')

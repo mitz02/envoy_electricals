@@ -9,10 +9,11 @@ use App\Services\AuditLogger;
 use App\Services\ReferenceGenerator;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class AssetController extends Controller
 {
-    public function index(Request $request): \Inertia\Response
+    public function index(Request $request): Response
     {
         $assets = Asset::query()
             ->when($request->search, fn ($q, $s) => $q->where(function ($q) use ($s) {
@@ -46,7 +47,7 @@ class AssetController extends Controller
         ]);
     }
 
-    public function create(): \Inertia\Response
+    public function create(): Response
     {
         return Inertia::render('Admin/Assets/Form', [
             'asset' => null,
@@ -68,7 +69,7 @@ class AssetController extends Controller
         return redirect()->route('admin.assets.show', $asset->id)->with('success', 'Asset added to the register.');
     }
 
-    public function show(Asset $asset): \Inertia\Response
+    public function show(Asset $asset): Response
     {
         return Inertia::render('Admin/Assets/Show', [
             'asset' => $asset->loadCount('maintenances'),
@@ -77,7 +78,7 @@ class AssetController extends Controller
         ]);
     }
 
-    public function edit(Asset $asset): \Inertia\Response
+    public function edit(Asset $asset): Response
     {
         return Inertia::render('Admin/Assets/Form', [
             'asset' => $asset,

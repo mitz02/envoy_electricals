@@ -1,8 +1,10 @@
 <script setup>
-import { Link } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 
 defineOptions({ layout: PublicLayout });
+
+const origin = window.location.origin;
 
 const props = defineProps({
     packages: { type: Array, required: true },
@@ -11,9 +13,21 @@ const props = defineProps({
 function naira(v) {
     return '₦' + Number(v || 0).toLocaleString('en-NG');
 }
+
+function imageSrc(path) {
+    return path?.startsWith('/images/') ? path : `/storage/${path}`;
+}
+
+function firstImage(pkg) {
+    return pkg.images?.[0]?.media?.path ?? null;
+}
 </script>
 
 <template>
+    <Head title="Solar Installation Packages & Complete Home Power Systems in Nigeria | Envoy Electricals">
+        <meta name="description" content="Complete solar packages from ₦650,000 — panels, inverter, battery, mounting and protection gear with installation by Envoy Electricals. Available across Nigeria." />
+        <link rel="canonical" :href="origin + '/packages'" />
+    </Head>
     <header class="bg-[#0D1527] text-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
             <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight">Complete Solar Packages</h1>
@@ -30,6 +44,22 @@ function naira(v) {
                 :class="pkg.is_featured ? 'border-amber-400 ring-2 ring-amber-400/20' : 'border-slate-200/80'"
             >
                 <div v-if="pkg.is_featured" class="absolute top-4 right-4 rounded-full bg-amber-400 px-3 py-1 text-[10px] font-black uppercase tracking-wide text-slate-950">Popular</div>
+
+                <!-- Package Image -->
+                <div class="aspect-[4/3] overflow-hidden bg-slate-100">
+                    <img
+                        v-if="firstImage(pkg)"
+                        :src="imageSrc(firstImage(pkg))"
+                        :alt="pkg.name"
+                        class="w-full h-full object-cover"
+                    />
+                    <img
+                        v-else
+                        src="/images/landing/solar_products.jpg"
+                        :alt="pkg.name"
+                        class="w-full h-full object-cover"
+                    />
+                </div>
 
                 <div class="p-6 sm:p-8">
                     <h2 class="text-xl font-extrabold text-slate-950">{{ pkg.name }}</h2>
@@ -65,10 +95,20 @@ function naira(v) {
                 </div>
 
                 <div class="p-6 sm:p-8 pt-0 mt-auto">
-                    <Link
-                        :href="`/calculator?package=${pkg.id}`"
-                        class="block w-full rounded-xl bg-[#0D1527] py-3.5 text-center text-sm font-bold text-white hover:bg-amber-400 hover:text-slate-950 transition-colors"
-                    >Get Free Quote</Link>
+                    <div class="flex gap-3">
+                        <Link
+                            :href="`/packages/${pkg.id}`"
+                            class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-[#0D1527] py-3.5 text-center text-sm font-bold text-white hover:bg-amber-400 hover:text-slate-950 transition-colors"
+                        >
+                            <i class="bi bi-cart-check" /> Buy Now
+                        </Link>
+                        <Link
+                            :href="`/calculator?package=${pkg.id}`"
+                            class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white py-3.5 text-center text-sm font-bold text-slate-700 hover:bg-slate-50 hover:border-amber-400 transition-colors"
+                        >
+                            Get Free Quote
+                        </Link>
+                    </div>
                     <p v-if="pkg.availability === 'unavailable'" class="mt-2 text-center text-xs font-semibold text-red-500">Currently unavailable — reserved for approved leads</p>
                 </div>
             </div>

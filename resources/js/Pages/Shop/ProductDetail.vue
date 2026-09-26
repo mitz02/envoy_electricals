@@ -1,11 +1,13 @@
-<script setup>
+﻿<script setup>
 import { ref, computed } from 'vue';
-import { Link } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { addItem } from '@/lib/cart';
 import { naira, stockStatusLabel } from '@/lib/format';
 
 defineOptions({ layout: PublicLayout });
+
+const origin = window.location.origin;
 
 const props = defineProps({
     product: { type: Object, required: true },
@@ -42,9 +44,53 @@ function relatedImage(p) {
     return img ? imageUrl(img) : '/images/landing/solar_products.jpg';
 }
 
+const productUrl = computed(() => `${origin}/shop/${props.product.id}`);
+
+const pageMetaDescription = computed(() =>
+    String(props.product.description || props.product.name || '').slice(0, 160),
+);
+
+const productImage = computed(() => {
+    const img = props.product.images?.find((i) => i.is_featured) || props.product.images?.[0];
+    return img ? imageUrl(img) : `${origin}/images/landing/solar_products.jpg`;
+});
+
+const productSchema = computed(() => {
+    const schema = {
+        '@context': 'https://schema.org',
+        '@type': 'Product',
+        name: props.product.name,
+        image: productImage.value,
+        description: String(props.product.description || props.product.name || '').slice(0, 300),
+        sku: props.product.sku || undefined,
+        brand: props.product.brand?.name ? { '@type': 'Brand', name: props.product.brand.name } : undefined,
+        category: props.product.category?.name,
+        offers: {
+            '@type': 'Offer',
+            url: productUrl.value,
+            priceCurrency: 'NGN',
+            price: String(Number(props.product.selling_price || 0).toFixed(2)),
+            availability: isOutOfStock() ? 'https://schema.org/OutOfStock' : 'https://schema.org/InStock',
+            itemCondition: 'https://schema.org/NewCondition',
+            seller: { '@type': 'Organization', name: 'Envoy Electricals' },
+        },
+    };
+    return JSON.stringify(schema);
+});
+
 const specRows = computed(() => {
     const rows = [];
-    if (props.product.brand) rows.push({ label: 'Brand', value: props.product.brand });
+    const structured = Array.isArray(props.product.specifications_json)
+        ? props.product.specifications_json
+        : parseLegacySpecs(props.product.specifications);
+    if (structured.length) {
+        structured.forEach((s) => {
+            if (s?.label && s?.value) {
+                rows.push({ label: s.label, value: s.value });
+            }
+        });
+    }
+    if (props.product.brand?.name) rows.push({ label: 'Brand', value: props.product.brand.name });
     if (props.product.sku) rows.push({ label: 'SKU', value: props.product.sku });
     if (props.product.unit) rows.push({ label: 'Unit', value: props.product.unit });
     if (props.product.category?.name) rows.push({ label: 'Category', value: props.product.category.name });
@@ -61,13 +107,34 @@ const features = computed(() => {
     if (props.product.is_featured) f.push('Envoy best-seller');
     if (!isOutOfStock()) f.push('Ready for same-day dispatch');
     f.push('Quality-checked before delivery');
-    if (props.product.brand) f.push(`Brand: ${props.product.brand}`);
+    if (props.product.brand?.name) f.push(`Brand: ${props.product.brand.name}`);
     if (props.product.unit) f.push(`Sold in: ${props.product.unit}`);
     return f;
 });
+
+function parseLegacySpecs(text) {
+    if (typeof text !== 'string' || !text.trim()) return [];
+    return text
+        .split(/\r?\n/)
+        .map((line) => {
+            const [label, ...rest] = line.split(':');
+            return { label: (label ?? '').trim(), value: rest.join(':').trim() };
+        })
+        .filter((s) => s.label && s.value);
+}
 </script>
 
 <template>
+    <Head :title="`${product.name} — Solar & Electrical Supplies | Envoy Electricals`">
+        <meta name="description" :content="pageMetaDescription" />
+        <link rel="canonical" :href="productUrl" />
+        <meta property="og:type" content="product" />
+        <meta property="og:title" :content="`${product.name} — Envoy Electricals`" />
+        <meta property="og:description" :content="pageMetaDescription" />
+        <meta property="og:url" :href="productUrl" />
+        <meta property="og:image" :content="productImage" />
+        <component is="script" type="application/ld+json">{{ productSchema }}</component>
+    </Head>
     <!-- ======================= TOP BAR / BREADCRUMB ======================= -->
     <div class="bg-[#0D1527]">
         <div class="max-w-7xl mx-auto px-6 sm:px-12 lg:px-16 py-3.5">
@@ -100,7 +167,7 @@ const features = computed(() => {
                         {{ product.name }}
                     </h1>
                     <p class="mt-1 text-[13px] text-slate-500">
-                        Brand: <span class="font-bold text-slate-700">{{ product.brand || 'Envoy' }}</span>
+                        Brand: <span class="font-bold text-slate-700">{{ product.brand?.name || 'Envoy' }}</span>
                         <span v-if="product.category" class="mx-1.5 text-slate-300">•</span>
                         <Link v-if="product.category" :href="`/shop?category=${product.category.id}`" class="text-[#40e0d0] hover:underline">
                             Similar products from {{ product.category.name }}
@@ -251,15 +318,6 @@ const features = computed(() => {
                                 </div>
                             </div>
                             <div class="flex items-start gap-4 px-6 py-4">
-                                <div class="w-10 h-10 shrink-0 rounded-xl bg-[#40e0d0]/10 flex items-center justify-center mt-0.5">
-                                    <svg class="w-5 h-5 text-[#40e0d0]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7l8-4z" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                                </div>
-                                <div class="flex-1">
-                                    <p class="text-sm font-bold text-slate-800">Return Policy</p>
-                                    <p class="mt-0.5 text-xs text-slate-400 leading-relaxed">Free return or replacement within 7 days for eligible items — as long as they remain unused and in original packaging.</p>
-                                </div>
-                            </div>
-                            <div class="flex items-start gap-4 px-6 py-4">
                                 <div class="w-10 h-10 shrink-0 rounded-xl bg-yellow-400/10 flex items-center justify-center mt-0.5">
                                     <svg class="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                 </div>
@@ -302,7 +360,7 @@ const features = computed(() => {
 
                         <!-- Spec table -->
                         <dl class="divide-y divide-slate-100">
-                            <div v-for="row in specRows" :key="row.label" class="grid grid-cols-[140px_1fr] sm:grid-cols-[200px_1fr] gap-4 px-6 sm:px-8 py-3.5">
+                            <div v-for="(row, i) in specRows" :key="i" class="grid grid-cols-[140px_1fr] sm:grid-cols-[200px_1fr] gap-4 px-6 sm:px-8 py-3.5">
                                 <dt class="text-xs font-semibold text-slate-400">{{ row.label }}</dt>
                                 <dd class="text-sm font-bold text-slate-800">{{ row.value }}</dd>
                             </div>
@@ -320,7 +378,7 @@ const features = computed(() => {
                                 <svg class="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1.4 14.2L6.8 12.4l1.4-1.4 2.6 2.6 4.4-4.4 1.4 1.4-6 6z"/></svg>
                             </div>
                             <div>
-                                <p class="text-sm font-extrabold text-slate-900">Envoy Electric</p>
+                                <p class="text-sm font-extrabold text-slate-900">Envoy Electricals</p>
                                 <p class="text-[11px] text-slate-400">Official Solar Store</p>
                             </div>
                         </div>
@@ -387,7 +445,7 @@ const features = computed(() => {
                         <div class="relative h-40 sm:h-44 overflow-hidden bg-slate-100">
                             <img :src="relatedImage(p)" :alt="p.name" loading="lazy" class="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105" />
                             <span class="absolute top-3 left-3 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-800">
-                                {{ p.category?.name || p.brand || 'Envoy' }}
+                                {{ p.category?.name || p.brand?.name || 'Envoy' }}
                             </span>
                         </div>
                         <div class="flex flex-1 flex-col p-4">

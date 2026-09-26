@@ -11,12 +11,13 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class OrderController extends Controller
 {
     public function __construct(protected OrderService $orders) {}
 
-    public function index(Request $request): \Inertia\Response
+    public function index(Request $request): Response
     {
         $orders = Order::query()
             ->withCount('items')
@@ -49,7 +50,7 @@ class OrderController extends Controller
         ]);
     }
 
-    public function show(Order $order): \Inertia\Response
+    public function show(Order $order): Response
     {
         $order->load(['items.product:id,name,sku', 'payments' => fn ($q) => $q->latest('id')]);
 
@@ -89,17 +90,14 @@ class OrderController extends Controller
 
     public function deliver(Request $request, Order $order): RedirectResponse
     {
-        if (! in_array($order->status, ['paid', 'processing', 'completed'])) {
-            return back()->with('error', 'Order must be paid before it can be marked as delivered.');
+        try {
+            $order = $this->orders->fulfillOrder($order, $request->user()->id);
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors());
         }
 
-        $order->update([
-            'fulfillment' => 'delivered',
-            'status' => 'completed',
-        ]);
+        AuditLogger::log('updated', 'order', $order->id, "Order {$order->ref_id} fulfilled and stock deducted.");
 
-        AuditLogger::log('updated', 'order', $order->id, "Order {$order->ref_id} marked as delivered.");
-
-        return back()->with('success', "Order {$order->ref_id} marked as delivered.");
+        return back()->with('success', "Order {$order->ref_id} fulfilled and stock updated.");
     }
 }

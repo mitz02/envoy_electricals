@@ -9,14 +9,13 @@ defineOptions({ layout: AdminLayout });
 
 const props = defineProps({
     staff: { type: Object, default: null },
-    users: { type: Array, default: () => [] },
+    roles: { type: Array, default: () => [] },
 });
 
 const editing = computed(() => Boolean(props.staff));
 
 const form = useForm({
     name: props.staff?.name ?? '',
-    position: props.staff?.position ?? '',
     phone: props.staff?.phone ?? '',
     email: props.staff?.email ?? '',
     date_joined: props.staff?.date_joined ?? '',
@@ -24,7 +23,9 @@ const form = useForm({
     housing_allowance: props.staff?.housing_allowance ?? '',
     transport_allowance: props.staff?.transport_allowance ?? '',
     other_allowance: props.staff?.other_allowance ?? '',
-    user_id: props.staff?.user_id ?? '',
+    role_id: props.staff?.user?.role_id ?? '',
+    password: '',
+    password_confirmation: '',
     is_active: props.staff ? Boolean(props.staff.is_active) : true,
     notes: props.staff?.notes ?? '',
 });
@@ -64,10 +65,6 @@ function submit() {
                         <p v-if="form.errors.name" class="mt-1 text-xs text-red-600">{{ form.errors.name }}</p>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-slate-700">Position</label>
-                        <input v-model="form.position" type="text" class="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" />
-                    </div>
-                    <div>
                         <label class="block text-sm font-medium text-slate-700">Date joined</label>
                         <input v-model="form.date_joined" type="date" class="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" />
                     </div>
@@ -76,8 +73,8 @@ function submit() {
                         <input v-model="form.phone" type="tel" class="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" />
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-slate-700">Email</label>
-                        <input v-model="form.email" type="email" class="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" />
+                        <label class="block text-sm font-medium text-slate-700">Email {{ editing ? '' : '*' }}</label>
+                        <input v-model="form.email" type="email" :required="!editing" class="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" />
                         <p v-if="form.errors.email" class="mt-1 text-xs text-red-600">{{ form.errors.email }}</p>
                     </div>
                 </div>
@@ -107,11 +104,12 @@ function submit() {
 
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div>
-                        <label class="block text-sm font-medium text-slate-700">Linked login account</label>
-                        <select v-model="form.user_id" class="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20">
-                            <option value="">No linked account</option>
-                            <option v-for="u in users" :key="u.id" :value="u.id">{{ u.name }} ({{ u.email }})</option>
+                        <label class="block text-sm font-medium text-slate-700">Login role *</label>
+                        <select v-model="form.role_id" :required="!editing" class="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20">
+                            <option value="">Select a role</option>
+                            <option v-for="role in roles" :key="role.id" :value="role.id">{{ role.name }}</option>
                         </select>
+                        <p v-if="form.errors.role_id" class="mt-1 text-xs text-red-600">{{ form.errors.role_id }}</p>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-slate-700">Status</label>
@@ -119,6 +117,17 @@ function submit() {
                             <option :value="true">Active</option>
                             <option :value="false">Inactive</option>
                         </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700">Password {{ editing ? '' : '*' }}</label>
+                        <input v-model="form.password" type="password" autocomplete="new-password" :required="!editing" class="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" />
+                        <p v-if="form.errors.password" class="mt-1 text-xs text-red-600">{{ form.errors.password }}</p>
+                        <p v-if="editing" class="mt-1 text-xs text-slate-400">Leave blank to keep the current password.</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700">Confirm password {{ editing ? '' : '*' }}</label>
+                        <input v-model="form.password_confirmation" type="password" autocomplete="new-password" :required="!editing" class="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" />
+                        <p v-if="form.errors.password_confirmation" class="mt-1 text-xs text-red-600">{{ form.errors.password_confirmation }}</p>
                     </div>
                 </div>
 

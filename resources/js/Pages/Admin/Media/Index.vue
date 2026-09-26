@@ -1,4 +1,4 @@
-﻿<script setup>
+<script setup>
 import { ref } from 'vue';
 import { useForm, Link } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
@@ -89,7 +89,7 @@ function isImage(m) {
     />
 
     <div class="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs sm:flex-row">
-        <input v-model="form.search" type="search" placeholder="Search mediaâ€¦" class="flex-1 rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" @keyup.enter="applyFilters" />
+        <input v-model="form.search" type="search" placeholder="Search media…" class="flex-1 rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" @keyup.enter="applyFilters" />
         <select v-model="form.category" class="rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" @change="applyFilters">
             <option value="">All categories</option>
             <option v-for="c in categories" :key="c" :value="c">{{ c }}</option>
@@ -118,7 +118,7 @@ function isImage(m) {
             </div>
             <div class="p-2.5">
                 <p class="truncate text-xs font-semibold text-slate-800">{{ m.name }}</p>
-                <p class="text-[10px] text-slate-400">{{ formatDate(m.created_at) }}<span v-if="m.uploader"> Â· {{ m.uploader.name }}</span></p>
+                <p class="text-[10px] text-slate-400">{{ formatDate(m.created_at) }}<span v-if="m.uploader"> · {{ m.uploader.name }}</span></p>
                 <div class="mt-1.5 flex gap-1">
                     <button class="rounded-md px-1.5 py-0.5 text-[11px] font-medium text-slate-600 hover:bg-slate-100" @click="openDetail(m)">Edit</button>
                     <a :href="mediaUrl(m)" target="_blank" class="rounded-md px-1.5 py-0.5 text-[11px] font-medium text-slate-600 hover:bg-slate-100">View</a>

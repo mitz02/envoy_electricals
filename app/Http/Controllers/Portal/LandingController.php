@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Portal;
 
 use App\Http\Controllers\Controller;
+use App\Models\Certificate;
 use App\Models\Training;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -29,7 +30,7 @@ class LandingController extends Controller
             ]),
             'stats' => [
                 'programs' => $programs->count(),
-                'graduates' => \App\Models\Certificate::issued()->count(),
+                'graduates' => Certificate::issued()->count(),
             ],
         ]);
     }

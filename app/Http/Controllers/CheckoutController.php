@@ -15,10 +15,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use Inertia\Response;
 
 /**
  * Public storefront checkout: create an order from the client-side cart and
- * accept payment via Paystack or via an offline bank transfer.
+ * accept payment via Paystack.
  */
 class CheckoutController extends Controller
 {
@@ -27,12 +28,12 @@ class CheckoutController extends Controller
         protected PaystackService $paystack
     ) {}
 
-    public function cart(): \Inertia\Response
+    public function cart(): Response
     {
         return Inertia::render('Storefront/Cart');
     }
 
-    public function checkout(): \Inertia\Response
+    public function checkout(): Response
     {
         return Inertia::render('Storefront/Checkout');
     }
@@ -65,7 +66,7 @@ class CheckoutController extends Controller
             ->with('success', "Order {$order->ref_id} placed! Complete payment to confirm your order.");
     }
 
-    public function pay(Order $order): \Inertia\Response
+    public function pay(Order $order): Response
     {
         $order->load(['items.product.images']);
 
@@ -76,7 +77,11 @@ class CheckoutController extends Controller
             'balance' => $this->orders->balance($order),
             'paystackConfigured' => $this->paystack->isConfigured(),
             'businessEmail' => Setting::where('key', 'business.email')->value('value'),
-            'bank' => Setting::where('group', 'bank')->pluck('value', 'key'),
+            'whatsappNumber' => preg_replace('/\D/', '', (string) Setting::where('key', 'business.phone')->value('value')),
+            'bankAccountName' => Setting::where('key', 'bank.account_name')->value('value'),
+            'bankAccountNumber' => Setting::where('key', 'bank.account_number')->value('value'),
+            'bankName' => Setting::where('key', 'bank.bank_name')->value('value'),
+            'bankInstructions' => Setting::where('key', 'bank.instructions')->value('value'),
         ]);
     }
 
@@ -128,15 +133,15 @@ class CheckoutController extends Controller
             status: Payment::STATUS_PENDING,
         );
 
-        // An already-initialized reference cannot be re-initialized with Paystack
-        // (duplicate_reference). Give this attempt a fresh reference so retries work.
-        if ($payment->gateway_reference) {
-            $payment->forceFill(['ref_id' => ReferenceGenerator::generate('payment')])->save();
-        }
+        // Generate a fresh reference for THIS Paystack attempt.
+        // We do NOT save it to the payment yet - only after Paystack succeeds.
+        // This avoids "Duplicate Transaction Reference" if the call fails and user retries.
+        // Add timestamp + random to avoid collisions with previous test runs on Paystack test mode.
+        $paystackReference = ReferenceGenerator::generate('payment').'-'.bin2hex(random_bytes(4));
 
         try {
             $response = $this->paystack->initialize(
-                reference: $payment->ref_id,
+                reference: $paystackReference,
                 amount: $balance,
                 email: $email,
                 callbackUrl: route('orders.pay', $order->ref_id),
@@ -150,10 +155,10 @@ class CheckoutController extends Controller
             $detail = $e->getMessage();
             if (method_exists($e, 'response') && $e->response) {
                 $json = $e->response->json();
-                $detail .= ' :: ' . ($json['message'] ?? $e->response->body());
+                $detail .= ' :: '.($json['message'] ?? $e->response->body());
             }
 
-            Log::error('Paystack initialize failed: ' . $detail, ['payment' => $payment->ref_id]);
+            Log::error('Paystack initialize failed: '.$detail, ['payment' => $payment->ref_id]);
 
             return response()->json(['message' => 'Could not reach Paystack. Please try again.'], 502);
         }
@@ -164,26 +169,70 @@ class CheckoutController extends Controller
             return response()->json(['message' => 'Paystack did not return a payment link.'], 502);
         }
 
-        $payment->update(['gateway_reference' => $payment->ref_id]);
+        // Only now update the payment with the successful Paystack reference
+        $payment->update([
+            'gateway_reference' => $paystackReference,
+            'ref_id' => $paystackReference,
+        ]);
 
         return response()->json([
             'authorization_url' => $response['data']['authorization_url'],
-            'reference' => $payment->ref_id,
+            'reference' => $paystackReference,
         ]);
     }
 
     /**
-     * Confirm an offline bank transfer intent. The order's payment stays pending
-     * until an admin verifies the transfer and confirms it.
+     * Verify a Paystack payment from the callback URL.
+     * Called by the frontend when user returns from Paystack with reference/trxref params.
      */
-    public function offline(Request $request, Order $order): RedirectResponse
+    public function verify(Request $request, Order $order): JsonResponse
     {
-        if (in_array($order->status, ['cancelled', 'refunded']) || $this->orders->balance($order) <= 0) {
-            return back()->with('error', 'This order is no longer payable.');
+        $reference = $request->query('reference') ?? $request->query('trxref');
+
+        if (! $reference) {
+            return response()->json(['success' => false, 'message' => 'No payment reference provided.'], 400);
         }
 
-        $this->orders->requestOffline($order, $request->user()?->id);
+        if (! $this->paystack->isConfigured()) {
+            return response()->json(['success' => false, 'message' => 'Paystack is not configured.'], 503);
+        }
 
-        return back()->with('success', "Transfer confirmed! We'll verify your payment and update order {$order->ref_id} shortly.");
+        try {
+            $verification = $this->paystack->verify($reference);
+        } catch (\Throwable $e) {
+            Log::error('Paystack verify failed: '.$e->getMessage(), ['reference' => $reference]);
+
+            return response()->json(['success' => false, 'message' => 'Could not verify payment.'], 502);
+        }
+
+        $statusOk = $this->paystack->isSuccessfulVerification($verification);
+
+        if (! $statusOk) {
+            return response()->json(['success' => false, 'message' => 'Payment not successful.']);
+        }
+
+        // Find and mark the payment as successful
+        $payment = Payment::where('document_type', 'order')
+            ->where('document_id', $order->id)
+            ->where('gateway', Payment::GATEWAY_PAYSTACK)
+            ->where(function ($q) use ($reference) {
+                $q->where('gateway_reference', $reference)->orWhere('ref_id', $reference);
+            })
+            ->first();
+
+        if ($payment && $payment->status !== Payment::STATUS_SUCCESS) {
+            $amountOk = ((int) ($verification['data']['amount'] ?? 0)) === (int) round((float) $payment->amount * 100);
+            if ($amountOk) {
+                $this->orderService->receivePayment(
+                    order: $order,
+                    amount: (float) $payment->amount,
+                    method: 'paystack',
+                    userId: $payment->created_by,
+                    payment: $payment,
+                );
+            }
+        }
+
+        return response()->json(['success' => true, 'message' => 'Payment verified successfully.']);
     }
 }

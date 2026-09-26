@@ -2,22 +2,71 @@
 
 namespace App\Services;
 
-use App\Models\Payroll;
 use App\Models\Payment;
+use App\Models\Payroll;
+use App\Models\Role;
 use App\Models\Staff;
+use App\Models\Store;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 use RuntimeException;
 
 class StaffService
 {
     public function create(array $data, int $userId): Staff
     {
-        return DB::transaction(function () use ($data, $userId) {
+        return DB::transaction(function () use ($data) {
+            $user = null;
+
+            if (! empty($data['user_id'])) {
+                $user = User::find($data['user_id']);
+            }
+
+            if ($user === null) {
+                if (empty($data['password']) || empty($data['role_id'])) {
+                    throw new InvalidArgumentException(
+                        'A password and role_id are required to create the staff login account.'
+                    );
+                }
+
+                $role = Role::find($data['role_id']);
+                $allowedStoreIds = $role?->allowedStoreIds() ?? [];
+
+                $user = User::create([
+                    'name' => $data['name'],
+                    'email' => $data['email'],
+                    'password' => $data['password'],
+                    'role_id' => $data['role_id'],
+                    'is_active' => true,
+                    'store_id' => $allowedStoreIds[0] ?? null,
+                ]);
+
+                app(UserMailService::class)->newAccount($user, $data['password'], 'staff');
+            }
+
+            // Sync store access based on role's allowed_store_ids
+            $this->syncStoreAccessFromRole($user, $data);
+
+            // Whitelist the fields explicitly — the caller array may also carry
+            // login-only keys (password, role_id) that must never land on the
+            // staff row, and seeding runs with mass assignment unguarded.
             $staff = Staff::create([
-                ...$data,
+                'name' => $data['name'],
+                'phone' => $data['phone'] ?? null,
+                'email' => $data['email'],
+                'date_joined' => $data['date_joined'] ?? null,
+                'base_salary' => (float) ($data['base_salary'] ?? 0),
+                'housing_allowance' => (float) ($data['housing_allowance'] ?? 0),
+                'transport_allowance' => (float) ($data['transport_allowance'] ?? 0),
+                'other_allowance' => (float) ($data['other_allowance'] ?? 0),
+                'is_active' => $data['is_active'] ?? true,
+                'notes' => $data['notes'] ?? null,
+                'user_id' => $user->id,
                 'ref_id' => ReferenceGenerator::generate('staff'),
             ]);
 
+            AuditLogger::log('created', 'user', $user->id, "Created login account for staff {$staff->ref_id}: {$staff->name} ({$user->email})");
             AuditLogger::log('created', 'staff', $staff->id, "Created staff {$staff->ref_id}: {$staff->name}");
 
             return $staff;
@@ -26,11 +75,117 @@ class StaffService
 
     public function update(Staff $staff, array $data, int $userId): Staff
     {
-        $staff->update($data);
+        $this->syncLoginAccount($staff, $data);
+
+        $staff->update([
+            'name' => $data['name'],
+            'phone' => $data['phone'] ?? null,
+            'email' => $data['email'],
+            'date_joined' => $data['date_joined'] ?? null,
+            'base_salary' => $data['base_salary'],
+            'housing_allowance' => (float) ($data['housing_allowance'] ?? 0),
+            'transport_allowance' => (float) ($data['transport_allowance'] ?? 0),
+            'other_allowance' => (float) ($data['other_allowance'] ?? 0),
+            'is_active' => $data['is_active'] ?? $staff->is_active,
+            'notes' => $data['notes'] ?? null,
+        ]);
 
         AuditLogger::log('updated', 'staff', $staff->id, "Updated staff {$staff->ref_id}: {$staff->name}");
 
         return $staff;
+    }
+
+    protected function syncLoginAccount(Staff $staff, array $data): void
+    {
+        if (! $staff->user) {
+            return;
+        }
+
+        $userData = [];
+
+        if (array_key_exists('name', $data)) {
+            $userData['name'] = $data['name'];
+        }
+
+        if (array_key_exists('email', $data)) {
+            $userData['email'] = $data['email'];
+        }
+
+        if (! empty($data['password'])) {
+            $userData['password'] = $data['password'];
+        }
+
+        if (array_key_exists('role_id', $data) && $data['role_id']) {
+            $userData['role_id'] = $data['role_id'];
+        }
+
+        if ($userData) {
+            $staff->user->update($userData);
+
+            AuditLogger::log('updated', 'user', $staff->user->id, "Updated login account for staff {$staff->ref_id}: {$staff->name} ({$staff->user->email})");
+        }
+
+        // Sync store access based on role's allowed_store_ids
+        $this->syncStoreAccessFromRole($staff->user, $data);
+    }
+
+    /**
+     * Sync the user's store access based on their role's allowed_store_ids.
+     * This ensures store access is tied to the role, not set individually per staff.
+     */
+    protected function syncStoreAccessFromRole(User $user, array $data): void
+    {
+        // Get the role_id from data or user
+        $roleId = $data['role_id'] ?? $user->role_id ?? null;
+
+        if (! $roleId) {
+            return;
+        }
+
+        $role = Role::find($roleId);
+
+        if (! $role) {
+            return;
+        }
+
+        $allowedStoreIds = $role->allowedStoreIds();
+
+        // If role has no store restrictions, user sees all branches
+        if ($allowedStoreIds === null) {
+            // User is unrestricted - clear any store restrictions
+            if ($user->stores()->exists()) {
+                $user->allowedStores()->detach();
+
+                AuditLogger::log(
+                    'updated',
+                    'user',
+                    $user->id,
+                    "Set branch access for {$user->email} to: all branches (role has no restrictions)"
+                );
+            }
+
+            return;
+        }
+
+        // Role has specific allowed stores - sync user to match
+        $currentStoreIds = $user->stores()->pluck('stores.id')->map(fn ($id) => (int) $id)->all();
+
+        if ($allowedStoreIds === $currentStoreIds) {
+            return; // Already in sync
+        }
+
+        $user->syncAllowedStores($allowedStoreIds);
+
+        $names = $allowedStoreIds === []
+            ? 'all branches'
+            : Store::whereIn('id', $allowedStoreIds)->orderBy('name')->pluck('name')->implode(', ');
+
+        AuditLogger::log(
+            'updated',
+            'user',
+            $user->id,
+            "Set branch access for {$user->email} to: {$names} (via role {$role->name})"
+        );
     }
 
     public function destroy(Staff $staff, int $userId): void
@@ -143,7 +298,7 @@ class StaffService
 
     public function void(Payroll $payroll, int $userId): void
     {
-        DB::transaction(function () use ($payroll, $userId) {
+        DB::transaction(function () use ($payroll) {
             if ($payroll->status === Payroll::STATUS_PAID) {
                 $payroll->payments()->update(['status' => Payment::STATUS_REVERSED]);
             }

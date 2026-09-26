@@ -1,11 +1,13 @@
 <script setup>
 import { ref, reactive, computed } from 'vue';
-import { Link, router } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { addItem } from '@/lib/cart';
 import { naira, stockStatusLabel } from '@/lib/format';
 
 defineOptions({ layout: PublicLayout });
+
+const origin = window.location.origin;
 
 const props = defineProps({
     products: { type: Object, required: true },
@@ -135,15 +137,21 @@ function applyPreset(p) {
     state.maxPrice = p.to;
     apply({ page: 1 });
 }
-
-const heroFeatured = computed(() => props.products.data.slice(0, 2));
 </script>
 
 <template>
+    <Head title="Shop Solar Panels, Inverters, Batteries & Electrical Supplies in Nigeria | Envoy Electricals">
+        <meta name="description" content="Buy genuine solar panels, inverters, lithium batteries, cables, breakers and electrical accessories online at Envoy Electricals, Akure. Nationwide delivery, installation and warranty included." />
+        <link rel="canonical" :href="origin + '/shop'" />
+        <meta property="og:title" content="Shop Solar Panels, Inverters & Batteries in Nigeria | Envoy Electricals" />
+        <meta property="og:description" content="Genuine solar and electrical equipment with nationwide delivery, professional installation and warranty." />
+    </Head>
     <!-- ======================= HERO ======================= -->
     <section class="relative bg-[#0D1527] overflow-hidden">
         <!-- Background accents -->
         <div class="absolute inset-0 pointer-events-none" aria-hidden="true">
+            <img src="/images/landing/hero_solar_panels.jpg" alt="" class="absolute inset-0 w-full h-full object-cover opacity-50" />
+            <div class="absolute inset-0 bg-gradient-to-r from-[#0D1527] via-[#0D1527]/85 to-[#0D1527]/45"></div>
             <div class="absolute inset-0" style="background-image:linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px); background-size:56px 56px;"></div>
             <div class="absolute -top-40 -right-32 w-[560px] h-[560px] rounded-full bg-yellow-400/[0.07] blur-[110px]"></div>
             <div class="absolute top-1/3 -left-40 w-[480px] h-[480px] rounded-full bg-[#40e0d0]/[0.06] blur-[110px]"></div>
@@ -151,8 +159,7 @@ const heroFeatured = computed(() => props.products.data.slice(0, 2));
         </div>
 
         <div class="relative max-w-7xl mx-auto px-6 sm:px-12 lg:px-16 pt-16 sm:pt-24 pb-24 sm:pb-36">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-14 items-center">
-                <div class="relative z-10">
+            <div class="relative z-10 max-w-3xl">
                     <div class="inline-flex items-center gap-2.5 mb-6">
                         <span class="w-10 h-[2px] bg-[#40e0d0]"></span>
                         <span class="text-[#40e0d0] text-[11px] font-bold uppercase tracking-[0.25em]">Solar Shop</span>
@@ -195,66 +202,6 @@ const heroFeatured = computed(() => props.products.data.slice(0, 2));
                         </span>
                     </div>
                 </div>
-
-                <!-- Decorative showcase -->
-                <div class="hidden lg:flex relative items-center justify-center h-[480px]" aria-hidden="true">
-                    <!-- Rotating sun rays -->
-                    <div class="absolute inset-0 flex items-center justify-center">
-                        <svg class="shop-rays w-[560px] h-[560px] opacity-50" viewBox="0 0 200 200">
-                            <g stroke="#FACC15" stroke-width="2.5" stroke-linecap="round">
-                                <line x1="100" y1="4" x2="100" y2="30" />
-                                <line x1="100" y1="170" x2="100" y2="196" />
-                                <line x1="4" y1="100" x2="30" y2="100" />
-                                <line x1="170" y1="100" x2="196" y2="100" />
-                                <line x1="32" y1="32" x2="51" y2="51" />
-                                <line x1="149" y1="149" x2="168" y2="168" />
-                                <line x1="32" y1="168" x2="51" y2="149" />
-                                <line x1="168" y1="32" x2="149" y2="51" />
-                            </g>
-                            <circle cx="100" cy="100" r="34" fill="#FACC15" opacity="0.14" />
-                        </svg>
-                    </div>
-                    <div class="absolute w-80 h-80 rounded-full border border-white/10"></div>
-                    <div class="absolute w-52 h-52 rounded-full border border-[#40e0d0]/20"></div>
-
-                    <!-- Main product card -->
-                    <div v-if="heroFeatured[0]" class="hero-float relative bg-white rounded-3xl border border-slate-100 shadow-2xl p-4 w-64">
-                        <div class="rounded-2xl overflow-hidden bg-[#FAF8F2] border border-slate-100">
-                            <img :src="imageFor(heroFeatured[0])" :alt="heroFeatured[0].name" class="w-full h-40 object-cover" />
-                        </div>
-                        <div class="flex items-center justify-between pt-3.5">
-                            <div>
-                                <p class="text-[10px] font-bold uppercase tracking-widest text-[#40e0d0]">{{ heroFeatured[0].brand || 'Envoy' }}</p>
-                                <p class="text-sm font-extrabold text-slate-900 line-clamp-1">{{ heroFeatured[0].name }}</p>
-                            </div>
-                            <span class="rounded-lg bg-yellow-400 px-2 py-1 text-[10px] font-black text-slate-950">HOT</span>
-                        </div>
-                        <p class="mt-2 text-lg font-black text-[#40e0d0]">{{ naira(heroFeatured[0].selling_price) }}</p>
-                    </div>
-
-                    <!-- Floating mini card -->
-                    <div v-if="heroFeatured[1]" class="hero-float-delay absolute -right-2 top-8 bg-white rounded-2xl shadow-2xl border border-slate-100 p-3 flex items-center gap-3 w-56">
-                        <div class="w-16 h-16 rounded-xl overflow-hidden bg-[#FAF8F2] border border-slate-100 shrink-0">
-                            <img :src="imageFor(heroFeatured[1])" :alt="heroFeatured[1].name" class="w-full h-full object-cover" />
-                        </div>
-                        <div class="min-w-0">
-                            <p class="text-xs font-extrabold text-slate-900 line-clamp-1">{{ heroFeatured[1].name }}</p>
-                            <p class="text-sm font-black text-[#40e0d0] mt-0.5">{{ naira(heroFeatured[1].selling_price) }}</p>
-                        </div>
-                    </div>
-
-                    <!-- Floating chip -->
-                    <div class="hero-float-delay absolute bottom-8 -left-6 bg-[#0D1527] text-white rounded-2xl px-5 py-3.5 shadow-2xl flex items-center gap-3 border border-white/10">
-                        <span class="w-10 h-10 rounded-xl bg-[#40e0d0]/15 flex items-center justify-center">
-                            <svg class="w-5 h-5 text-[#40e0d0]" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M6 7h12l-1 13H7L6 7zM9 7a3 3 0 0 1 6 0" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                        </span>
-                        <div>
-                            <p class="text-[10px] uppercase text-slate-400 font-bold tracking-widest">In store</p>
-                            <p class="text-base font-black text-yellow-400">{{ products.total }}+ Products</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
 
         <!-- Wave transition into content -->
@@ -475,7 +422,7 @@ const heroFeatured = computed(() => props.products.data.slice(0, 2));
                                 <div class="absolute top-3 left-3 flex flex-col gap-1.5">
                                     <span
                                         class="rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-800 backdrop-blur-sm"
-                                    >{{ product.brand || (product.category?.name || 'Envoy') }}</span>
+                                    >{{ product.brand?.name || (product.category?.name || 'Envoy') }}</span>
                                     <span
                                         v-if="product.is_featured"
                                         class="rounded-full bg-yellow-400 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-950"
@@ -644,33 +591,5 @@ const heroFeatured = computed(() => props.products.data.slice(0, 2));
 @keyframes slideIn {
     from { transform: translateX(100%); }
     to { transform: translateX(0); }
-}
-
-@keyframes shopSpin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-}
-
-@keyframes shopFloat {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-14px); }
-}
-
-@keyframes shopFloatDelayed {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(12px); }
-}
-
-.shop-rays {
-    animation: shopSpin 45s linear infinite;
-    transform-origin: center center;
-}
-
-.hero-float {
-    animation: shopFloat 6s ease-in-out infinite;
-}
-
-.hero-float-delay {
-    animation: shopFloatDelayed 7.5s ease-in-out 1.2s infinite;
 }
 </style>

@@ -1,8 +1,8 @@
-<script setup>
+﻿<script setup>
 import { useForm, Link } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
-import { naira, badgeClass } from '@/lib/format';
+import { naira, maskNaira, badgeClass } from '@/lib/format';
 import { useCan } from '@/composables/permissions';
 
 defineOptions({ layout: AdminLayout });
@@ -57,7 +57,7 @@ const statusClasses = {
                     <div class="flex items-center gap-2">
                         <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-400 font-black text-slate-900">E</span>
                         <div>
-                            <p class="text-sm font-bold text-slate-900">Envoy Electric</p>
+                            <p class="text-sm font-bold text-slate-900">Envoy Electricals</p>
                             <p class="text-xs text-slate-400">Payslip {{ payroll.ref_id }}</p>
                         </div>
                     </div>
@@ -71,29 +71,29 @@ const statusClasses = {
             <div class="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-2">
                 <div class="rounded-lg bg-slate-50 p-4">
                     <p class="text-xs text-slate-500">Base salary</p>
-                    <p class="mt-1 text-lg font-semibold text-slate-900">{{ naira(payroll.base_salary) }}</p>
+                    <p class="mt-1 text-lg font-semibold text-slate-900">{{ maskNaira('salary', payroll.base_salary) }}</p>
                 </div>
                 <div class="rounded-lg bg-slate-50 p-4">
                     <p class="text-xs text-slate-500">Allowance</p>
-                    <p class="mt-1 text-lg font-semibold text-slate-900">{{ naira(payroll.allowance) }}</p>
+                    <p class="mt-1 text-lg font-semibold text-slate-900">{{ maskNaira('salary', payroll.allowance) }}</p>
                 </div>
                 <div class="rounded-lg bg-emerald-50 p-4">
                     <p class="text-xs text-emerald-600">Bonus</p>
-                    <p class="mt-1 text-lg font-semibold text-emerald-700">{{ naira(payroll.bonus) }}</p>
+                    <p class="mt-1 text-lg font-semibold text-emerald-700">{{ maskNaira('salary', payroll.bonus) }}</p>
                 </div>
                 <div class="rounded-lg bg-amber-50 p-4">
                     <p class="text-xs text-amber-600">Advance (−)</p>
-                    <p class="mt-1 text-lg font-semibold text-amber-700">{{ naira(payroll.advance) }}</p>
+                    <p class="mt-1 text-lg font-semibold text-amber-700">{{ maskNaira('salary', payroll.advance) }}</p>
                 </div>
                 <div class="rounded-lg bg-red-50 p-4">
                     <p class="text-xs text-red-600">Deduction (−)</p>
-                    <p class="mt-1 text-lg font-semibold text-red-700">-{{ naira(payroll.deduction) }}</p>
+                    <p class="mt-1 text-lg font-semibold text-red-700">-{{ maskNaira('salary', payroll.deduction) }}</p>
                 </div>
             </div>
 
             <div class="mt-4 flex items-center justify-between rounded-xl bg-[#0D1527] px-5 py-4 text-white">
                 <span class="text-sm font-medium text-slate-300">Net pay</span>
-                <span class="text-2xl font-bold">{{ naira(payroll.amount_paid) }}</span>
+                <span class="text-2xl font-bold">{{ maskNaira('salary', payroll.amount_paid) }}</span>
             </div>
 
             <dl class="mt-5 grid grid-cols-2 gap-3 text-sm">

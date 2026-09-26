@@ -43,7 +43,9 @@ const loginFeatures = [
         subtitle="Continue your solar journey — access your quotes, orders and account dashboard."
         :features="loginFeatures"
     >
-        <Head title="Log in" />
+        <Head title="Log in">
+            <meta name="robots" content="noindex, nofollow" />
+        </Head>
 
         <!-- Header -->
         <div class="mb-8">
@@ -160,5 +162,6 @@ const loginFeatures = [
             Don't have an account?
             <Link :href="route('register')" class="font-bold text-[#40e0d0] hover:text-amber-500 transition-colors">Create one — it's free</Link>
         </div>
-    </GuestLayout>
+
+        </GuestLayout>
 </template>

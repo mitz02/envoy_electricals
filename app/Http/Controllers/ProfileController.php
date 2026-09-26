@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
-use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -18,9 +17,14 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): Response
     {
+        $user = $request->user();
+
         return Inertia::render('Profile/Edit', [
-            'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
-            'status' => session('status'),
+            // `User` does not implement MustVerifyEmail, so there is no
+            // verification flow to surface here. Exposing one would render a
+            // link to a route that 500s on hasVerifiedEmail().
+            'isActive' => (bool) $user->is_active,
+            'createdAt' => $user->created_at?->toDateString(),
         ]);
     }
 

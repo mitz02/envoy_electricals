@@ -10,6 +10,7 @@ use App\Models\StockMovement;
 use App\Models\User;
 use App\Services\InventoryService;
 use App\Services\ProjectService;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -21,7 +22,7 @@ class ProjectFeatureTest extends TestCase
 
     protected function owner(): User
     {
-        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $this->seed(RolesAndPermissionsSeeder::class);
 
         return User::factory()->create([
             'role_id' => Role::where('slug', 'owner')->first()->id,
@@ -30,7 +31,7 @@ class ProjectFeatureTest extends TestCase
 
     protected function userWithRole(string $slug): User
     {
-        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $this->seed(RolesAndPermissionsSeeder::class);
 
         return User::factory()->create([
             'role_id' => Role::where('slug', $slug)->first()->id,
@@ -40,9 +41,9 @@ class ProjectFeatureTest extends TestCase
     protected function product(string $name, float $cost = 100): Product
     {
         $product = Product::create([
-            'ref_id' => 'EV-PROD-' . str_pad((string) random_int(1000, PHP_INT_MAX), 6, '0', STR_PAD_LEFT),
+            'ref_id' => 'EV-PROD-'.str_pad((string) random_int(1000, PHP_INT_MAX), 6, '0', STR_PAD_LEFT),
             'name' => $name,
-            'sku' => 'PRJ-' . strtoupper(substr(md5((string) mt_rand()), 0, 8)),
+            'sku' => 'PRJ-'.strtoupper(substr(md5((string) mt_rand()), 0, 8)),
             'unit' => 'piece',
             'cost_price' => $cost,
             'selling_price' => 150,

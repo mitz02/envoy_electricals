@@ -1,14 +1,33 @@
-<script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+﻿<script setup>
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
+import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { cartCount } from '../lib/cart';
 
-const isMobileMenuOpen = ref(false);
+defineOptions({ layout: PublicLayout });
+
+const props = defineProps({
+    canLogin: {
+        type: Boolean,
+        default: true,
+    },
+    canRegister: {
+        type: Boolean,
+        default: true,
+    },
+    whatsappNumber: {
+        type: String,
+        default: '',
+    },
+});
+
+const whatsapp = computed(() => (props.whatsappNumber || '2348097089259').replace(/\D/g, ''));
+const whatsappUrl = computed(() => `https://wa.me/${whatsapp.value}`);
+
 const isContactModalOpen = ref(false);
 const contactForm = ref({ name: '', email: '', phone: '', message: '' });
 const contactSubmitted = ref(false);
 const contactSending = ref(false);
-const currentYear = new Date().getFullYear();
 
 const heroGridPattern = `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z' stroke='%23FFCC00' stroke-width='0.5'/%3E%3C/g%3E%3C/svg%3E")`;
 
@@ -24,6 +43,13 @@ function submitContact() {
             contactForm.value = { name: '', email: '', phone: '', message: '' };
         }, 2500);
     }, 900);
+}
+
+function handleFooterEstimate(value) {
+    if (value) {
+        contactForm.value.message = `Free Solar Estimate request: ${value}`;
+    }
+    isContactModalOpen.value = true;
 }
 
 const values = [
@@ -137,191 +163,16 @@ onUnmounted(() => {
 
 function onKeydown(e) {
     if (e.key === 'Escape') {
-        isMobileMenuOpen.value = false;
         isContactModalOpen.value = false;
     }
 }
 </script>
 
 <template>
-    <Head title="About Us — Envoy Electricals" />
+    <Head title="About Envoy Electricals — Nigeria's Trusted Solar Energy Company" />
 
-    <div class="min-h-screen bg-[#FAF8F2] text-slate-900 font-sans antialiased selection:bg-yellow-400 selection:text-slate-900">
-        <!-- ===================== HEADER ===================== -->
-        <header class="sticky top-0 left-0 right-0 z-40 border-b border-slate-200 bg-white/80 backdrop-blur-md shadow-sm">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between">
-                <!-- Logo -->
-                <Link href="/" class="flex items-center gap-3 group">
-                    <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#0D1527] flex items-center justify-center p-1.5 group-hover:scale-105 transition-transform">
-                        <img src="/envoy_images/logo.png" alt="Envoy Electricals" class="h-full w-full object-contain" />
-                    </div>
-                    <span class="hidden sm:block font-black text-slate-950 tracking-tight">Envoy Electricals</span>
-                </Link>
-
-                <!-- Desktop Nav Links -->
-                <nav class="hidden lg:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
-                    <Link
-                        href="/"
-                        class="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:text-slate-950 hover:bg-slate-100 transition-all duration-300"
-                    >
-                        Home
-                    </Link>
-                    <Link
-                        href="/#shop"
-                        class="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:text-slate-950 hover:bg-slate-100 transition-all duration-300"
-                    >
-                        Shop
-                    </Link>
-                    <Link
-                        href="/training"
-                        class="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:text-slate-950 hover:bg-slate-100 transition-all duration-300"
-                    >
-                        Training
-                    </Link>
-                    <Link
-                        href="/about"
-                        class="px-4 py-2.5 rounded-xl text-sm font-bold text-slate-950 bg-yellow-400 shadow-lg shadow-yellow-400/30"
-                    >
-                        About Us
-                    </Link>
-                    <Link
-                        href="/contact"
-                        class="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 hover:text-slate-950 hover:bg-slate-100 transition-all duration-300"
-                    >
-                        Contact
-                    </Link>
-                </nav>
-
-                <!-- Desktop Actions -->
-                <div class="flex items-center gap-2 sm:gap-3">
-                    <Link
-                        href="/#shop"
-                        title="View Cart"
-                        class="relative w-10 h-10 rounded-xl border border-slate-200 flex items-center justify-center text-slate-600 hover:border-yellow-400 hover:bg-yellow-400 hover:text-slate-950 hover:border-yellow-400 transition-all duration-300"
-                    >
-                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="9" cy="21" r="1" />
-                            <circle cx="20" cy="21" r="1" />
-                            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-                        </svg>
-                        <span
-                            v-if="cartCount > 0"
-                            class="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] rounded-full bg-[#E4312B] text-white text-[10px] font-black flex items-center justify-center px-1"
-                        >
-                            {{ cartCount }}
-                        </span>
-                    </Link>
-
-                    <button
-                        type="button"
-                        @click="isContactModalOpen = true"
-                        class="hidden sm:inline-flex items-center justify-center px-6 py-2.5 rounded-full border border-slate-300 text-slate-900 font-semibold text-sm hover:bg-slate-950 hover:text-white hover:border-slate-950 transition-all duration-300"
-                    >
-                        Let's talk
-                    </button>
-
-                    <Link
-                        v-if="$page.props.auth?.user"
-                        :href="route('dashboard')"
-                        title="Dashboard"
-                        class="w-10 h-10 rounded-xl border border-slate-200 flex items-center justify-center text-slate-600 hover:border-yellow-400 hover:bg-yellow-400 hover:text-slate-950 transition-all duration-300"
-                    >
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                    </Link>
-                    <Link
-                        v-else
-                        :href="route('login')"
-                        title="Sign In"
-                        class="w-10 h-10 rounded-xl border border-slate-200 flex items-center justify-center text-slate-600 hover:border-yellow-400 hover:bg-yellow-400 hover:text-slate-950 transition-all duration-300"
-                    >
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                    </Link>
-
-                    <button
-                        type="button"
-                        @click="isMobileMenuOpen = !isMobileMenuOpen"
-                        class="lg:hidden w-9 h-7 flex flex-col justify-between items-center py-1 group focus:outline-none"
-                        aria-label="Toggle menu"
-                    >
-                        <span class="w-7 h-[2.5px] bg-slate-900 transition-all duration-300 group-hover:bg-yellow-400"></span>
-                        <span class="w-7 h-[2.5px] bg-slate-900 transition-all duration-300 group-hover:bg-yellow-400"></span>
-                    </button>
-                </div>
-            </div>
-        </header>
-
-        <!-- ===================== MOBILE DRAWER ===================== -->
-        <div
-            v-if="isMobileMenuOpen"
-            class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex justify-end transition-opacity duration-300"
-            @click.self="isMobileMenuOpen = false"
-        >
-            <div class="w-full max-w-sm bg-[#0B132B] h-full p-8 flex flex-col justify-between shadow-2xl border-l border-white/10">
-                <div>
-                    <div class="flex items-center justify-between pb-6 border-b border-white/10">
-                        <div class="flex items-center gap-3">
-                            <img src="/envoy_images/logo.png" alt="Envoy Electricals" class="h-10 w-auto object-contain bg-white rounded-lg p-1" />
-                        </div>
-                        <button
-                            type="button"
-                            @click="isMobileMenuOpen = false"
-                            class="text-white/70 hover:text-white text-2xl font-bold p-1"
-                        >
-                            ✕
-                        </button>
-                    </div>
-
-                    <nav class="mt-8 space-y-4">
-                        <Link href="/" @click="isMobileMenuOpen = false" class="block text-lg font-semibold text-white/90 hover:text-yellow-400 transition">
-                            Home
-                        </Link>
-                        <Link href="/#shop" @click="isMobileMenuOpen = false" class="flex items-center justify-between text-lg font-semibold text-white/90 hover:text-yellow-400 transition">
-                            <span>Shop Products</span>
-                            <span class="relative flex items-center justify-center">
-                                <svg class="w-5 h-5 text-white/80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <circle cx="9" cy="21" r="1" />
-                                    <circle cx="20" cy="21" r="1" />
-                                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-                                </svg>
-                                <span
-                                    v-if="cartCount > 0"
-                                    class="absolute -top-2 -right-2 min-w-[18px] h-[18px] rounded-full bg-[#E4312B] text-white text-[10px] font-black flex items-center justify-center px-1"
-                                >
-                                    {{ cartCount }}
-                                </span>
-                            </span>
-                        </Link>
-                        <Link href="/about" @click="isMobileMenuOpen = false" class="block text-lg font-bold text-yellow-400 transition">
-                            About Us
-                        </Link>
-                        <Link href="/contact" @click="isMobileMenuOpen = false" class="block text-lg font-semibold text-white/90 hover:text-yellow-400 transition">
-                            Contact
-                        </Link>
-                        <button
-                            type="button"
-                            @click="isMobileMenuOpen = false; isContactModalOpen = true"
-                            class="block w-full text-left text-lg font-semibold text-white/90 hover:text-yellow-400 transition pt-4 border-t border-white/10"
-                        >
-                            Consultation Request
-                        </button>
-                    </nav>
-                </div>
-
-                <div class="text-xs text-white/50 leading-relaxed">
-                    <p class="font-semibold text-white/70 uppercase tracking-widest mb-2">Get in touch</p>
-                    <p>+234 809 708 9259</p>
-                    <p>hello@envoyelectricals.com</p>
-                    <p class="mt-2">Shop 1, Peace Avenue Junction, opp Goddy Royal Hotel, Futa Southgate Road, Akure</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- ===================== PAGE HERO ===================== -->
-        <section class="relative overflow-hidden bg-[#0D1527]">
+    <!-- ===================== PAGE HERO ===================== -->
+    <section class="relative overflow-hidden bg-[#0D1527]">
             <!-- Background Layers -->
             <div class="absolute inset-0" aria-hidden="true">
                 <img
@@ -750,117 +601,6 @@ function onKeydown(e) {
             </div>
         </section>
 
-        <!-- ===================== FOOTER ===================== -->
-        <footer id="contact" class="relative bg-[#0D1527] text-white overflow-hidden">
-            <div class="absolute inset-0" aria-hidden="true">
-                <div class="absolute -top-24 right-0 w-96 h-96 rounded-full bg-yellow-400/10 blur-3xl"></div>
-                <div class="absolute -bottom-24 left-0 w-96 h-96 rounded-full bg-teal-400/10 blur-3xl"></div>
-                <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-yellow-400/30 to-transparent"></div>
-            </div>
-
-            <div class="max-w-7xl mx-auto px-6 sm:px-12 pt-10 pb-14 relative z-10">
-                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 pb-10 border-b border-white/10 mb-10">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-xl bg-yellow-400 flex items-center justify-center p-1">
-                            <img src="/envoy_images/logo.png" alt="Envoy Electricals" class="h-full w-full object-contain" />
-                        </div>
-                        <span class="font-extrabold text-xl tracking-tight">Envoy Electricals</span>
-                    </div>
-                    <nav class="flex flex-wrap items-center gap-6 sm:gap-10 text-xs sm:text-sm font-medium text-slate-300">
-                        <Link href="/" class="hover:text-white transition-colors">Home</Link>
-                        <Link href="/training" class="hover:text-yellow-400 transition-colors">Training</Link>
-                        <Link href="/about" class="text-yellow-400">About</Link>
-                        <Link href="/contact" class="hover:text-white transition-colors">Contact</Link>
-                        <Link href="/#shop" class="hover:text-white transition-colors">Shop</Link>
-                    </nav>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-8">
-                    <div class="lg:col-span-1">
-                        <div class="flex items-center gap-3 mb-4">
-                            <div class="w-10 h-10 rounded-xl bg-yellow-400 flex items-center justify-center p-1">
-                                <img src="/envoy_images/logo.png" alt="Envoy Electricals" class="h-full w-full object-contain" />
-                            </div>
-                            <span class="font-extrabold text-xl tracking-tight">Envoy Electricals</span>
-                        </div>
-                        <p class="text-sm text-slate-400 leading-relaxed mb-6">
-                            Clean, dependable solar & electrical energy for homes, businesses, and the technicians of tomorrow.
-                        </p>
-                        <div class="flex items-center gap-3">
-                            <a href="#" class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 hover:bg-yellow-400 hover:text-slate-950 hover:border-yellow-400 transition-all duration-300"><i class="bi bi-facebook text-lg"></i></a>
-                            <a href="#" class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 hover:bg-yellow-400 hover:text-slate-950 hover:border-yellow-400 transition-all duration-300"><i class="bi bi-instagram text-lg"></i></a>
-                            <a href="#" class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 hover:bg-yellow-400 hover:text-slate-950 hover:border-yellow-400 transition-all duration-300"><i class="bi bi-twitter-x text-lg"></i></a>
-                            <a href="https://wa.me/2348097089259" target="_blank" rel="noopener" class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 hover:bg-yellow-400 hover:text-slate-950 hover:border-yellow-400 transition-all duration-300"><i class="bi bi-whatsapp text-lg"></i></a>
-                            <a href="#" class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 hover:bg-yellow-400 hover:text-slate-950 hover:border-yellow-400 transition-all duration-300"><i class="bi bi-linkedin text-lg"></i></a>
-                        </div>
-                    </div>
-
-                    <div>
-                        <p class="text-xs font-bold uppercase tracking-widest text-yellow-400 mb-5">Quick Links</p>
-                        <ul class="space-y-3.5 text-sm text-slate-400">
-                            <li><Link href="/" class="hover:text-white transition-colors flex items-center gap-2"><i class="bi bi-chevron-right text-xs text-slate-500"></i>Home</Link></li>
-                            <li><Link href="/training" class="hover:text-yellow-400 transition-colors flex items-center gap-2"><i class="bi bi-chevron-right text-xs text-slate-500"></i>Training Programs</Link></li>
-                            <li><Link href="/#shop" class="hover:text-white transition-colors flex items-center gap-2"><i class="bi bi-chevron-right text-xs text-slate-500"></i>Shop Solar Products</Link></li>
-                            <li><Link href="/about" class="hover:text-yellow-400 transition-colors flex items-center gap-2"><i class="bi bi-chevron-right text-xs text-slate-500"></i>About Us</Link></li>
-                            <li><Link href="/contact" class="hover:text-white transition-colors flex items-center gap-2"><i class="bi bi-chevron-right text-xs text-slate-500"></i>Contact</Link></li>
-                            <li><Link href="/calculator" class="hover:text-white transition-colors flex items-center gap-2"><i class="bi bi-chevron-right text-xs text-slate-500"></i>Solar Calculator</Link></li>
-                        </ul>
-                    </div>
-
-                    <div>
-                        <p class="text-xs font-bold uppercase tracking-widest text-yellow-400 mb-5">Our Services</p>
-                        <ul class="space-y-3.5 text-sm text-slate-400">
-                            <li class="flex items-center gap-2"><i class="bi bi-lightning-charge text-xs text-slate-500"></i>Solar Installation</li>
-                            <li class="flex items-center gap-2"><i class="bi bi-battery-charging text-xs text-slate-500"></i>Inverter & Battery Systems</li>
-                            <li class="flex items-center gap-2"><i class="bi bi-shop text-xs text-slate-500"></i>Electrical Products Sales</li>
-                            <li class="flex items-center gap-2"><i class="bi bi-mortarboard text-xs text-slate-500"></i>Technician Training</li>
-                            <li class="flex items-center gap-2"><i class="bi bi-tools text-xs text-slate-500"></i>Maintenance & Support</li>
-                            <li class="flex items-center gap-2"><i class="bi bi-diagram-3 text-xs text-slate-500"></i>Energy Audits</li>
-                        </ul>
-                    </div>
-
-                    <div>
-                        <p class="text-xs font-bold uppercase tracking-widest text-yellow-400 mb-5">Contact Us</p>
-                        <ul class="space-y-4 text-sm text-slate-400">
-                            <li class="flex items-start gap-3">
-                                <div class="w-8 h-8 rounded-lg bg-yellow-400/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                    <i class="bi bi-geo-alt text-yellow-400"></i>
-                                </div>
-                                <span>Shop 1, Peace Avenue Junction,<br />opp Goddy Royal Hotel, Futa Southgate Road, Akure</span>
-                            </li>
-                            <li class="flex items-center gap-3">
-                                <div class="w-8 h-8 rounded-lg bg-yellow-400/10 flex items-center justify-center flex-shrink-0">
-                                    <i class="bi bi-telephone text-yellow-400"></i>
-                                </div>
-                                <a href="tel:+2348097089259" class="hover:text-white transition-colors">+234 809 708 9259</a>
-                            </li>
-                            <li class="flex items-center gap-3">
-                                <div class="w-8 h-8 rounded-lg bg-yellow-400/10 flex items-center justify-center flex-shrink-0">
-                                    <i class="bi bi-envelope text-yellow-400"></i>
-                                </div>
-                                <a href="mailto:hello@envoyelectricals.com" class="hover:text-white transition-colors">hello@envoyelectricals.com</a>
-                            </li>
-                            <li class="flex items-center gap-3">
-                                <div class="w-8 h-8 rounded-lg bg-yellow-400/10 flex items-center justify-center flex-shrink-0">
-                                    <i class="bi bi-clock text-yellow-400"></i>
-                                </div>
-                                <span>Mon – Sat, 8am – 6pm</span>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-
-            <div class="border-t border-white/10">
-                <div class="max-w-7xl mx-auto px-6 sm:px-12 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
-                    <p>© {{ currentYear }} Envoy Electricals. All rights reserved.</p>
-                    <p class="flex items-center gap-1.5">
-                        Powering homes with <i class="bi bi-sun text-yellow-400"></i> clean solar energy
-                    </p>
-                </div>
-            </div>
-        </footer>
-
         <!-- ===================== CONTACT MODAL ===================== -->
         <div
             v-if="isContactModalOpen"
@@ -940,7 +680,6 @@ function onKeydown(e) {
                 </div>
             </div>
         </div>
-    </div>
 </template>
 
 <style>

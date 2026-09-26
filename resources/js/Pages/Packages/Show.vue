@@ -1,27 +1,84 @@
 <script setup>
-import { ref, onMounted } from 'vue';
-import { Link, router, useForm, usePage } from '@inertiajs/vue3';
+import { ref, computed, onMounted } from 'vue';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import axios from 'axios';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 
 defineOptions({ layout: PublicLayout });
 
+const origin = window.location.origin;
+
 const props = defineProps({
     package: { type: Object, required: true },
-    image: { type: Object, default: null },
+    images: { type: Array, default: () => [] },
     paystackConfigured: { type: Boolean, default: false },
-    bankDetails: { type: Object, default: () => ({}) },
 });
 
+function parsePrice(value) {
+    if (!value) return 0;
+    // Handle strings with commas (e.g., "1,500,000") or numeric strings
+    const cleaned = String(value).replace(/,/g, '');
+    const parsed = Number(cleaned);
+    return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+const packageUrl = computed(() => `${origin}/packages/${props.package.id}`);
+
+const packagePrice = computed(() => {
+    const price = parsePrice(props.package.package_price);
+    const installation = parsePrice(props.package.installation_cost);
+    return price + installation;
+});
+
+const firstImage = computed(() => props.images[0]?.media?.path ?? null);
+
+const packageSchema = computed(() => JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: `${props.package.name} Solar Package`,
+    description: String(props.package.description || props.package.name || '').slice(0, 300),
+    image: firstImage.value ? `${origin}${firstImage.value.startsWith('/storage') ? '' : '/images/'}${firstImage.value}` : `${origin}/images/landing/solar_panels_sky.jpg`,
+    offers: {
+        '@type': 'Offer',
+        url: packageUrl.value,
+        priceCurrency: 'NGN',
+        price: String(packagePrice.value.toFixed(2)),
+        availability: props.package.availability === 'available' ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+        itemCondition: 'https://schema.org/NewCondition',
+        seller: { '@type': 'Organization', name: 'Envoy Electricals' },
+    },
+}));
+
+const pageMetaDescription = computed(() =>
+    String(props.package.description || props.package.name || '').slice(0, 160),
+);
+
 const hasUser = !!usePage().props.auth?.user;
+const user = usePage().props.auth?.user;
+const hasCustomer = hasUser && user?.customer;
 const isProcessing = ref(false);
 const paymentError = ref(null);
-const showOfflineDetails = ref(false);
-const activeTab = ref('paystack');
+const showGuestForm = ref(false);
+const guestForm = ref({
+    customer_name: hasUser ? (user?.name ?? '') : '',
+    customer_phone: hasCustomer ? (user?.customer?.phone ?? '') : '',
+    customer_email: hasCustomer ? (user?.customer?.email ?? user?.email ?? '') : (user?.email ?? ''),
+});
 
 const totalAmount = ref(0);
 
+const currentImageIndex = ref(0);
+
+function currentImage() {
+    return props.images[currentImageIndex.value]?.media?.path;
+}
+
+function imageSrc(path) {
+    return path?.startsWith('/images/') ? path : `/storage/${path}`;
+}
+
 onMounted(() => {
-    totalAmount.value = (props.package.package_price || 0) + (props.package.installation_cost || 0);
+    totalAmount.value = packagePrice.value;
 });
 
 function naira(v) {
@@ -29,72 +86,67 @@ function naira(v) {
 }
 
 function handlePaystackPayment() {
-    if (!hasUser) {
-        router.visit('/portal/register');
-        return;
-    }
-
     if (!props.paystackConfigured) {
-        paymentError.value = 'Paystack is not configured. Please use offline payment.';
+        paymentError.value = 'Paystack is not configured. Please use bank transfer.';
         return;
     }
 
-    isProcessing.value = true;
-    paymentError.value = null;
+    // If user is logged in but needs to provide details, show form
+    if (hasUser && !hasCustomer && (!guestForm.value.customer_name || !guestForm.value.customer_phone || !guestForm.value.customer_email)) {
+        showGuestForm.value = true;
+        return;
+    }
 
-    router.post(`/packages/${props.package.id}/paystack`, {}, {
-        onSuccess: (page) => {
-            if (page.props.authorization_url) {
-                window.location.href = page.props.authorization_url;
-            } else {
-                paymentError.value = 'Failed to initialize payment';
-            }
-            isProcessing.value = false;
-        },
-        onError: (errors) => {
-            paymentError.value = errors.payment || 'Payment initialization failed';
-            isProcessing.value = false;
-        },
-        onFinish: () => {
-            isProcessing.value = false;
-        },
-    });
-}
-
-function handleOfflinePayment() {
+    // If not logged in, show form to collect details
     if (!hasUser) {
-        router.visit('/portal/register');
+        showGuestForm.value = true;
         return;
     }
 
+    // Proceed with payment
+    processPayment();
+}
+
+function processPayment() {
     isProcessing.value = true;
     paymentError.value = null;
 
-    router.post(`/orders/${props.package.id}/offline`, {
-        package_id: props.package.id,
-    }, {
-        onSuccess: () => {
-            showOfflineDetails.value = true;
-            isProcessing.value = false;
-        },
-        onError: (errors) => {
-            paymentError.value = errors.payment || 'Failed to process offline payment';
-            isProcessing.value = false;
-        },
-        onFinish: () => {
-            isProcessing.value = false;
-        },
-    });
-}
+    const payload = hasUser ? {} : guestForm.value;
 
-function copyToClipboard(text) {
-    navigator.clipboard.writeText(text).then(() => {
-        alert('Copied to clipboard!');
-    });
+    axios.post(`/packages/${props.package.id}/paystack`, payload)
+        .then(({ data }) => {
+            if (data.authorization_url) {
+                window.location.href = data.authorization_url;
+            } else if (data.requires_email) {
+                // Server says email is required - show form
+                showGuestForm.value = true;
+                paymentError.value = data.message;
+            } else {
+                paymentError.value = data.message || 'Failed to initialize payment';
+            }
+        })
+        .catch((e) => {
+            if (e.response?.status === 422 && e.response?.data?.requires_email) {
+                showGuestForm.value = true;
+            }
+            paymentError.value = e.response?.data?.message || 'Payment initialization failed';
+        })
+        .finally(() => {
+            isProcessing.value = false;
+        });
 }
 </script>
 
 <template>
+    <Head :title="`${package.name} Solar Package — Price & Specs | Envoy Electricals`">
+        <meta name="description" :content="pageMetaDescription" />
+        <link rel="canonical" :href="packageUrl" />
+        <meta property="og:type" content="product" />
+        <meta property="og:title" :content="`${package.name} Solar Package — Envoy Electricals`" />
+        <meta property="og:description" :content="pageMetaDescription" />
+        <meta property="og:url" :href="packageUrl" />
+        <component is="script" type="application/ld+json">{{ packageSchema }}</component>
+    </Head>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         <nav class="flex items-center gap-2 text-xs font-semibold text-slate-500 mb-6">
             <Link href="/packages" class="hover:text-amber-600">Solar Packages</Link>
@@ -104,12 +156,35 @@ function copyToClipboard(text) {
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
             <div>
-                <div class="aspect-[4/3] overflow-hidden rounded-3xl border border-slate-200 bg-white">
+                <div class="aspect-[4/3] overflow-hidden rounded-3xl border border-slate-200 bg-white relative">
                     <img
-                        :src="image ? `/storage/${image.path}` : '/images/landing/solar_installation.jpg'"
+                        v-if="currentImage()"
+                        :src="imageSrc(currentImage())"
                         :alt="package.name"
                         class="w-full h-full object-cover"
                     />
+                    <img
+                        v-else
+                        src="/images/landing/solar_installation.jpg"
+                        :alt="package.name"
+                        class="w-full h-full object-cover"
+                    />
+
+                    <!-- Thumbnail navigation -->
+                    <div v-if="props.images.length > 1" class="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                        <button
+                            v-for="(img, index) in props.images"
+                            :key="img.id"
+                            @click="currentImageIndex = index"
+                            :class="[
+                                'w-2 h-2 rounded-full transition-all',
+                                index === currentImageIndex
+                                    ? 'bg-white scale-125'
+                                    : 'bg-white/50 hover:bg-white/75'
+                            ]"
+                            class="focus:outline-none focus:ring-2 focus:ring-white"
+                        />
+                    </div>
                 </div>
             </div>
 
@@ -160,44 +235,43 @@ function copyToClipboard(text) {
                 <div class="mt-6">
                     <p class="text-sm font-semibold text-slate-900 mb-4">Choose Payment Method</p>
 
-                    <!-- Tabs -->
-                    <div class="flex gap-2 mb-4 border-b border-slate-200">
-                        <button
-                            @click="activeTab = 'paystack'"
-                            :class="[
-                                'px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 transition-colors',
-                                activeTab === 'paystack'
-                                    ? 'border-amber-500 text-amber-600'
-                                    : 'border-transparent text-slate-400 hover:text-slate-600'
-                            ]"
-                            :disabled="!props.paystackConfigured"
-                        >
-                            <i class="bi bi-credit-card mr-1"></i> Paystack (Card/Bank/USSD)
-                            <span v-if="!props.paystackConfigured" class="ml-1 text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded">Unavailable</span>
-                        </button>
-                        <button
-                            @click="activeTab = 'offline'"
-                            :class="[
-                                'px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 transition-colors',
-                                activeTab === 'offline'
-                                    ? 'border-amber-500 text-amber-600'
-                                    : 'border-transparent text-slate-400 hover:text-slate-600'
-                            ]"
-                        >
-                            <i class="bi bi-bank mr-1"></i> Bank Transfer (Offline)
-                        </button>
-                    </div>
-
                     <!-- Error Message -->
                     <div v-if="paymentError" class="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
                         {{ paymentError }}
                     </div>
 
-                    <!-- Paystack Tab -->
-                    <div v-if="activeTab === 'paystack'" class="space-y-4">
+                    <!-- Guest/Profile Form - shows when email/details needed -->
+                    <div v-if="showGuestForm" class="mb-4 p-4 rounded-xl border border-slate-200 bg-white">
+                        <h3 class="text-sm font-semibold text-slate-900 mb-3">
+                            {{ hasUser ? 'Complete your details for payment' : 'Enter your details to proceed' }}
+                        </h3>
+                        <p class="text-xs text-slate-500 mb-3">Your email is required for Paystack payment receipt.</p>
+                        <div class="grid gap-3 sm:grid-cols-3">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700">Full Name</label>
+                                <input v-model="guestForm.customer_name" type="text" required class="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" placeholder="John Doe" />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700">Phone Number</label>
+                                <input v-model="guestForm.customer_phone" type="tel" required class="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" placeholder="08012345678" />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700">Email Address <span class="text-red-500">*</span></label>
+                                <input v-model="guestForm.customer_email" type="email" required class="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" placeholder="john@example.com" />
+                            </div>
+                        </div>
+                        <div class="mt-3 flex gap-2">
+                            <button @click="processPayment" :disabled="isProcessing" class="rounded-xl bg-[#0D1527] px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50">
+                                {{ isProcessing ? 'Processing...' : 'Continue to Paystack' }}
+                            </button>
+                            <button @click="showGuestForm = false" class="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+                        </div>
+                    </div>
+
+                    <div v-else-if="props.paystackConfigured">
                         <button
                             @click="handlePaystackPayment"
-                            :disabled="isProcessing || !props.paystackConfigured || !hasUser"
+                            :disabled="isProcessing"
                             class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-amber-400 px-6 py-4 text-sm font-bold text-slate-950 hover:bg-amber-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-amber-400/30"
                         >
                             <i v-if="isProcessing" class="bi bi-arrow-clockwise animate-spin"></i>
@@ -205,96 +279,24 @@ function copyToClipboard(text) {
                             <span v-if="isProcessing">Processing...</span>
                             <span v-else>Pay {{ naira(totalAmount) }} with Paystack</span>
                         </button>
-
-                        <p v-if="!hasUser" class="text-center text-sm text-slate-500">
-                            You'll be redirected to register/login first, then complete payment.
-                        </p>
-
-                        <p v-if="!props.paystackConfigured" class="text-center text-sm text-red-600">
-                            Paystack is not configured. Please use offline payment.
-                        </p>
                     </div>
 
-                    <!-- Offline/Bank Transfer Tab -->
-                    <div v-if="activeTab === 'offline'" class="space-y-4">
-                        <button
-                            @click="handleOfflinePayment"
-                            :disabled="isProcessing || !hasUser"
-                            class="w-full inline-flex items-center justify-center gap-2 rounded-xl border-2 border-slate-200 px-6 py-4 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <i v-if="isProcessing" class="bi bi-arrow-clockwise animate-spin"></i>
-                            <i v-else class="bi bi-bank"></i>
-                            <span v-if="isProcessing">Processing...</span>
-                            <span v-else>Proceed to Offline Payment</span>
-                        </button>
+                    <p v-else class="rounded-lg bg-slate-100 p-3 text-center text-sm text-slate-500">
+                        Online card payment is not available right now — please use bank transfer.
+                    </p>
 
-                        <p v-if="!hasUser" class="text-center text-sm text-slate-500">
-                            You'll be redirected to register/login first.
-                        </p>
-
-                        <!-- Bank Details (shown after offline payment intent) -->
-                        <div v-if="showOfflineDetails" class="rounded-xl border border-amber-200 bg-amber-50 p-5 animate-fade-in">
-                            <div class="flex items-center gap-2 mb-4">
-                                <i class="bi bi-info-circle text-amber-600 text-xl"></i>
-                                <h3 class="text-lg font-bold text-amber-800">Bank Transfer Details</h3>
-                            </div>
-                            <p class="text-sm text-amber-800 mb-4">
-                                Transfer <span class="font-bold">{{ naira(totalAmount) }}</span> for <span class="font-bold">{{ package.name }}</span> to the account below.
-                                Include the payment reference in the narration.
-                            </p>
-
-                            <div class="space-y-3">
-                                <div class="flex items-center justify-between p-3 bg-white rounded-lg border border-amber-100">
-                                    <span class="text-sm font-medium text-slate-500">Account Name</span>
-                                    <div class="flex items-center gap-2">
-                                        <code class="flex-1 text-sm font-mono text-slate-900 bg-amber-50 px-2 py-1 rounded">{{ bankDetails.account_name || 'Envoy Electricals' }}</code>
-                                        <button @click="copyToClipboard(bankDetails.account_name || 'Envoy Electricals')" class="text-amber-600 hover:text-amber-800 text-sm">Copy</button>
-                                    </div>
-                                </div>
-
-                                <div class="flex items-center justify-between p-3 bg-white rounded-lg border border-amber-100">
-                                    <span class="text-sm font-medium text-slate-500">Account Number</span>
-                                    <div class="flex items-center gap-2">
-                                        <code class="flex-1 text-sm font-mono text-slate-900 bg-amber-50 px-2 py-1 rounded">{{ bankDetails.account_number || '5168265608' }}</code>
-                                        <button @click="copyToClipboard(bankDetails.account_number || '5168265608')" class="text-amber-600 hover:text-amber-800 text-sm">Copy</button>
-                                    </div>
-                                </div>
-
-                                <div class="flex items-center justify-between p-3 bg-white rounded-lg border border-amber-100">
-                                    <span class="text-sm font-medium text-slate-500">Bank Name</span>
-                                    <div class="flex items-center gap-2">
-                                        <code class="flex-1 text-sm font-mono text-slate-900 bg-amber-50 px-2 py-1 rounded">{{ bankDetails.bank_name || 'Moniepoint MFB' }}</code>
-                                        <button @click="copyToClipboard(bankDetails.bank_name || 'Moniepoint MFB')" class="text-amber-600 hover:text-amber-800 text-sm">Copy</button>
-                                    </div>
-                                </div>
-
-                                <div class="flex items-center justify-between p-3 bg-white rounded-lg border border-amber-100">
-                                    <span class="text-sm font-medium text-slate-500">Narration / Reference</span>
-                                    <div class="flex items-center gap-2">
-                                        <code class="flex-1 text-sm font-mono text-slate-900 bg-amber-50 px-2 py-1 rounded">PAY-{{ package.ref_id || package.id }}</code>
-                                        <button @click="copyToClipboard('PAY-' + (package.ref_id || package.id))" class="text-amber-600 hover:text-amber-800 text-sm">Copy</button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="mt-4 p-3 rounded-lg bg-white border border-amber-100">
-                                <p class="text-xs text-slate-600 mb-2 font-semibold">Important:</p>
-                                <ul class="text-xs text-slate-600 space-y-1 list-disc list-inside">
-                                    <li>Transfer the exact amount: <span class="font-bold">{{ naira(totalAmount) }}</span></li>
-                                    <li>Use the reference <span class="font-bold">PAY-{{ package.ref_id || package.id }}</span> in the narration</li>
-                                    <li>Payment will be verified manually within 1-2 business hours</li>
-                                    <li>You'll receive a confirmation once verified</li>
-                                </ul>
-                            </div>
-
-                            <button
-                                @click="showOfflineDetails = false"
-                                class="mt-4 w-full text-sm font-medium text-amber-700 hover:text-amber-900 underline"
-                            >
-                                Hide Details
-                            </button>
-                        </div>
+                    <div class="my-5 flex items-center gap-3 text-xs uppercase tracking-wide text-slate-400">
+                        <span class="h-px flex-1 bg-slate-200" />or<span class="h-px flex-1 bg-slate-200" />
                     </div>
+
+                    <Link
+                        :href="`/packages/${props.package.id}/pay/bank-transfer`"
+                        class="w-full inline-flex items-center justify-center gap-2 rounded-xl border-2 border-slate-300 bg-white px-6 py-4 text-sm font-bold text-slate-800 hover:border-slate-400 hover:bg-slate-50 transition-all"
+                    >
+                        <i class="bi bi-bank"></i>
+                        Pay by Bank Transfer
+                    </Link>
+                    <p class="mt-2 text-center text-xs text-slate-400">Transfer to our account and send your proof on WhatsApp.</p>
                 </div>
 
                 <Link href="/packages" class="mt-6 block text-center text-sm font-semibold text-slate-500 hover:text-amber-600">← Back to all packages</Link>
@@ -302,13 +304,3 @@ function copyToClipboard(text) {
         </div>
     </div>
 </template>
-
-<style scoped>
-@keyframes fade-in {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-.animate-fade-in {
-    animation: fade-in 0.3s ease-out;
-}
-</style>

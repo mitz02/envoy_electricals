@@ -1,4 +1,4 @@
-﻿<script setup>
+<script setup>
 import { useForm, Link } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
@@ -70,7 +70,7 @@ const statusBadge = {
                         <td class="px-4 py-3">
                             <Link :href="`/admin/marketing/newsletters/${n.id}`" class="font-medium text-slate-900 hover:text-slate-600">{{ n.subject }}</Link>
                         </td>
-                        <td class="px-4 py-3 text-slate-600">{{ n.creator?.name || 'â€”' }}</td>
+                        <td class="px-4 py-3 text-slate-600">{{ n.creator?.name || '—' }}</td>
                         <td class="px-4 py-3 text-center">
                             <span :class="badgeClass(statusBadge[n.status] || 'bg-slate-100 text-slate-500')">{{ n.status }}</span>
                         </td>

@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\StockMovement;
+use App\Models\Store;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -18,21 +19,30 @@ class SaleService
     /**
      * Create a sale with its items. Everything (sale + inventory + ledger) is atomic.
      *
-     * @param array $items Each: ['product_id' => int, 'quantity' => int, 'unit_price' => float]
+     * @param  array  $items  Each: ['product_id' => int, 'quantity' => int, 'unit_price' => float]
      */
     public function createSale(array $data, array $items, int $userId): Sale
     {
-        // Validate stock availability upfront before any mutation.
+        $storeId = (int) ($data['store_id']
+            ?? session('admin_store_id')
+            ?? auth()->user()?->store_id
+            ?? Store::where('is_default', true)->value('id')
+            ?? Store::value('id')
+            ?? 1);
+
+        // Validate store-specific stock availability upfront before any mutation.
         foreach ($items as $item) {
             $product = Product::findOrFail($item['product_id']);
-            if ($product->current_quantity < $item['quantity']) {
+            $available = $this->inventory->getStoreStock($product, $storeId);
+            if ($available < $item['quantity']) {
+                $storeName = Store::where('id', $storeId)->value('name') ?? "Store #{$storeId}";
                 throw ValidationException::withMessages([
-                    'items' => "Insufficient stock for {$product->name}. Only {$product->current_quantity} unit(s) available.",
+                    'items' => "Insufficient stock for {$product->name} at {$storeName}. Available: {$available}, Requested: {$item['quantity']}.",
                 ]);
             }
         }
 
-        return DB::transaction(function () use ($data, $items, $userId) {
+        return DB::transaction(function () use ($data, $items, $userId, $storeId) {
             $subtotal = 0;
             $preparedItems = [];
 
@@ -55,16 +65,45 @@ class SaleService
             $tax = round($taxableBase * ($taxRate / 100), 2);
             $total = round($taxableBase + $tax, 2);
 
+            // Ensure a customer exists.
+            $customerId = $this->resolveCustomer($data, $userId, $storeId);
+
+            // Check if customer is walk-in
+            $isWalkIn = false;
+            if ($customerId !== null) {
+                $customer = Customer::find($customerId);
+                $isWalkIn = $customer && $customer->customer_type === 'walk_in';
+            }
+
             $amountPaid = round((float) ($data['amount_paid'] ?? 0), 2);
-            if ($amountPaid > $total) {
+
+            // Walk-in customers must pay in full
+            if ($isWalkIn) {
+                $amountPaid = $total;
+            }
+
+            // Any excess beyond the invoice total is applied toward the customer's
+            // previous outstanding balance (oldest invoices first).
+            $outstanding = 0.0;
+            if ($customerId !== null) {
+                $outstanding = round((float) Sale::where('customer_id', $customerId)
+                    ->where('status', 'completed')
+                    ->where('balance', '>', 0)
+                    ->sum('balance'), 2);
+            }
+
+            $maxPayable = round($total + $outstanding, 2);
+            if ($amountPaid > $maxPayable) {
                 throw ValidationException::withMessages([
-                    'amount_paid' => 'Payment cannot exceed invoice total.',
+                    'amount_paid' => $outstanding > 0
+                        ? 'Payment cannot exceed the invoice total plus the customer\'s outstanding balance of ₦'.number_format($outstanding, 2, '.', ',').'.'
+                        : 'Payment cannot exceed the invoice total.',
                 ]);
             }
-            $balance = round($total - $amountPaid, 2);
 
-            // Ensure a customer exists.
-            $customerId = $this->resolveCustomer($data, $userId);
+            $amountPaidBase = round(min($amountPaid, $total), 2);
+            $excess = round($amountPaid - $amountPaidBase, 2);
+            $balance = round($total - $amountPaidBase, 2);
 
             $invoiceNo = ReferenceGenerator::generate('invoice');
 
@@ -72,6 +111,7 @@ class SaleService
                 'ref_id' => ReferenceGenerator::generate('sale'),
                 'invoice_no' => $invoiceNo,
                 'sale_date' => $data['sale_date'] ?? now()->toDateString(),
+                'store_id' => $storeId,
                 'customer_id' => $customerId,
                 'salesperson_id' => $userId,
                 'subtotal' => $subtotal,
@@ -79,7 +119,7 @@ class SaleService
                 'tax_rate' => $taxRate,
                 'tax' => $tax,
                 'total' => $total,
-                'amount_paid' => $amountPaid,
+                'amount_paid' => $amountPaidBase,
                 'balance' => $balance,
                 'payment_method' => $data['payment_method'] ?? null,
                 'status' => 'completed',
@@ -107,7 +147,7 @@ class SaleService
                     'profit' => $profit,
                 ]);
 
-                // Deduct stock atomically.
+                // Deduct stock atomically from the specific store.
                 $this->inventory->outbound(
                     product: $product,
                     quantity: $pi['quantity'],
@@ -116,14 +156,15 @@ class SaleService
                     documentType: 'sale',
                     documentId: $sale->id,
                     userId: $userId,
+                    storeId: $storeId,
                 );
             }
 
             // Record the payment received (if any) as a payment_in record.
-            if ($amountPaid > 0) {
+            if ($amountPaidBase > 0) {
                 PaymentService::recordPayment(
                     type: 'payment_in',
-                    amount: $amountPaid,
+                    amount: $amountPaidBase,
                     paymentMethod: $data['payment_method'] ?? 'cash',
                     documentType: 'sale',
                     documentId: $sale->id,
@@ -131,25 +172,63 @@ class SaleService
                     supplierId: null,
                     reference: $invoiceNo,
                     userId: $userId,
+                    storeId: $storeId,
                 );
             }
+
+            // Apply any excess payment toward the customer's previous invoices (oldest first).
+            if ($excess > 0 && $customerId !== null) {
+                $remaining = $excess;
+                $outstandingSales = Sale::where('customer_id', $customerId)
+                    ->where('status', 'completed')
+                    ->where('balance', '>', 0)
+                    ->orderBy('sale_date')
+                    ->orderBy('id')
+                    ->get(['id', 'customer_id', 'status', 'balance']);
+
+                foreach ($outstandingSales as $invoice) {
+                    if ($remaining <= 0) {
+                        break;
+                    }
+
+                    $apply = round(min($remaining, (float) $invoice->balance), 2);
+                    if ($apply <= 0) {
+                        continue;
+                    }
+
+                    $this->receivePayment(
+                        $invoice,
+                        $apply,
+                        $data['payment_method'] ?? 'cash',
+                        $userId,
+                        remarks: 'Applied from excess payment on sale '.$invoiceNo,
+                        paymentDate: $data['sale_date'] ?? now()->toDateString(),
+                    );
+
+                    $remaining = round($remaining - $apply, 2);
+                }
+            }
+
+            $sale->excess_applied = $excess;
+            $sale->previous_outstanding = $outstanding;
 
             return $sale;
         });
     }
 
-    protected function resolveCustomer(array $data, int $userId): ?int
+    protected function resolveCustomer(array $data, int $userId, int $storeId = 1): ?int
     {
-        if (!empty($data['customer_id'])) {
+        if (! empty($data['customer_id'])) {
             return (int) $data['customer_id'];
         }
 
-        if (!empty($data['customer_name'])) {
+        if (! empty($data['customer_name'])) {
             $customer = Customer::create([
                 'ref_id' => ReferenceGenerator::generate('customer'),
                 'name' => $data['customer_name'],
                 'phone' => $data['customer_phone'] ?? null,
                 'customer_type' => 'walk_in',
+                'store_id' => $storeId,
             ]);
 
             return $customer->id;
@@ -176,11 +255,12 @@ class SaleService
                     product: $product,
                     quantity: $item->quantity,
                     type: StockMovement::TYPE_RETURN,
-                    reference: 'VOID:' . $sale->invoice_no,
-                    reason: 'Sale voided: ' . $reason,
+                    reference: 'VOID:'.$sale->invoice_no,
+                    reason: 'Sale voided: '.$reason,
                     documentType: 'sale',
                     documentId: $sale->id,
                     userId: $userId,
+                    storeId: $sale->store_id,
                 );
             }
 
@@ -205,8 +285,6 @@ class SaleService
 
     /**
      * Record an additional payment against a sale and update the outstanding balance.
-     *
-     * @param  Payment|null  $payment  An existing pending Paystack payment to mark as successful.
      */
     public function receivePayment(
         Sale $sale,
@@ -215,58 +293,52 @@ class SaleService
         int $userId,
         ?Payment $payment = null,
         ?string $remarks = null,
-        ?string $paymentDate = null
+        ?string $paymentDate = null,
     ): Payment {
-        if ($sale->status !== 'completed') {
-            throw ValidationException::withMessages(['amount' => 'Payments cannot be recorded on a ' . $sale->status . ' sale.']);
-        }
-
-        $amount = round($amount, 2);
         if ($amount <= 0) {
             throw ValidationException::withMessages(['amount' => 'Payment amount must be greater than zero.']);
         }
 
-        $balance = round((float) $sale->balance, 2);
+        $balance = (float) $sale->balance;
         if ($amount > $balance) {
             throw ValidationException::withMessages([
-                'amount' => "Payment cannot exceed outstanding balance of ₦{$balance}.",
+                'amount' => 'Payment exceeds outstanding balance of ₦'.number_format($balance, 2, '.', ',').'.',
             ]);
         }
 
         return DB::transaction(function () use ($sale, $amount, $method, $userId, $payment, $remarks, $paymentDate) {
-            if ($payment !== null) {
-                if ($payment->status !== Payment::STATUS_PENDING) {
-                    throw ValidationException::withMessages(['amount' => 'This payment has already been processed.']);
-                }
-
-                $payment->update([
-                    'status' => Payment::STATUS_SUCCESS,
-                    'gateway' => Payment::GATEWAY_PAYSTACK,
-                    'payment_method' => 'paystack',
-                    'paid_at' => now(),
-                ]);
-            } else {
-                $payment = PaymentService::recordPayment(
-                    type: 'payment_in',
-                    amount: $amount,
-                    paymentMethod: $method ?? 'cash',
-                    documentType: 'sale',
-                    documentId: $sale->id,
-                    customerId: $sale->customer_id,
-                    supplierId: null,
-                    reference: null,
-                    userId: $userId,
-                    remarks: $remarks,
-                    paymentDate: $paymentDate,
-                );
-            }
+            $newPaid = round((float) $sale->amount_paid + $amount, 2);
+            $newBalance = max(round((float) $sale->total - $newPaid, 2), 0);
 
             $sale->update([
-                'amount_paid' => round((float) $sale->amount_paid + $amount, 2),
-                'balance' => round((float) $sale->balance - $amount, 2),
+                'amount_paid' => $newPaid,
+                'balance' => $newBalance,
             ]);
 
-            return $payment;
+            if ($payment !== null) {
+                $payment->update([
+                    'status' => Payment::STATUS_SUCCESS,
+                    'paid_at' => now(),
+                    'remarks' => $remarks ?? $payment->remarks,
+                ]);
+
+                return $payment;
+            }
+
+            return PaymentService::recordPayment(
+                type: 'payment_in',
+                amount: $amount,
+                paymentMethod: $method ?? 'cash',
+                documentType: 'sale',
+                documentId: $sale->id,
+                customerId: $sale->customer_id,
+                supplierId: null,
+                reference: $sale->invoice_no,
+                userId: $userId,
+                remarks: $remarks,
+                paymentDate: $paymentDate,
+                storeId: $sale->store_id,
+            );
         });
     }
 }

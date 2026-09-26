@@ -91,6 +91,7 @@ const levelStyles = {
                         <th class="px-4 py-3 text-left font-semibold text-slate-600">Program</th>
                         <th class="px-4 py-3 text-left font-semibold text-slate-600">Level</th>
                         <th class="px-4 py-3 text-center font-semibold text-slate-600">Duration</th>
+                        <th class="px-4 py-3 text-right font-semibold text-slate-600">Price</th>
                         <th class="px-4 py-3 text-center font-semibold text-slate-600">Enrolled</th>
                         <th class="px-4 py-3 text-right font-semibold text-slate-600">Capacity</th>
                         <th class="px-4 py-3 text-center font-semibold text-slate-600">Status</th>
@@ -107,6 +108,7 @@ const levelStyles = {
                             <span :class="badgeClass(levelStyles[t.level] || 'bg-slate-100 text-slate-600')" class="capitalize">{{ t.level }}</span>
                         </td>
                         <td class="px-4 py-3 text-center text-slate-700">{{ t.duration_weeks }} {{ t.duration_weeks === 1 ? 'wk' : 'wks' }}</td>
+                        <td class="px-4 py-3 text-right font-semibold text-slate-800">{{ t.price > 0 ? '₦' + Number(t.price).toLocaleString() : 'Free' }}</td>
                         <td class="px-4 py-3 text-center text-slate-700">{{ t.enrolled }}</td>
                         <td class="px-4 py-3 text-right text-slate-700">{{ t.capacity ?? '—' }}</td>
                         <td class="px-4 py-3 text-center">
@@ -122,7 +124,7 @@ const levelStyles = {
                         </td>
                     </tr>
                     <tr v-if="!trainings.data.length">
-                        <td colspan="7" class="px-4 py-12 text-center text-sm text-slate-400">No training programs found.</td>
+                        <td colspan="8" class="px-4 py-12 text-center text-sm text-slate-400">No training programs found.</td>
                     </tr>
                 </tbody>
             </table>

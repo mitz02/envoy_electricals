@@ -1,14 +1,18 @@
 <?php
 
 use App\Http\Controllers\Admin\AssetController;
+use App\Http\Controllers\Admin\BrandController;
+use App\Http\Controllers\Admin\BuyerController;
 use App\Http\Controllers\Admin\CertificateController;
 use App\Http\Controllers\Admin\CustomerController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\EnrollmentController;
 use App\Http\Controllers\Admin\ExpenseController;
 use App\Http\Controllers\Admin\MarketingController;
+use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\OrderController;
 use App\Http\Controllers\Admin\PaymentController;
+use App\Http\Controllers\Admin\PayrollController;
 use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\ProjectController;
 use App\Http\Controllers\Admin\ProjectExpenseController;
@@ -16,59 +20,83 @@ use App\Http\Controllers\Admin\ProjectMaterialController;
 use App\Http\Controllers\Admin\ProjectMediaController;
 use App\Http\Controllers\Admin\ProjectPaymentController;
 use App\Http\Controllers\Admin\PurchaseController;
-use App\Http\Controllers\Admin\PayrollController;
 use App\Http\Controllers\Admin\ReportController;
+use App\Http\Controllers\Admin\RoleAccessController;
 use App\Http\Controllers\Admin\SaleController;
-use App\Http\Controllers\Admin\SolarPackageController;
+use App\Http\Controllers\Admin\SearchController;
+use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\SolarLeadController;
+use App\Http\Controllers\Admin\SolarPackageController;
 use App\Http\Controllers\Admin\StaffController;
+use App\Http\Controllers\Admin\StoreController;
+use App\Http\Controllers\Admin\StoreSelectionController;
 use App\Http\Controllers\Admin\SupplierController;
 use App\Http\Controllers\Admin\TraineeController;
 use App\Http\Controllers\Admin\TrainingController;
 use App\Http\Controllers\Admin\WebsiteController;
+use App\Http\Controllers\Buyer\DashboardController as BuyerDashboardController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\PaystackWebhookController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SeoController;
 use App\Http\Controllers\StorefrontController;
+use App\Models\AuditLog;
+use App\Models\Product;
+use App\Models\Setting;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 // ==========================================================
 // PUBLIC WEBSITE (Phase 3 expands this heavily)
 // ==========================================================
+Route::get('/robots.txt', [SeoController::class, 'robots'])->name('robots');
+Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('sitemap');
+
 Route::get('/', function () {
-    $featuredProducts = \App\Models\Product::where('is_visible_online', true)
+    $featuredProducts = Product::where('is_visible_online', true)
+        ->where('is_featured', true)
+        ->whereHas('images')
         ->with('images')
-        ->orderByDesc('is_featured')
         ->orderBy('name')
-        ->limit(8)
+        ->limit(12)
         ->get()
         ->map(fn ($p) => [
             'id' => $p->id,
             'name' => $p->name,
             'price' => (int) $p->selling_price,
-            'image' => $p->images->first()?->path ?? '/images/landing/solar_panels_sky.jpg',
+            'image' => $p->images->first()?->path,
             'category' => $p->category?->name ?? 'Solar',
-        ]);
+        ])
+        ->filter(fn ($p) => $p['image'] !== null)
+        ->values();
+
+    $whatsappNumber = preg_replace('/\D/', '', (string) Setting::where('key', 'business.phone')->value('value'));
 
     return Inertia::render('Welcome', [
         'canLogin' => Route::has('login'),
         'canRegister' => Route::has('register'),
         'featuredProducts' => $featuredProducts,
+        'whatsappNumber' => $whatsappNumber,
     ]);
 })->name('home');
 
 Route::get('/about', function () {
+    $whatsappNumber = preg_replace('/\D/', '', (string) Setting::where('key', 'business.phone')->value('value'));
+
     return Inertia::render('About', [
         'canLogin' => Route::has('login'),
         'canRegister' => Route::has('register'),
+        'whatsappNumber' => $whatsappNumber,
     ]);
 })->name('about');
 
 Route::get('/contact', function () {
+    $whatsappNumber = preg_replace('/\D/', '', (string) Setting::where('key', 'business.phone')->value('value'));
+
     return Inertia::render('Contact', [
         'canLogin' => Route::has('login'),
         'canRegister' => Route::has('register'),
+        'whatsappNumber' => $whatsappNumber,
     ]);
 })->name('contact');
 
@@ -80,26 +108,29 @@ Route::get('/checkout', [CheckoutController::class, 'checkout'])->name('checkout
 Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store');
 Route::get('/orders/{order:ref_id}/pay', [CheckoutController::class, 'pay'])->name('orders.pay');
 Route::post('/orders/{order:ref_id}/paystack', [CheckoutController::class, 'paystack'])->name('orders.paystack');
-Route::post('/orders/{order:ref_id}/offline', [CheckoutController::class, 'offline'])->name('orders.offline');
+Route::get('/orders/{order:ref_id}/paystack/verify', [CheckoutController::class, 'verify'])->name('orders.paystack.verify');
 
 Route::get('/packages', [StorefrontController::class, 'packages'])->name('packages');
 Route::get('/packages/{solarPackage}', [StorefrontController::class, 'packageShow'])->name('packages.show');
+Route::get('/packages/{solarPackage}/pay/bank-transfer', [StorefrontController::class, 'packageBankTransfer'])->name('packages.pay.bank-transfer');
 Route::post('/packages/{solarPackage}/paystack', [StorefrontController::class, 'packagePaystack'])->name('packages.paystack');
 Route::get('/packages/{solarPackage}/payment/callback', [StorefrontController::class, 'packagePaymentCallback'])->name('packages.payment.callback');
 Route::post('/packages/{solarPackage}/offline', [StorefrontController::class, 'packageOffline'])->name('packages.offline');
 
 Route::get('/calculator', [StorefrontController::class, 'calculator'])->name('calculator');
-Route::post('/calculator', [StorefrontController::class, 'calculatorStore'])->name('calculator.store');
+Route::post('/calculator', [StorefrontController::class, 'calculatorStore'])->middleware('throttle:10,1')->name('calculator.store');
 
 Route::get('/projects', [StorefrontController::class, 'projects'])->name('projects');
 
 Route::get('/training', [StorefrontController::class, 'training'])->name('training');
 Route::get('/training/{training}', [StorefrontController::class, 'trainingShow'])->name('training.show');
+Route::get('/training/{training}/pay/bank-transfer', [StorefrontController::class, 'trainingBankTransfer'])->name('training.pay.bank-transfer');
 Route::post('/training/{training}/paystack', [StorefrontController::class, 'trainingPaystack'])->name('training.paystack');
 Route::get('/training/{training}/payment/callback', [StorefrontController::class, 'trainingPaymentCallback'])->name('training.payment.callback');
 
-Route::post('/feedback', [StorefrontController::class, 'feedback'])->name('feedback.store');
-Route::post('/newsletter', [StorefrontController::class, 'newsletter'])->name('newsletter.store');
+Route::post('/feedback', [StorefrontController::class, 'feedback'])->middleware('throttle:10,1')->name('feedback.store');
+Route::post('/newsletter', [StorefrontController::class, 'newsletter'])->middleware('throttle:10,1')->name('newsletter.store');
+Route::get('/newsletter/unsubscribe/{token}', [StorefrontController::class, 'newsletterUnsubscribe'])->name('newsletter.unsubscribe');
 
 // ==========================================================
 // PRIVATE BUSINESS SYSTEM (Admin)
@@ -109,18 +140,42 @@ Route::get('/admin', [DashboardController::class, '__invoke'])
     ->name('admin.dashboard');
 
 // Breeze auth controllers redirect to named route "dashboard" after login/register.
-Route::get('/dashboard', fn () => redirect()->route('admin.dashboard'))
+Route::get('/dashboard', function () {
+    $user = auth()->user();
+
+    if ($user->role?->slug === 'buyer') {
+        return redirect()->route('buyer.dashboard');
+    }
+
+    return redirect()->route('admin.dashboard');
+})
     ->middleware('auth')
     ->name('dashboard');
 
 Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
-    Route::resource('products', ProductController::class)->except(['show']);
-    Route::get('products/{product}/movements', [ProductController::class, 'stockMovements'])->name('products.movements');
+    Route::get('search', [SearchController::class, 'index'])->middleware('permission:dashboard.view')->name('search');
+
+    // Custom product routes (must come before resource)
+    Route::get('products/movements', [ProductController::class, 'stockMovements'])->middleware('permission:inventory.view')->name('products.movements');
     Route::post('products/{product}/adjust-stock', [ProductController::class, 'adjustStock'])->middleware('permission:inventory.adjust')->name('products.adjust-stock');
+    Route::post('products/bulk-delete', [ProductController::class, 'bulkDelete'])->middleware('permission:products.delete')->name('products.bulk-delete');
+    Route::post('products/bulk-status', [ProductController::class, 'bulkStatus'])->middleware('permission:products.edit')->name('products.bulk-status');
+    Route::post('products/bulk-featured', [ProductController::class, 'bulkFeatured'])->middleware('permission:products.edit')->name('products.bulk-featured');
+    Route::post('products/bulk-online', [ProductController::class, 'bulkOnline'])->middleware('permission:products.edit')->name('products.bulk-online');
+    Route::post('products/bulk-brand', [ProductController::class, 'bulkBrand'])->middleware('permission:products.edit')->name('products.bulk-brand');
+    Route::post('products/bulk-adjust-stock', [ProductController::class, 'bulkAdjustStock'])->middleware('permission:inventory.adjust')->name('products.bulk-adjust-stock');
+    Route::post('products/bulk-store', [ProductController::class, 'bulkStore'])->middleware('permission:products.edit')->name('products.bulk-store');
+    Route::delete('products/{product}', [ProductController::class, 'destroy'])->middleware('permission:products.delete')->name('products.destroy');
+
+    Route::resource('products', ProductController::class)->except(['destroy']);
     Route::get('stock/movements', [ProductController::class, 'stockMovements'])->middleware('permission:inventory.view')->name('stock.movements');
+    Route::get('stock/adjust', [ProductController::class, 'adjustStockPage'])->middleware('permission:inventory.adjust')->name('stock.adjust');
+    Route::post('stock/adjust', [ProductController::class, 'adjustStockAction'])->middleware('permission:inventory.adjust')->name('stock.adjust.submit');
+    Route::get('stock/receive', fn () => redirect()->route('admin.purchases.create'))->name('stock.receive');
 
     Route::resource('sales', SaleController::class)->only(['index', 'create', 'store', 'show']);
     Route::post('sales/{sale}/void', [SaleController::class, 'destroy'])->middleware('permission:sales.void')->name('sales.void');
+    Route::get('sales/{sale}/invoice', [SaleController::class, 'downloadInvoice'])->middleware('permission:sales.view')->name('sales.invoice');
 
     Route::resource('purchases', PurchaseController::class)->only(['index', 'create', 'store', 'show']);
     Route::post('purchases/{purchase}/void', [PurchaseController::class, 'destroy'])->middleware('permission:purchases.void')->name('purchases.void');
@@ -128,15 +183,31 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::resource('customers', CustomerController::class);
     Route::post('customers/quick', [CustomerController::class, 'quickCreate'])->name('customers.quick');
     Route::resource('suppliers', SupplierController::class)->except(['create', 'edit']);
+    Route::post('suppliers/quick', [SupplierController::class, 'quickCreate'])->name('suppliers.quick');
+
+    Route::get('brands', [BrandController::class, 'index'])->middleware('permission:products.view')->name('brands.index');
+    Route::get('brands/{brand}', [BrandController::class, 'show'])->middleware('permission:products.view')->name('brands.show');
+    Route::post('brands', [BrandController::class, 'store'])->middleware('permission:products.create')->name('brands.store');
+    Route::put('brands/{brand}', [BrandController::class, 'update'])->middleware('permission:products.edit')->name('brands.update');
+    Route::delete('brands/{brand}', [BrandController::class, 'destroy'])->middleware('permission:products.delete')->name('brands.destroy');
+    Route::post('brands/quick', [BrandController::class, 'quickCreate'])->middleware('permission:products.create')->name('brands.quick');
 
     Route::get('payments', [PaymentController::class, 'index'])->middleware('permission:payments.view')->name('payments.index');
     Route::post('payments', [PaymentController::class, 'store'])->middleware('permission:payments.record')->name('payments.store');
     Route::post('payments/paystack', [PaymentController::class, 'paystack'])->middleware('permission:payments.record')->name('payments.paystack');
+    Route::post('payments/send-link', [PaymentController::class, 'sendPaymentLinkEmail'])->middleware('permission:payments.record')->name('payments.send-link');
 
     Route::get('orders', [OrderController::class, 'index'])->middleware('permission:orders.view')->name('orders.index');
     Route::get('orders/{order}', [OrderController::class, 'show'])->middleware('permission:orders.view')->name('orders.show');
     Route::post('orders/{order}/pay/{payment}', [OrderController::class, 'confirmPayment'])->middleware('permission:orders.manage')->name('orders.confirm-payment');
     Route::post('orders/{order}/deliver', [OrderController::class, 'deliver'])->middleware('permission:orders.manage')->name('orders.deliver');
+
+    Route::get('buyers', [BuyerController::class, 'index'])->middleware('permission:orders.view')->name('buyers.index');
+    Route::get('buyers/{buyer}', [BuyerController::class, 'show'])->middleware('permission:orders.view')->name('buyers.show');
+    Route::get('buyers/{buyer}/edit', [BuyerController::class, 'edit'])->middleware('permission:orders.manage')->name('buyers.edit');
+    Route::put('buyers/{buyer}', [BuyerController::class, 'update'])->middleware('permission:orders.manage')->name('buyers.update');
+    Route::delete('buyers/{buyer}', [BuyerController::class, 'destroy'])->middleware('permission:orders.manage')->name('buyers.destroy');
+    Route::post('buyers/{buyer}/impersonate', [BuyerController::class, 'impersonate'])->middleware('permission:orders.manage')->name('buyers.impersonate');
 
     Route::resource('expenses', ExpenseController::class)->except(['show']);
 
@@ -171,6 +242,18 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::put('staff/{staff}', [StaffController::class, 'update'])->middleware('permission:staff.manage')->name('staff.update');
     Route::delete('staff/{staff}', [StaffController::class, 'destroy'])->middleware('permission:staff.manage')->name('staff.destroy');
 
+    // Positions (for staff roles)
+    Route::get('positions', [StaffController::class, 'positionsIndex'])->middleware('permission:staff.manage')->name('positions.index');
+    Route::post('positions', [StaffController::class, 'positionStore'])->middleware('permission:staff.manage')->name('positions.store');
+    Route::put('positions/{position}', [StaffController::class, 'positionUpdate'])->middleware('permission:staff.manage')->name('positions.update');
+    Route::delete('positions/{position}', [StaffController::class, 'positionDestroy'])->middleware('permission:staff.manage')->name('positions.destroy');
+
+    Route::resource('stores', StoreController::class)
+        ->parameters(['stores' => 'store:code']);
+    Route::post('stores/transfer', [StoreController::class, 'transferStock'])->name('stores.transfer');
+
+    Route::post('store/select', [StoreSelectionController::class, 'select'])->name('store.select');
+
     // ---- Academy: training programs, trainees, enrollments & certificates ----
     Route::get('training', [TrainingController::class, 'index'])->middleware('permission:training.view')->name('training.index');
     Route::get('training/create', [TrainingController::class, 'create'])->middleware('permission:training.manage')->name('training.create');
@@ -190,6 +273,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
 
     Route::post('trainees/{trainee}/enroll', [EnrollmentController::class, 'store'])->middleware('permission:training.manage')->name('trainees.enroll');
     Route::post('enrollments/{enrollment}/progress', [EnrollmentController::class, 'progress'])->middleware('permission:training.manage')->name('enrollments.progress');
+    Route::post('enrollments/{enrollment}/complete', [EnrollmentController::class, 'complete'])->middleware('permission:training.manage')->name('enrollments.complete');
     Route::post('enrollments/{enrollment}/withdraw', [EnrollmentController::class, 'withdraw'])->middleware('permission:training.manage')->name('enrollments.withdraw');
     Route::delete('enrollments/{enrollment}', [EnrollmentController::class, 'destroy'])->middleware('permission:training.manage')->name('enrollments.destroy');
 
@@ -227,6 +311,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::get('solar-leads/quotations/{quotation}', [SolarLeadController::class, 'showQuotation'])->middleware('permission:solar.leads')->name('solar-leads.quotations.show');
     Route::post('solar-leads/status', [SolarLeadController::class, 'updateStatus'])->middleware('permission:solar.leads')->name('solar-leads.status');
     Route::get('solar-leads/{calculation}', [SolarLeadController::class, 'show'])->middleware('permission:solar.leads')->name('solar-leads.show');
+    Route::post('solar-leads/{calculation}/quotation', [SolarLeadController::class, 'createQuotation'])->middleware('permission:solar.leads')->name('solar-leads.quotation.create');
     Route::delete('solar-leads/{calculation}', [SolarLeadController::class, 'destroy'])->middleware('permission:solar.leads')->name('solar-leads.destroy');
     Route::delete('solar-leads/quotations/{quotation}', [SolarLeadController::class, 'destroyQuotation'])->middleware('permission:solar.leads')->name('solar-leads.quotations.destroy');
 
@@ -234,6 +319,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/', [MarketingController::class, 'index'])->middleware('permission:marketing.newsletter')->name('index');
 
         Route::get('subscribers', [MarketingController::class, 'subscribers'])->middleware('permission:marketing.newsletter')->name('subscribers.index');
+        Route::post('subscribers', [MarketingController::class, 'storeSubscriber'])->middleware('permission:marketing.newsletter')->name('subscribers.store');
         Route::post('subscribers/{subscriber}/toggle', [MarketingController::class, 'toggleSubscriber'])->middleware('permission:marketing.newsletter')->name('subscribers.toggle');
         Route::delete('subscribers/{subscriber}', [MarketingController::class, 'destroySubscriber'])->middleware('permission:marketing.newsletter')->name('subscribers.destroy');
 
@@ -283,9 +369,24 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         abort_unless(request()->user()->hasPermission('audit.view'), 403);
 
         return Inertia::render('Admin/AuditLogs', [
-            'logs' => \App\Models\AuditLog::with('user')->latest()->paginate(20)->withQueryString(),
+            'logs' => AuditLog::with('user')->latest()->paginate(20)->withQueryString(),
         ]);
     })->name('audit-logs');
+
+    Route::get('settings', [SettingsController::class, 'index'])->middleware('permission:settings.manage')->name('settings.index');
+    Route::post('settings/categories', [SettingsController::class, 'storeCategory'])->middleware('permission:settings.manage')->name('settings.categories.store');
+    Route::delete('settings/categories/{category}', [SettingsController::class, 'destroyCategory'])->middleware('permission:settings.manage')->name('settings.categories.destroy');
+    Route::post('settings/calculator', [SettingsController::class, 'storeCalculator'])->middleware('permission:settings.manage')->name('settings.calculator.store');
+
+    Route::get('settings/roles', [RoleAccessController::class, 'index'])->middleware('permission:settings.roles')->name('settings.roles');
+    Route::post('settings/roles', [RoleAccessController::class, 'store'])->middleware('permission:settings.roles')->name('settings.roles.store');
+    Route::post('settings/roles/{role}', [RoleAccessController::class, 'update'])->middleware('permission:settings.roles')->name('settings.roles.update');
+    Route::delete('settings/roles/{role}', [RoleAccessController::class, 'destroy'])->middleware('permission:settings.roles')->name('settings.roles.destroy');
+
+    Route::get('notifications', [NotificationController::class, 'index'])->middleware('permission:dashboard.view')->name('notifications.index');
+    Route::get('notifications/data', [NotificationController::class, 'data'])->middleware('permission:dashboard.view')->name('notifications.data');
+    Route::post('notifications/read-all', [NotificationController::class, 'readAll'])->middleware('permission:dashboard.view')->name('notifications.read-all');
+    Route::post('notifications/{notification}/read', [NotificationController::class, 'read'])->middleware('permission:dashboard.view')->name('notifications.read');
 });
 
 // ==========================================================
@@ -301,6 +402,15 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+});
+
+// ==========================================================
+// BUYER ACCOUNT (website buyers only)
+// ==========================================================
+Route::middleware(['auth', 'buyer'])->prefix('account')->name('buyer.')->group(function () {
+    Route::get('/', [BuyerDashboardController::class, 'index'])->name('dashboard');
+    Route::get('orders', [BuyerDashboardController::class, 'orders'])->name('orders');
+    Route::post('leave-impersonation', [BuyerController::class, 'leaveImpersonation'])->name('impersonation.leave');
 });
 
 require __DIR__.'/auth.php';

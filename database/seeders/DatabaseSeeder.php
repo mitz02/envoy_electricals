@@ -8,6 +8,7 @@ use App\Models\Role;
 use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
 {
@@ -15,16 +16,17 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(RolesAndPermissionsSeeder::class);
 
+        $this->call(StoreSeeder::class);
+
         $this->seedCategories();
         $this->seedExpenseCategories();
         $this->seedSettings();
         $this->seedOwner();
+        $this->seedAdmin();
 
-        $this->call(ProjectsSeeder::class);
         $this->call(StaffSeeder::class);
         $this->call(DemoProductsSeeder::class);
-        $this->call(TrainingSeeder::class);
-        $this->call(SolarPackageSeeder::class);
+        $this->call(DemoBuyerSeeder::class);
     }
 
     protected function seedOwner(): void
@@ -42,6 +44,47 @@ class DatabaseSeeder extends Seeder
         );
     }
 
+    protected function seedAdmin(): void
+    {
+        $ownerRole = Role::where('slug', 'owner')->first();
+
+        if (! $ownerRole) {
+            throw new \RuntimeException('Owner role must exist before seeding the admin user.');
+        }
+
+        $email = env('ADMIN_EMAIL', 'admin@gmail.com');
+        $name = env('ADMIN_NAME', 'Super Admin');
+
+        $user = User::where('email', $email)->first();
+
+        if (! $user) {
+            $password = env('ADMIN_PASSWORD', 'password');
+
+            User::create([
+                'name' => $name,
+                'email' => $email,
+                'password' => $password,
+                'role_id' => $ownerRole->id,
+                'is_active' => true,
+            ]);
+
+            $this->command?->warn("Admin user created: {$email} (role: owner). Set ADMIN_EMAIL / ADMIN_NAME / ADMIN_PASSWORD in .env to customize, or edit the users table directly.");
+            $this->command?->warn('Change the password immediately after first login — see /admin settings or `php artisan user:set-password`.');
+
+            return;
+        }
+
+        // The user already exists — keep name/role active in sync but NEVER reset
+        // the password, so any edits made directly in the database are respected.
+        $user->update([
+            'name' => $name,
+            'role_id' => $ownerRole->id,
+            'is_active' => true,
+        ]);
+
+        $this->command?->line("Admin user {$email} already exists — password left unchanged (edit it in the users table or with `php artisan user:set-password`).");
+    }
+
     protected function seedCategories(): void
     {
         $categories = [
@@ -52,7 +95,7 @@ class DatabaseSeeder extends Seeder
 
         foreach ($categories as $name) {
             ProductCategory::updateOrCreate(
-                ['slug' => \Illuminate\Support\Str::slug($name)],
+                ['slug' => Str::slug($name)],
                 ['name' => $name]
             );
         }
@@ -68,7 +111,7 @@ class DatabaseSeeder extends Seeder
 
         foreach ($categories as $name) {
             ExpenseCategory::updateOrCreate(
-                ['slug' => \Illuminate\Support\Str::slug($name)],
+                ['slug' => Str::slug($name)],
                 ['name' => $name]
             );
         }

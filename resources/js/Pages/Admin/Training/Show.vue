@@ -1,5 +1,5 @@
 <script setup>
-import { Link } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
 import Pagination from '@/Components/Pagination.vue';
@@ -22,6 +22,22 @@ const statusStyles = {
     completed: 'bg-emerald-100 text-emerald-800',
     withdrawn: 'bg-red-100 text-red-700',
 };
+
+const statusLabels = {
+    enrolled: 'Enrolled',
+    in_progress: 'In Progress',
+    completed: 'Qualified',
+    withdrawn: 'Withdrawn',
+};
+
+function statusLabel(s) {
+    return statusLabels[s] || s.replace('_', ' ');
+}
+
+function complete(e) {
+    if (!confirm(`Mark ${e.trainee.name} as qualified for this training? They'll be able to download their certificate.`)) return;
+    router.post(route('admin.enrollments.complete', e.id));
+}
 </script>
 
 <template>
@@ -140,7 +156,7 @@ const statusStyles = {
                                     <p class="text-xs text-slate-400">{{ e.trainee.ref_id }}</p>
                                 </td>
                                 <td class="px-4 py-3 text-center">
-                                    <span :class="badgeClass(statusStyles[e.status] || 'bg-slate-100 text-slate-600')" class="capitalize">{{ e.status.replace('_', ' ') }}</span>
+                                    <span :class="badgeClass(statusStyles[e.status] || 'bg-slate-100 text-slate-600')" class="capitalize">{{ statusLabel(e.status) }}</span>
                                 </td>
                                 <td class="px-4 py-3 text-center">
                                     <span class="font-semibold text-slate-800">{{ e.progress }}%</span>
@@ -151,7 +167,17 @@ const statusStyles = {
                                     </span>
                                 </td>
                                 <td class="px-4 py-3 text-right">
-                                    <Link :href="`/admin/trainees/${e.trainee.id}`" class="rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100">Manage</Link>
+                                    <div class="flex flex-wrap items-center justify-end gap-1">
+                                        <button
+                                            v-if="canManage && e.status !== 'completed' && e.status !== 'withdrawn'"
+                                            @click="complete(e)"
+                                            title="Mark as qualified and issue certificate"
+                                            class="rounded-md bg-emerald-600 px-2 py-1 text-xs font-bold text-white hover:bg-emerald-700"
+                                        >
+                                            <i class="bi bi-award"></i> Mark Qualified
+                                        </button>
+                                        <Link :href="`/admin/trainees/${e.trainee.id}`" class="rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100">Manage</Link>
+                                    </div>
                                 </td>
                             </tr>
                             <tr v-if="!enrollments.data.length">
@@ -189,7 +215,7 @@ const statusStyles = {
                     <div class="flex justify-between"><dt class="text-slate-500">Lessons</dt><dd class="font-semibold text-slate-800">{{ training.weeks.reduce((n, w) => n + w.lessons.length, 0) }}</dd></div>
                 </dl>
                 <p class="mt-4 text-[11px] leading-relaxed text-slate-400">
-                    Setting a trainee's progress to 100% marks the program completed and issues a certificate automatically.
+                    Use "Mark Qualified" on an enrollment once the trainee finishes the program — this issues their certificate for download.
                 </p>
             </div>
         </div>

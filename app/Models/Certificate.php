@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Certificate extends Model
 {
     const STATUS_ISSUED = 'issued';
+
     const STATUS_VOID = 'void';
 
     protected $fillable = [

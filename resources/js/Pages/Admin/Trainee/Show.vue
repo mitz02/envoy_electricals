@@ -27,6 +27,17 @@ const statusStyles = {
     withdrawn: 'bg-red-100 text-red-700',
 };
 
+const statusLabels = {
+    enrolled: 'Enrolled',
+    in_progress: 'In Progress',
+    completed: 'Qualified',
+    withdrawn: 'Withdrawn',
+};
+
+function statusLabel(s) {
+    return statusLabels[s] || s.replace('_', ' ');
+}
+
 const typeLabels = { staff: 'Staff', apprentice: 'Apprentice', trainee: 'Trainee' };
 const initials = (props.trainee?.name || 'T').split(' ').map((p) => p.charAt(0)).join('').slice(0, 2).toUpperCase();
 
@@ -63,6 +74,11 @@ function saveProgress(e) {
 function withdraw(e) {
     if (!confirm(`Withdraw ${props.trainee.name} from this program?`)) return;
     router.post(route('admin.enrollments.withdraw', e.id));
+}
+
+function complete(e) {
+    if (!confirm(`Mark ${props.trainee.name} as qualified for "${e.training.title}"? They'll be able to download their certificate.`)) return;
+    router.post(route('admin.enrollments.complete', e.id));
 }
 
 function removeEnrollment(e) {
@@ -134,7 +150,7 @@ const formatDate = (d) => (d ? new Date(d + 'T00:00:00').toLocaleDateString('en-
                                     <p class="text-xs text-slate-400">{{ e.ref_id }} · Enrolled {{ formatDate(e.enrolled_at) }}</p>
                                 </td>
                                 <td class="px-4 py-3 text-center">
-                                    <span :class="badgeClass(statusStyles[e.status] || 'bg-slate-100 text-slate-600')" class="capitalize">{{ e.status.replace('_', ' ') }}</span>
+                                    <span :class="badgeClass(statusStyles[e.status] || 'bg-slate-100 text-slate-600')" class="capitalize">{{ statusLabel(e.status) }}</span>
                                 </td>
                                 <td class="px-4 py-3 text-center">
                                     <template v-if="canManage && e.status !== 'completed' && e.status !== 'withdrawn'">
@@ -158,6 +174,14 @@ const formatDate = (d) => (d ? new Date(d + 'T00:00:00').toLocaleDateString('en-
                                 </td>
                                 <td v-if="canManage" class="px-4 py-3 text-right">
                                     <div class="flex justify-end gap-1">
+                                        <button
+                                            v-if="e.status !== 'completed' && e.status !== 'withdrawn'"
+                                            @click="complete(e)"
+                                            title="Mark as qualified and issue certificate"
+                                            class="rounded-md bg-emerald-600 px-2 py-1 text-xs font-bold text-white hover:bg-emerald-700"
+                                        >
+                                            <i class="bi bi-award"></i> Mark Qualified
+                                        </button>
                                         <button v-if="e.status !== 'completed' && e.status !== 'withdrawn'" @click="withdraw(e)" title="Withdraw" class="rounded-md px-2 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50">
                                             <i class="bi bi-x-circle"></i>
                                         </button>

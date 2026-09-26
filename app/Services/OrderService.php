@@ -7,6 +7,7 @@ use App\Models\OrderItem;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\Setting;
+use App\Models\StockMovement;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -19,6 +20,8 @@ use Illuminate\Validation\ValidationException;
  */
 class OrderService
 {
+    public function __construct(protected InventoryService $inventory) {}
+
     /**
      * Create an order from storefront cart lines. Prices always come from the
      * database (selling_price), never from the client's cart payload.
@@ -50,7 +53,7 @@ class OrderService
             }
         }
 
-        return DB::transaction(function () use ($data, $items, $userId) {
+        $order = DB::transaction(function () use ($data, $items, $userId) {
             $subtotal = 0;
             $prepared = [];
 
@@ -102,6 +105,16 @@ class OrderService
 
             return $order;
         });
+
+        NotificationService::notifyAdmins(
+            'New website order',
+            "{$order->ref_id} — {$order->customer_name} placed an order worth ₦".number_format((float) $order->total, 2).'.',
+            'order',
+            route('admin.orders.show', $order->id),
+            ['orders.view'],
+        );
+
+        return $order;
     }
 
     /**
@@ -123,39 +136,6 @@ class OrderService
     }
 
     /**
-     * Create (or reuse) a pending offline bank-transfer payment. The order is
-     * untouched until an admin confirms the transfer via receivePayment().
-     */
-    public function requestOffline(Order $order, ?int $userId): Payment
-    {
-        $existing = $order->payments()
-            ->where('gateway', Payment::GATEWAY_LOCAL)
-            ->where('payment_method', 'bank_transfer')
-            ->where('status', Payment::STATUS_PENDING)
-            ->latest('id')
-            ->first();
-
-        if ($existing) {
-            return $existing;
-        }
-
-        return PaymentService::recordPayment(
-            type: 'payment_in',
-            amount: $this->balance($order),
-            paymentMethod: 'bank_transfer',
-            documentType: 'order',
-            documentId: $order->id,
-            customerId: null,
-            supplierId: null,
-            reference: null,
-            userId: $userId,
-            gateway: Payment::GATEWAY_LOCAL,
-            status: Payment::STATUS_PENDING,
-            remarks: 'Awaiting offline bank transfer confirmation.',
-        );
-    }
-
-    /**
      * Apply a successful payment to an order and flip its status to "paid" once
      * the full total is covered.
      *
@@ -174,7 +154,7 @@ class OrderService
         ?string $paymentDate = null
     ): Payment {
         if (in_array($order->status, ['cancelled', 'refunded'])) {
-            throw ValidationException::withMessages(['amount' => 'Payments cannot be recorded on a ' . $order->status . ' order.']);
+            throw ValidationException::withMessages(['amount' => 'Payments cannot be recorded on a '.$order->status.' order.']);
         }
 
         $amount = round($amount, 2);
@@ -224,6 +204,62 @@ class OrderService
             }
 
             return $payment;
+        });
+
+        NotificationService::notifyAdmins(
+            'Order payment received',
+            '₦'.number_format((float) $amount, 2)." received for order {$order->ref_id}.",
+            'payment',
+            route('admin.orders.show', $order->id),
+            ['orders.view'],
+        );
+    }
+
+    /**
+     * Fulfill an order by deducting stock for each item and recording stock movements.
+     * Should be called when an order is marked as delivered/fulfilled.
+     *
+     * @throws ValidationException
+     */
+    public function fulfillOrder(Order $order, int $userId): Order
+    {
+        if ($order->fulfillment === 'delivered') {
+            throw ValidationException::withMessages(['order' => 'Order is already fulfilled.']);
+        }
+
+        if (! in_array($order->status, ['paid', 'processing', 'completed'])) {
+            throw ValidationException::withMessages(['order' => 'Order must be paid before it can be fulfilled.']);
+        }
+
+        $order->load('items.product');
+
+        return DB::transaction(function () use ($order, $userId) {
+            foreach ($order->items as $item) {
+                $product = $item->product;
+
+                if (! $product) {
+                    throw ValidationException::withMessages([
+                        'items' => "Product for order item {$item->id} no longer exists.",
+                    ]);
+                }
+
+                $this->inventory->outbound(
+                    product: $product,
+                    quantity: $item->quantity,
+                    type: StockMovement::TYPE_SALE,
+                    reference: 'ORDER:'.$order->ref_id,
+                    documentType: 'order',
+                    documentId: $order->id,
+                    userId: $userId,
+                );
+            }
+
+            $order->update([
+                'fulfillment' => 'delivered',
+                'status' => 'completed',
+            ]);
+
+            return $order;
         });
     }
 }

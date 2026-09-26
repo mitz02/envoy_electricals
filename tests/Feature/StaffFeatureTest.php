@@ -3,11 +3,14 @@
 namespace Tests\Feature;
 
 use App\Models\Payment;
+use App\Models\Payroll;
 use App\Models\Role;
 use App\Models\Staff;
 use App\Models\User;
 use App\Services\StaffService;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class StaffFeatureTest extends TestCase
@@ -16,7 +19,7 @@ class StaffFeatureTest extends TestCase
 
     protected function owner(): User
     {
-        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $this->seed(RolesAndPermissionsSeeder::class);
 
         return User::factory()->create([
             'role_id' => Role::where('slug', 'owner')->first()->id,
@@ -25,7 +28,7 @@ class StaffFeatureTest extends TestCase
 
     protected function userWithRole(string $slug): User
     {
-        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $this->seed(RolesAndPermissionsSeeder::class);
 
         return User::factory()->create([
             'role_id' => Role::where('slug', $slug)->first()->id,
@@ -37,11 +40,14 @@ class StaffFeatureTest extends TestCase
         return app(StaffService::class)->create(array_merge([
             'name' => 'Test Technician',
             'position' => 'Technician',
+            'email' => 'tech'.uniqid().'@envoyelectric.com',
+            'password' => 'password',
+            'role_id' => Role::where('slug', 'technician')->value('id') ?? Role::value('id'),
             'base_salary' => 200000,
         ], $overrides), $userId);
     }
 
-    protected function payroll(int $userId, array $components = []): \App\Models\Payroll
+    protected function payroll(int $userId, array $components = []): Payroll
     {
         $staff = $this->staff($userId, ['name' => 'Payroll Staff']);
 
@@ -60,6 +66,7 @@ class StaffFeatureTest extends TestCase
     public function test_create_staff_generates_ref_and_stores_allowances(): void
     {
         $owner = $this->owner();
+        $technician = Role::where('slug', 'technician')->first();
 
         $this->actingAs($owner)
             ->post('/admin/staff', [
@@ -68,6 +75,9 @@ class StaffFeatureTest extends TestCase
                 'email' => 'ada@staff.test',
                 'phone' => '08012345678',
                 'date_joined' => now()->toDateString(),
+                'role_id' => $technician->id,
+                'password' => 'secret-pass',
+                'password_confirmation' => 'secret-pass',
                 'base_salary' => 350000,
                 'housing_allowance' => 70000,
                 'transport_allowance' => 30000,
@@ -78,13 +88,22 @@ class StaffFeatureTest extends TestCase
 
         $this->assertDatabaseHas('staff', [
             'name' => 'Ada Manager',
-            'ref_id' => 'STF-' . now()->format('Y') . '-000001',
+            'ref_id' => 'STF-'.now()->format('Y').'-000001',
             'base_salary' => 350000,
             'housing_allowance' => 70000,
         ]);
 
+        $this->assertDatabaseHas('users', [
+            'name' => 'Ada Manager',
+            'email' => 'ada@staff.test',
+            'role_id' => $technician->id,
+            'is_active' => true,
+        ]);
+
         $staff = Staff::where('name', 'Ada Manager')->first();
         $this->assertSame(110000.0, (float) $staff->total_allowance);
+        $this->assertNotNull($staff->user_id);
+        $this->assertTrue(Hash::check('secret-pass', $staff->user->password));
 
         $this->actingAs($owner)->get("/admin/staff/{$staff->id}")->assertOk();
     }
@@ -120,7 +139,7 @@ class StaffFeatureTest extends TestCase
         ]);
 
         $payroll = $staff->payrolls()->first();
-        $this->assertStringStartsWith('PRL-' . now()->format('Y') . '-', $payroll->ref_id);
+        $this->assertStringStartsWith('PRL-'.now()->format('Y').'-', $payroll->ref_id);
     }
 
     public function test_negative_net_pay_is_rejected_server_side(): void

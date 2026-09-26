@@ -1,8 +1,10 @@
 <script setup>
-import { Link, usePage } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 
 defineOptions({ layout: PublicLayout });
+
+const origin = window.location.origin;
 
 defineProps({
     trainings: { type: Array, default: () => [] },
@@ -45,6 +47,10 @@ const curriculumPreview = (t) => {
 </script>
 
 <template>
+    <Head title="Solar Training Programs & Electrical Courses in Nigeria | Envoy Solar Academy">
+        <meta name="description" content="Practical solar installation, inverter and electrical training programs in Akure, Nigeria. Hands-on curriculum, certification and mentorship from Envoy Electricals." />
+        <link rel="canonical" :href="origin + '/training'" />
+    </Head>
     <div class="min-h-screen bg-[#FAF8F2] font-sans text-slate-800 antialiased">
         <!-- Programs Grid -->
         <section id="programs" class="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">

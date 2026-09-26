@@ -43,7 +43,9 @@ const loginFeatures = [
         subtitle="Track your training, update your details and download certificates — all in one place."
         :features="loginFeatures"
     >
-        <Head title="Portal Login" />
+        <Head title="Portal Login">
+            <meta name="robots" content="noindex, nofollow" />
+        </Head>
 
         <!-- Header -->
         <div class="mb-8">

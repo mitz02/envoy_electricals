@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Models\ProductImage;
 use App\Models\Role;
 use App\Models\User;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -17,7 +18,7 @@ class ProductImageTest extends TestCase
 
     protected function owner(): User
     {
-        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $this->seed(RolesAndPermissionsSeeder::class);
 
         return User::factory()->create([
             'role_id' => Role::where('slug', 'owner')->first()->id,
@@ -28,7 +29,6 @@ class ProductImageTest extends TestCase
     {
         return array_merge([
             'name' => '550W Solar Panel',
-            'sku' => 'EV-SOL-TEST',
             'cost_price' => 180000,
             'selling_price' => 220000,
         ], $overrides);
@@ -49,8 +49,9 @@ class ProductImageTest extends TestCase
             ]))
             ->assertRedirect(route('admin.products.index'));
 
-        $product = Product::where('sku', 'EV-SOL-TEST')->first();
+        $product = Product::where('name', '550W Solar Panel')->first();
         $this->assertNotNull($product);
+        $this->assertStringStartsWith('EV-', $product->sku);
 
         $images = $product->images()->orderBy('sort_order')->get();
         $this->assertCount(2, $images);
@@ -67,13 +68,13 @@ class ProductImageTest extends TestCase
         Storage::fake('public');
 
         $this->actingAs($this->owner())
-            ->post('/admin/products', array_merge($this->payload(['sku' => 'EV-SOL-COVER']), [
+            ->post('/admin/products', array_merge($this->payload(['name' => 'Cover Panel']), [
                 'images' => [$this->png(), $this->png(), $this->png()],
                 'featured_new_index' => 2,
             ]))
             ->assertRedirect(route('admin.products.index'));
 
-        $product = Product::where('sku', 'EV-SOL-COVER')->first();
+        $product = Product::where('name', 'Cover Panel')->first();
         $this->assertNotNull($product);
 
         $featured = $product->images()->where('is_featured', true)->first();
@@ -123,7 +124,7 @@ class ProductImageTest extends TestCase
         ]);
 
         $this->actingAs($this->owner())
-            ->put("/admin/products/{$product->id}", array_merge($this->payload(['name' => 'Updated Panel', 'sku' => 'EV-SOL-UPD']), [
+            ->put("/admin/products/{$product->id}", array_merge($this->payload(['name' => 'Updated Panel']), [
                 'remove_images' => [$old->id],
                 'images' => [$this->png()],
                 'featured_new_index' => 0,
@@ -143,5 +144,82 @@ class ProductImageTest extends TestCase
         $this->assertNotNull($featured);
         $this->assertNotSame($keep->id, $featured->id);
         $this->assertSame(1, $product->images()->where('is_featured', true)->count());
+    }
+
+    public function test_create_product_with_specs_rows(): void
+    {
+        $this->actingAs($this->owner())
+            ->post('/admin/products', array_merge($this->payload(['name' => 'Spec Panel']), [
+                'specs' => [
+                    ['label' => 'Wattage', 'value' => '550W'],
+                    ['label' => 'Warranty', 'value' => '12 months'],
+                    ['label' => '', 'value' => 'dropped'],
+                    ['label' => 'dropped', 'value' => ''],
+                ],
+            ]))
+            ->assertRedirect(route('admin.products.index'));
+
+        $product = Product::where('name', 'Spec Panel')->first();
+        $this->assertNotNull($product);
+        $this->assertSame([
+            ['label' => 'Wattage', 'value' => '550W'],
+            ['label' => 'Warranty', 'value' => '12 months'],
+        ], $product->specifications_json);
+        $this->assertSame("Wattage: 550W\nWarranty: 12 months", $product->specifications);
+    }
+
+    public function test_update_specs_rows_replaces_previous_ones(): void
+    {
+        $product = Product::create([
+            'ref_id' => 'PROD-TEST-2',
+            'sku' => 'EV-SOL-SPC',
+            'name' => 'Spec Update',
+            'cost_price' => 100,
+            'selling_price' => 150,
+            'specifications' => "Wattage: 500W\nWarranty: 6 months",
+            'specifications_json' => [
+                ['label' => 'Wattage', 'value' => '500W'],
+                ['label' => 'Warranty', 'value' => '6 months'],
+            ],
+        ]);
+
+        $this->actingAs($this->owner())
+            ->put("/admin/products/{$product->id}", array_merge($this->payload(), [
+                'specs' => [
+                    ['label' => 'Wattage', 'value' => '550W'],
+                ],
+            ]))
+            ->assertRedirect(route('admin.products.index'));
+
+        $product->refresh();
+        $this->assertSame([
+            ['label' => 'Wattage', 'value' => '550W'],
+        ], $product->specifications_json);
+        $this->assertSame('Wattage: 550W', $product->specifications);
+    }
+
+    public function test_clearing_specs_stores_null(): void
+    {
+        $product = Product::create([
+            'ref_id' => 'PROD-TEST-3',
+            'sku' => 'EV-SOL-CLR',
+            'name' => 'Spec Clear',
+            'cost_price' => 100,
+            'selling_price' => 150,
+            'specifications' => 'Wattage: 550W',
+            'specifications_json' => [
+                ['label' => 'Wattage', 'value' => '550W'],
+            ],
+        ]);
+
+        $this->actingAs($this->owner())
+            ->put("/admin/products/{$product->id}", array_merge($this->payload(), [
+                'specs' => [],
+            ]))
+            ->assertRedirect(route('admin.products.index'));
+
+        $product->refresh();
+        $this->assertNull($product->specifications_json);
+        $this->assertNull($product->specifications);
     }
 }

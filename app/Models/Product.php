@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -13,7 +14,7 @@ class Product extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'ref_id', 'sku', 'name', 'category_id', 'subcategory_id', 'brand',
+        'ref_id', 'sku', 'name', 'category_id', 'subcategory_id', 'brand_id',
         'description', 'specifications', 'unit', 'barcode', 'supplier_id',
         'cost_price', 'selling_price', 'average_cost', 'current_quantity',
         'reorder_level', 'status', 'is_featured', 'is_visible_online',
@@ -29,6 +30,7 @@ class Product extends Model
         'is_featured' => 'boolean',
         'is_visible_online' => 'boolean',
         'allow_online_purchase' => 'boolean',
+        'specifications_json' => 'array',
     ];
 
     protected $appends = ['stock_status', 'stock_value'];
@@ -41,6 +43,11 @@ class Product extends Model
     public function subcategory(): BelongsTo
     {
         return $this->belongsTo(ProductCategory::class, 'subcategory_id');
+    }
+
+    public function brand(): BelongsTo
+    {
+        return $this->belongsTo(Brand::class);
     }
 
     public function supplier(): BelongsTo
@@ -61,6 +68,13 @@ class Product extends Model
     public function movements(): HasMany
     {
         return $this->hasMany(StockMovement::class);
+    }
+
+    public function stores(): BelongsToMany
+    {
+        return $this->belongsToMany(Store::class, 'product_store')
+            ->withPivot('current_quantity', 'reorder_level', 'average_cost', 'selling_price')
+            ->withTimestamps();
     }
 
     public function isLowStock(): bool

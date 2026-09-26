@@ -8,6 +8,7 @@ use App\Models\ProjectExpense;
 use App\Models\ProjectMaterial;
 use App\Models\ProjectPayment;
 use App\Models\StockMovement;
+use App\Models\Store;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -27,6 +28,11 @@ class ProjectService
     {
         $project = DB::transaction(function () use ($data, $userId) {
             $contract = round((float) ($data['contract_value'] ?? 0), 2);
+            $storeId = (int) ($data['store_id']
+                ?? session('admin_store_id')
+                ?? auth()->user()?->store_id
+                ?? Store::where('is_default', true)->value('id')
+                ?? 1);
 
             $project = Project::create([
                 'ref_id' => ReferenceGenerator::generate('project'),
@@ -35,6 +41,7 @@ class ProjectService
                 'customer_id' => $data['customer_id'] ?? null,
                 'customer_address' => $data['customer_address'] ?? null,
                 'location' => $data['location'] ?? null,
+                'store_id' => $storeId,
                 'contract_value' => $contract,
                 'status' => $data['status'] ?? Project::STATUS_DRAFT,
                 'start_date' => $data['start_date'] ?? null,
@@ -65,7 +72,7 @@ class ProjectService
 
     public function update(Project $project, array $data, int $userId): Project
     {
-        DB::transaction(function () use ($project, $data, $userId) {
+        DB::transaction(function () use ($project, $data) {
             $project->update([
                 'name' => $data['name'],
                 'description' => $data['description'] ?? null,
@@ -104,7 +111,7 @@ class ProjectService
             return;
         }
 
-        DB::transaction(function () use ($project, $status, $userId) {
+        DB::transaction(function () use ($project, $status) {
             $project->update(['status' => $status]);
             $this->syncCompletionDate($project, $status);
             $this->recompute($project);
@@ -188,11 +195,12 @@ class ProjectService
                 $material->product,
                 $material->quantity,
                 StockMovement::TYPE_PROJECT_ISSUE,
-                reference: $project->ref_id . '|MAT-' . $material->id,
+                reference: $project->ref_id.'|MAT-'.$material->id,
                 reason: "Material issued to project {$project->ref_id}",
                 documentType: 'project',
                 documentId: $project->id,
                 userId: $userId,
+                storeId: $project->store_id,
             );
 
             $material->update([
@@ -245,11 +253,11 @@ class ProjectService
         $balance = round((float) $project->balance, 2);
         if ($amount > $balance + 0.01) {
             throw ValidationException::withMessages([
-                'amount' => 'Payment cannot exceed the outstanding balance of ₦' . number_format(max($balance, 0), 2, '.', ',') . '.',
+                'amount' => 'Payment cannot exceed the outstanding balance of ₦'.number_format(max($balance, 0), 2, '.', ',').'.',
             ]);
         }
 
-        return DB::transaction(function () use ($project, $data, $amount, $userId) {
+        return DB::transaction(function () use ($project, $data, $amount) {
             $payment = ProjectPayment::create([
                 'ref_id' => ReferenceGenerator::generate('project_payment'),
                 'project_id' => $project->id,
@@ -275,7 +283,7 @@ class ProjectService
             abort(404);
         }
 
-        DB::transaction(function () use ($project, $payment, $userId) {
+        DB::transaction(function () use ($project, $payment) {
             $payment->delete();
             $this->recompute($project);
 
@@ -327,7 +335,7 @@ class ProjectService
             abort(404);
         }
 
-        DB::transaction(function () use ($project, $expense, $userId) {
+        DB::transaction(function () use ($project, $expense) {
             $expense->delete();
             $this->recompute($project);
 
@@ -374,13 +382,14 @@ class ProjectService
             $material->product,
             $material->quantity,
             StockMovement::TYPE_PROJECT_RETURN,
-            reference: $project->ref_id . '|MAT-' . $material->id . '|RET',
+            reference: $project->ref_id.'|MAT-'.$material->id.'|RET',
             unitCost: (float) $material->unit_cost,
             reason: "Material returned from project {$project->ref_id}",
             documentType: 'project',
             documentId: $project->id,
             userId: $userId,
             preserveAverage: true,
+            storeId: $project->store_id,
         );
 
         AuditLogger::log('project_material_return', 'project_material', $material->id,

@@ -1,8 +1,7 @@
-﻿<script setup>
+<script setup>
 import { useForm, Link } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
-import PageHeader from '@/Components/PageHeader.vue';
 import Pagination from '@/Components/Pagination.vue';
 import { naira, badgeClass } from '@/lib/format';
 import { useCan } from '@/composables/permissions';
@@ -35,12 +34,20 @@ const activeBadge = { true: 'bg-emerald-100 text-emerald-800', false: 'bg-slate-
 
 <template>
         <FlashMessages />
-        <PageHeader
-            title="Staff"
-            subtitle="Staff profiles, payroll and balances."
-            :action-href="canManage ? '/admin/staff/create' : ''"
-            action-label="Add Staff"
-        />
+        <div class="mb-6 flex items-center justify-between gap-4">
+            <div>
+                <h1 class="text-xl font-black uppercase tracking-tight text-[#0D1527] sm:text-2xl">Staff</h1>
+                <p class="mt-1 text-sm text-slate-500">Staff profiles, payroll and balances.</p>
+            </div>
+            <Link
+                v-if="canManage"
+                href="/admin/staff/create"
+                class="inline-flex shrink-0 items-center gap-2 rounded-xl bg-yellow-400 px-4 py-2 text-sm font-bold text-[#0D1527] shadow-sm transition hover:bg-yellow-300"
+            >
+                <i class="bi bi-plus-lg text-base"></i>
+                Add New Staff
+            </Link>
+        </div>
 
         <div class="mb-4 grid grid-cols-2 gap-4 lg:grid-cols-3">
             <div class="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
@@ -58,7 +65,7 @@ const activeBadge = { true: 'bg-emerald-100 text-emerald-800', false: 'bg-slate-
         </div>
 
         <div class="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs sm:flex-row">
-            <input v-model="form.search" type="search" placeholder="Search name, position, ref, phoneâ€¦" class="flex-1 rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" @keyup.enter="applyFilters" />
+            <input v-model="form.search" type="search" placeholder="Search name, position, ref, phone…" class="flex-1 rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" @keyup.enter="applyFilters" />
             <select v-model="form.status" class="rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20">
                 <option value="">All statuses</option>
                 <option value="active">Active</option>
@@ -85,9 +92,9 @@ const activeBadge = { true: 'bg-emerald-100 text-emerald-800', false: 'bg-slate-
                         <tr v-for="s in staff.data" :key="s.id" class="hover:bg-slate-50">
                             <td class="px-4 py-3">
                                 <Link :href="`/admin/staff/${s.id}`" class="font-medium text-slate-900 hover:text-slate-600">{{ s.name }}</Link>
-                                <p class="text-xs text-slate-400">{{ s.ref_id }} Â· {{ s.email || s.phone || 'No contact' }}</p>
+                                <p class="text-xs text-slate-400">{{ s.ref_id }} · {{ s.email || s.phone || 'No contact' }}</p>
                             </td>
-                            <td class="px-4 py-3 text-slate-600">{{ s.position || 'â€”' }}</td>
+                            <td class="px-4 py-3 text-slate-600">{{ s.position || '—' }}</td>
                             <td class="px-4 py-3 text-right font-semibold text-slate-900">{{ naira(s.base_salary) }}</td>
                             <td class="px-4 py-3 text-right text-slate-700">{{ naira(s.total_paid) }}</td>
                             <td class="px-4 py-3 text-center text-slate-700">{{ s.payrolls_count }}</td>

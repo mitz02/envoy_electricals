@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Portal;
 use App\Http\Controllers\Controller;
 use App\Models\Certificate;
 use App\Models\Enrollment;
+use App\Models\Setting;
 use App\Models\Training;
+use App\Services\PaystackService;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -45,8 +47,10 @@ class DashboardController extends Controller
             $certificates = $trainee->certificates()->issued()->with('training')->latest()->get();
         }
 
+        $enrolledTrainingIds = collect($enrollments)->pluck('training.id')->filter()->values()->all();
+
         $available = Training::active()
-            ->where('id', '!=', collect($enrollments)->pluck('training.id') ?? [])
+            ->when($enrolledTrainingIds, fn ($q) => $q->whereNotIn('id', $enrolledTrainingIds))
             ->withCount(['enrollments as enrolled_count' => fn ($q) => $q->where('status', '!=', 'withdrawn')])
             ->latest()
             ->limit(6)
@@ -65,7 +69,7 @@ class DashboardController extends Controller
                 'enrolled_count' => (int) $t->enrolled_count,
             ]);
 
-        $bankDetails = collect(\App\Models\Setting::where('group', 'bank')->pluck('value', 'key'))
+        $bankDetails = collect(Setting::where('group', 'bank')->pluck('value', 'key'))
             ->mapWithKeys(fn ($value, $key) => [str_replace('bank.', '', $key) => $value]);
 
         return Inertia::render('Portal/Dashboard', [
@@ -98,9 +102,9 @@ class DashboardController extends Controller
                 ],
             ]),
             'available' => $available,
-            'paystackConfigured' => app(\App\Services\PaystackService::class)->isConfigured(),
+            'paystackConfigured' => app(PaystackService::class)->isConfigured(),
             'bankDetails' => $bankDetails,
-            'whatsappNumber' => preg_replace('/\D/', '', (string) \App\Models\Setting::where('key', 'business.phone')->value('value')),
+            'whatsappNumber' => preg_replace('/\D/', '', (string) Setting::where('key', 'business.phone')->value('value')),
         ]);
     }
 }

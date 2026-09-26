@@ -1,5 +1,5 @@
 <script setup>
-import { Link, useForm } from '@inertiajs/vue3';
+import { Link, useForm, Head } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
 import { cartItems, cartSubtotal } from '@/lib/cart';
@@ -15,9 +15,12 @@ const form = useForm({
 });
 
 function submit() {
-    form.post('/checkout', {
-        items: cartItems.value.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
-    });
+    form
+        .transform((data) => ({
+            ...data,
+            items: cartItems.value.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
+        }))
+        .post('/checkout');
 }
 
 function imageUrl(item) {
@@ -26,6 +29,9 @@ function imageUrl(item) {
 </script>
 
 <template>
+    <Head>
+        <meta name="robots" content="noindex, nofollow" />
+    </Head>
     <FlashMessages />
     <div class="mx-auto max-w-5xl px-4 py-10 sm:px-6">
         <h1 class="text-2xl font-black text-slate-900">Checkout</h1>

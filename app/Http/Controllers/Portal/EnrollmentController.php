@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Portal;
 
 use App\Http\Controllers\Controller;
-use App\Models\Enrollment;
 use App\Models\Payment;
 use App\Models\Training;
 use App\Services\AcademyService;

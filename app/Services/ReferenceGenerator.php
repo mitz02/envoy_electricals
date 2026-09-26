@@ -90,8 +90,8 @@ class ReferenceGenerator
             // (including soft-deleted rows) so numbers are never re-issued.
             // External parties (e.g. Paystack) reject reused transaction refs,
             // so references must only ever increase across the DB's lifetime.
-            $prefixWithYear = $prefix . '-' . $year . '-';
-            $like = $prefixWithYear . '%';
+            $prefixWithYear = $prefix.'-'.$year.'-';
+            $like = $prefixWithYear.'%';
 
             $last = DB::table($table)->where('ref_id', 'like', $like)->max('ref_id');
 
@@ -106,6 +106,7 @@ class ReferenceGenerator
 
         if ($type === 'product') {
             $count = DB::table('products')->whereNull('deleted_at')->count();
+
             return sprintf('EV-PROD-%06d', $count + 1);
         }
 
@@ -119,13 +120,13 @@ class ReferenceGenerator
     public static function referenceFor(string $type, string $refPrefix): string
     {
         $last = DB::table('stock_movements')
-            ->where('ref_id', 'like', $refPrefix . '%')
+            ->where('ref_id', 'like', $refPrefix.'%')
             ->orderByDesc('id')
             ->value('ref_id');
 
         preg_match('/(\d+)$/', (string) $last, $m);
         $next = ((int) ($m[1] ?? 0)) + 1;
 
-        return $refPrefix . '-' . str_pad((string) $next, 6, '0', STR_PAD_LEFT);
+        return $refPrefix.'-'.str_pad((string) $next, 6, '0', STR_PAD_LEFT);
     }
 }

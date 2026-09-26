@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Role;
 use App\Models\Staff;
 use App\Models\User;
 use App\Services\StaffService;
@@ -23,13 +24,21 @@ class StaffSeeder extends Seeder
             $mark = User::where('email', 'mark@envoyelectric.com')->first();
             $user = $ada ?? User::where('email', 'owner@envoyelectric.com')->first();
 
-            // Demo staff profiles — Ada and Mark link to their login accounts.
+            $managerRole = Role::where('slug', 'manager')->first();
+            $technicianRole = Role::where('slug', 'technician')->first();
+            $accountantRole = Role::where('slug', 'accountant')->first();
+
+            // Demo staff profiles — Ada and Mark link to their existing login
+            // accounts when present, so credentials are only supplied as a
+            // fallback for a fresh database.
             $adaStaff = $staffService->create([
                 'user_id' => $ada?->id,
                 'name' => 'Ada Manager',
                 'position' => 'Operations Manager',
                 'phone' => '+234 802 222 3333',
                 'email' => 'ada@envoyelectric.com',
+                'password' => 'envoy123',
+                'role_id' => $managerRole?->id,
                 'date_joined' => now()->subYears(2)->toDateString(),
                 'base_salary' => 350000,
                 'housing_allowance' => 70000,
@@ -44,6 +53,8 @@ class StaffSeeder extends Seeder
                 'position' => 'Senior Technician',
                 'phone' => '+234 803 444 5555',
                 'email' => 'mark@envoyelectric.com',
+                'password' => 'envoy123',
+                'role_id' => $technicianRole?->id,
                 'date_joined' => now()->subYear()->toDateString(),
                 'base_salary' => 200000,
                 'housing_allowance' => 30000,
@@ -57,6 +68,8 @@ class StaffSeeder extends Seeder
                 'position' => 'Electrician',
                 'phone' => '+234 805 666 7777',
                 'email' => 'tunde@envoyelectric.com',
+                'password' => 'envoy123',
+                'role_id' => $technicianRole?->id,
                 'date_joined' => now()->subMonths(8)->toDateString(),
                 'base_salary' => 120000,
                 'housing_allowance' => 20000,
@@ -69,6 +82,8 @@ class StaffSeeder extends Seeder
                 'position' => 'Sales Attendant',
                 'phone' => '+234 807 888 9990',
                 'email' => 'blessing@envoyelectric.com',
+                'password' => 'envoy123',
+                'role_id' => $accountantRole?->id,
                 'date_joined' => now()->subMonths(14)->toDateString(),
                 'base_salary' => 100000,
                 'housing_allowance' => 15000,

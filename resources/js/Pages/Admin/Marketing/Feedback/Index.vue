@@ -1,4 +1,4 @@
-﻿<script setup>
+<script setup>
 import { useForm, Link } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
@@ -42,7 +42,7 @@ const statusBadge = {
 };
 
 function stars(rating) {
-    return 'â˜…'.repeat(rating || 0) + 'â˜†'.repeat(Math.max(0, 5 - (rating || 0)));
+    return '★'.repeat(rating || 0) + '☆'.repeat(Math.max(0, 5 - (rating || 0)));
 }
 </script>
 
@@ -54,7 +54,7 @@ function stars(rating) {
     />
 
     <div class="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs sm:flex-row">
-        <input v-model="form.search" type="search" placeholder="Search name, email or commentâ€¦" class="flex-1 rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" @keyup.enter="applyFilters" />
+        <input v-model="form.search" type="search" placeholder="Search name, email or comment…" class="flex-1 rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" @keyup.enter="applyFilters" />
         <select v-model="form.status" class="rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20">
             <option value="">All statuses</option>
             <option value="new">New</option>
@@ -82,9 +82,9 @@ function stars(rating) {
                     <tr v-for="f in feedback.data" :key="f.id" class="hover:bg-slate-50">
                         <td class="px-4 py-3">
                             <p class="font-medium text-slate-900">{{ f.customer_name || 'Anonymous' }}</p>
-                            <p class="text-xs text-slate-400">{{ f.customer_email || 'â€”' }}</p>
+                            <p class="text-xs text-slate-400">{{ f.customer_email || '—' }}</p>
                         </td>
-                        <td class="px-4 py-3 max-w-xs truncate text-slate-600" :title="f.comment || f.experience || ''">{{ f.comment || f.experience || 'â€”' }}</td>
+                        <td class="px-4 py-3 max-w-xs truncate text-slate-600" :title="f.comment || f.experience || ''">{{ f.comment || f.experience || '—' }}</td>
                         <td class="px-4 py-3 text-center text-amber-500">{{ stars(f.rating) }}</td>
                         <td class="px-4 py-3 text-center">
                             <span :class="badgeClass(statusBadge[f.status] || 'bg-slate-100 text-slate-500')">{{ f.status }}</span>

@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { useForm, Link } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
@@ -10,6 +10,7 @@ defineOptions({ layout: AdminLayout });
 const props = defineProps({
     newsletter: { type: Object, required: true },
     subscriber_count: { type: Number, default: 0 },
+    mail_from: { type: Object, default: () => ({ name: 'Envoy Electricals', address: 'hello@example.com' }) },
 });
 
 const { has } = useCan();
@@ -61,12 +62,15 @@ const statusBadge = {
             <div class="mt-4 flex flex-col gap-2">
                 <button
                     v-if="canManage && newsletter.status !== 'sent'"
-                    :disabled="form.processing"
+                    :disabled="form.processing || subscriber_count === 0"
                     class="rounded-lg bg-[#0D1527] px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
                     @click="send"
                 >
-                    Mark as Sent to {{ subscriber_count }} Subscribers
+                    {{ form.processing ? 'Sending…' : `Send to ${subscriber_count} Subscribers` }}
                 </button>
+                <p v-if="subscriber_count === 0 && newsletter.status !== 'sent'" class="text-[11px] text-amber-700">
+                    No active subscribers yet — add some before sending.
+                </p>
                 <Link v-if="canManage && newsletter.status !== 'sent'" :href="`/admin/marketing/newsletters/${newsletter.id}/edit`" class="rounded-lg border border-slate-200 px-3 py-1.5 text-center text-xs font-semibold text-slate-600 hover:bg-slate-50">Edit</Link>
                 <button v-if="canManage" class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50" @click="remove">Delete</button>
             </div>
@@ -75,8 +79,9 @@ const statusBadge = {
         <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs lg:col-span-2">
             <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Content Preview</h2>
             <div class="rounded-xl border border-slate-200 p-5">
+                <img v-if="newsletter.image_path" :src="`/storage/${newsletter.image_path}`" alt="Newsletter image" class="mb-4 max-h-60 w-full rounded-lg object-cover" />
                 <p class="text-lg font-bold text-slate-900">{{ newsletter.subject }}</p>
-                <p class="mt-1 text-xs text-slate-400">From: Envoy Electric &lt;hello@envoyelectric.com&gt;</p>
+                <p class="mt-1 text-xs text-slate-400">From: {{ mail_from.name }} &lt;{{ mail_from.address }}&gt;</p>
                 <hr class="my-4 border-slate-100" />
                 <div class="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{{ newsletter.content }}</div>
             </div>

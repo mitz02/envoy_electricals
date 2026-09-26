@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Customer;
 use App\Models\Enrollment;
 use App\Models\Feedback;
 use App\Models\Media;
@@ -10,30 +11,33 @@ use App\Models\Payment;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\Project;
+use App\Models\Setting;
 use App\Models\SolarCalculation;
 use App\Models\SolarPackage;
 use App\Models\Trainee;
 use App\Models\Training;
 use App\Services\AcademyService;
 use App\Services\AuditLogger;
-use App\Services\PaystackService;
+use App\Services\NotificationService;
 use App\Services\PaymentService;
+use App\Services\PaystackService;
 use App\Services\ReferenceGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
+use Inertia\Response;
 use RuntimeException;
 
 class StorefrontController extends Controller
 {
-    public function shop(Request $request): \Inertia\Response
+    public function shop(Request $request): Response
     {
         $active = $request->only(['search', 'category', 'min_price', 'max_price', 'availability', 'sort']);
 
         $products = Product::query()
             ->where('is_visible_online', true)
-            ->with(['images', 'category'])
+            ->with(['images', 'category', 'brand'])
             ->when($active['search'] ?? null, fn ($q, $s) => $q->where(fn ($w) => $w->where('name', 'like', "%{$s}%")->orWhere('description', 'like', "%{$s}%")))
             ->when($active['category'] ?? null, fn ($q, $c) => $q->where('category_id', $c))
             ->when(($active['min_price'] ?? '') !== '', fn ($q) => $q->where('selling_price', '>=', (float) $active['min_price']))
@@ -86,7 +90,7 @@ class StorefrontController extends Controller
         ]);
     }
 
-    public function product(Product $product): \Inertia\Response
+    public function product(Product $product): Response
     {
         abort_unless($product->is_visible_online, 404);
 
@@ -101,26 +105,20 @@ class StorefrontController extends Controller
         ]);
     }
 
-    public function packages(): \Inertia\Response
+    public function packages(): Response
     {
         return Inertia::render('Packages/Index', [
             'packages' => SolarPackage::query()
                 ->where('is_visible_online', true)
-                ->with('items')
+                ->with(['items', 'images.media'])
                 ->orderBy('package_price')
                 ->get(),
         ]);
     }
 
-    public function calculator(): \Inertia\Response
+    public function calculator(): Response
     {
-        return Inertia::render('Calculator', [
-            'packages' => SolarPackage::query()
-                ->where('is_visible_online', true)
-                ->where('availability', 'available')
-                ->orderBy('package_price')
-                ->get(['id', 'name', 'package_price', 'installation_cost', 'estimated_load_capacity', 'inverter_capacity', 'warranty']),
-        ]);
+        return Inertia::render('Calculator');
     }
 
     public function calculatorStore(Request $request)
@@ -137,7 +135,6 @@ class StorefrontController extends Controller
             'recommended_inverter' => ['nullable', 'string', 'max:255'],
             'recommended_panels' => ['nullable', 'integer', 'min:0'],
             'recommended_battery' => ['nullable', 'string', 'max:255'],
-            'recommended_package_id' => ['nullable', 'exists:solar_packages,id'],
             'estimated_price' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
@@ -151,7 +148,6 @@ class StorefrontController extends Controller
             'recommended_inverter' => $validated['recommended_inverter'] ?? null,
             'recommended_panels' => $validated['recommended_panels'] ?? null,
             'recommended_battery' => $validated['recommended_battery'] ?? null,
-            'recommended_package_id' => $validated['recommended_package_id'] ?? null,
             'estimated_price' => $validated['estimated_price'] ?? null,
             'customer_name' => $validated['customer_name'],
             'customer_phone' => $validated['customer_phone'],
@@ -166,7 +162,7 @@ class StorefrontController extends Controller
         return redirect()->route('calculator')->with('success', 'Design saved! Our team will call you within 24 hours to confirm your quote. Reference: '.$calc->ref_id);
     }
 
-    public function projects(): \Inertia\Response
+    public function projects(): Response
     {
         return Inertia::render('Projects/Index', [
             'projects' => Project::query()
@@ -178,7 +174,7 @@ class StorefrontController extends Controller
         ]);
     }
 
-    public function training(): \Inertia\Response
+    public function training(): Response
     {
         $trainings = Training::active()
             ->withCount(['enrollments as enrolled_count' => fn ($q) => $q->where('status', '!=', Enrollment::STATUS_WITHDRAWN)])
@@ -223,7 +219,7 @@ class StorefrontController extends Controller
         ]);
     }
 
-    public function trainingShow(Training $training): \Inertia\Response
+    public function trainingShow(Training $training): Response
     {
         abort_unless($training->is_active, 404);
 
@@ -270,9 +266,6 @@ class StorefrontController extends Controller
                 ])->values(),
             ],
             'paystackConfigured' => app(PaystackService::class)->isConfigured(),
-            'bankDetails' => collect(\App\Models\Setting::where('group', 'bank')->pluck('value', 'key'))
-                ->mapWithKeys(fn ($value, $key) => [str_replace('bank.', '', $key) => $value]),
-            'whatsappNumber' => preg_replace('/\D/', '', (string) \App\Models\Setting::where('key', 'business.phone')->value('value')),
         ]);
     }
 
@@ -317,13 +310,13 @@ class StorefrontController extends Controller
         }
 
         // Check if there's already a pending payment for this enrollment
-        $existingPayment = \App\Models\Payment::where('document_type', 'enrollment')
+        $existingPayment = Payment::where('document_type', 'enrollment')
             ->where('document_id', $training->id)
             ->where(function ($q) use ($trainee) {
                 $q->where('trainee_id', $trainee->id)->orWhere('customer_id', $trainee->id);
             })
-            ->where('gateway', \App\Models\Payment::GATEWAY_PAYSTACK)
-            ->where('status', \App\Models\Payment::STATUS_PENDING)
+            ->where('gateway', Payment::GATEWAY_PAYSTACK)
+            ->where('status', Payment::STATUS_PENDING)
             ->latest('id')
             ->first();
 
@@ -338,8 +331,8 @@ class StorefrontController extends Controller
             supplierId: null,
             reference: null,
             userId: $user->id,
-            gateway: \App\Models\Payment::GATEWAY_PAYSTACK,
-            status: \App\Models\Payment::STATUS_PENDING,
+            gateway: Payment::GATEWAY_PAYSTACK,
+            status: Payment::STATUS_PENDING,
         );
 
         // An already-initialized reference cannot be re-initialized with Paystack
@@ -366,10 +359,10 @@ class StorefrontController extends Controller
             $detail = $e->getMessage();
             if (method_exists($e, 'response') && $e->response) {
                 $json = $e->response->json();
-                $detail .= ' :: ' . ($json['message'] ?? $e->response->body());
+                $detail .= ' :: '.($json['message'] ?? $e->response->body());
             }
 
-            \Illuminate\Support\Facades\Log::error('Paystack initialize failed for training: ' . $detail, [
+            Log::error('Paystack initialize failed for training: '.$detail, [
                 'payment' => $payment->ref_id,
                 'training' => $training->id,
             ]);
@@ -378,7 +371,7 @@ class StorefrontController extends Controller
         }
 
         if (empty($response['status']) || empty($response['data']['authorization_url'] ?? null)) {
-            \Illuminate\Support\Facades\Log::error('Paystack initialize returned invalid response for training.', ['response' => $response]);
+            Log::error('Paystack initialize returned invalid response for training.', ['response' => $response]);
 
             return response()->json(['message' => 'Paystack did not return a payment link.'], 502);
         }
@@ -409,7 +402,7 @@ class StorefrontController extends Controller
         try {
             $verification = $paystack->verify($reference);
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('Paystack verification failed in callback: ' . $e->getMessage(), ['reference' => $reference]);
+            Log::error('Paystack verification failed in callback: '.$e->getMessage(), ['reference' => $reference]);
 
             return redirect()->route('training.show', $training)
                 ->with('error', 'Could not verify payment. Please contact support.');
@@ -506,19 +499,97 @@ class StorefrontController extends Controller
         }
     }
 
-    public function packageShow(SolarPackage $solarPackage): \Inertia\Response
+    /**
+     * Dedicated bank-transfer (offline enrollment) page for a training program.
+     */
+    public function trainingBankTransfer(Training $training): Response
+    {
+        abort_unless($training->is_active, 404);
+
+        $enrolledCount = $training->enrollments()
+            ->where('status', '!=', Enrollment::STATUS_WITHDRAWN)
+            ->count();
+
+        return Inertia::render('Training/BankTransfer', [
+            'training' => [
+                'id' => $training->id,
+                'ref_id' => $training->ref_id,
+                'title' => $training->title,
+                'description' => $training->description,
+                'image_path' => $training->image_path,
+                'start_date' => $training->start_date?->toDateString(),
+                'level' => $training->level,
+                'duration_weeks' => $training->duration_weeks,
+                'price' => $training->price,
+                'capacity' => $training->capacity,
+                'enrolled_count' => $enrolledCount,
+                'certificate_eligible' => $training->certificate_eligible,
+            ],
+            'bankDetails' => collect(Setting::where('group', 'bank')->pluck('value', 'key'))
+                ->mapWithKeys(fn ($value, $key) => [str_replace('bank.', '', $key) => $value]),
+            'whatsappNumber' => preg_replace('/\D/', '', (string) Setting::where('key', 'business.phone')->value('value')),
+        ]);
+    }
+
+    public function packageShow(SolarPackage $solarPackage): Response
+    {
+        abort_unless($solarPackage->is_visible_online, 404);
+
+        $solarPackage->load('items', 'images.media');
+
+        return Inertia::render('Packages/Show', [
+            'package' => $solarPackage,
+            'images' => $solarPackage->images->map(function ($img) {
+                return [
+                    'id' => $img->id,
+                    'media' => $img->media ? [
+                        'id' => $img->media->id,
+                        'path' => $img->media->path,
+                        'alt' => $img->media->alt,
+                    ] : null,
+                    'is_featured' => $img->is_featured,
+                    'sort_order' => $img->sort_order,
+                ];
+            })->toArray(),
+            'paystackConfigured' => app(PaystackService::class)->isConfigured(),
+        ]);
+    }
+
+    /**
+     * Dedicated bank-transfer instructions page for a solar package (no modal).
+     */
+    public function packageBankTransfer(SolarPackage $solarPackage): Response
     {
         abort_unless($solarPackage->is_visible_online, 404);
 
         $solarPackage->load('items');
 
-        return Inertia::render('Packages/Show', [
-            'package' => $solarPackage,
+        return Inertia::render('Packages/BankTransfer', [
+            'package' => [
+                'id' => $solarPackage->id,
+                'ref_id' => $solarPackage->ref_id,
+                'name' => $solarPackage->name,
+                'description' => $solarPackage->description,
+                'is_featured' => $solarPackage->is_featured,
+                'package_price' => $solarPackage->package_price,
+                'installation_cost' => $solarPackage->installation_cost,
+                'estimated_load_capacity' => $solarPackage->estimated_load_capacity,
+                'inverter_capacity' => $solarPackage->inverter_capacity,
+                'warranty' => $solarPackage->warranty,
+                'availability' => $solarPackage->availability,
+                'items' => $solarPackage->items->map(fn ($it) => [
+                    'id' => $it->id,
+                    'name' => $it->name,
+                    'quantity' => $it->quantity,
+                    'specification' => $it->specification,
+                ]),
+            ],
             'image' => $solarPackage->featured_image_media_id
                 ? Media::find($solarPackage->featured_image_media_id)
                 : null,
-            'paystackConfigured' => app(PaystackService::class)->isConfigured(),
-            'bankDetails' => \App\Models\Setting::where('group', 'bank')->pluck('value', 'key'),
+            'bankDetails' => collect(Setting::where('group', 'bank')->pluck('value', 'key'))
+                ->mapWithKeys(fn ($value, $key) => [str_replace('bank.', '', $key) => $value]),
+            'whatsappNumber' => preg_replace('/\D/', '', (string) Setting::where('key', 'business.phone')->value('value')),
         ]);
     }
 
@@ -544,22 +615,74 @@ class StorefrontController extends Controller
 
         $user = $request->user();
 
-        if (! $user) {
-            return response()->json(['message' => 'Please log in to purchase.'], 401);
+        // Allow guest checkout by accepting customer details in request
+        $customerData = $request->only(['customer_name', 'customer_phone', 'customer_email']);
+        $customer = null;
+        $customerId = null;
+
+        if ($user) {
+            $customer = $user->customer;
+            if ($customer) {
+                $customerId = $customer->id;
+                // Update customer with provided details if any
+                if ($customerData['customer_name'] ?? null) {
+                    $customer->name = $customerData['customer_name'];
+                }
+                if ($customerData['customer_phone'] ?? null) {
+                    $customer->phone = $customerData['customer_phone'];
+                }
+                if ($customerData['customer_email'] ?? null) {
+                    $customer->email = $customerData['customer_email'];
+                }
+                $customer->save();
+            }
         }
 
-        $customer = $user->customer;
+        // If no customer profile, create or find by email/phone for guest checkout
+        if (! $customerId && ($customerData['customer_email'] ?? $customerData['customer_phone'] ?? null)) {
+            $query = Customer::query();
+            if ($customerData['customer_email'] ?? null) {
+                $query->where('email', $customerData['customer_email']);
+            } elseif ($customerData['customer_phone'] ?? null) {
+                $query->where('phone', $customerData['customer_phone']);
+            }
+            $customer = $query->first();
 
-        if (! $customer) {
-            return response()->json(['message' => 'Complete your customer profile before purchasing.'], 422);
+            if (! $customer) {
+                $customer = Customer::create([
+                    'ref_id' => ReferenceGenerator::generate('customer'),
+                    'name' => $customerData['customer_name'] ?? 'Guest Customer',
+                    'phone' => $customerData['customer_phone'] ?? null,
+                    'email' => $customerData['customer_email'] ?? null,
+                    'address' => 'Online package purchase',
+                ]);
+            }
+            $customerId = $customer->id;
         }
 
-        // Check if there's already a pending payment for this package
-        $existingPayment = \App\Models\Payment::where('document_type', 'solar_package')
+        // Require email for Paystack
+        $email = $customerData['customer_email'] ?? $customer?->email ?? $user?->email;
+
+        if (! $email) {
+            return response()->json([
+                'message' => 'Email is required for Paystack payment. Please provide your email.',
+                'requires_email' => true,
+            ], 422);
+        }
+
+        // Check if there's already a pending payment for this package/customer
+        $existingPayment = Payment::where('document_type', 'solar_package')
             ->where('document_id', $solarPackage->id)
-            ->where('customer_id', $customer->id)
-            ->where('gateway', \App\Models\Payment::GATEWAY_PAYSTACK)
-            ->where('status', \App\Models\Payment::STATUS_PENDING)
+            ->where(function ($q) use ($customerId, $user) {
+                if ($customerId) {
+                    $q->where('customer_id', $customerId);
+                }
+                if ($user) {
+                    $q->orWhere('created_by', $user->id);
+                }
+            })
+            ->where('gateway', Payment::GATEWAY_PAYSTACK)
+            ->where('status', Payment::STATUS_PENDING)
             ->latest('id')
             ->first();
 
@@ -569,52 +692,69 @@ class StorefrontController extends Controller
             paymentMethod: 'paystack',
             documentType: 'solar_package',
             documentId: $solarPackage->id,
-            customerId: $customer->id,
+            customerId: $customerId,
             supplierId: null,
             reference: null,
-            userId: $user->id,
-            gateway: \App\Models\Payment::GATEWAY_PAYSTACK,
-            status: \App\Models\Payment::STATUS_PENDING,
+            userId: $user?->id,
+            gateway: Payment::GATEWAY_PAYSTACK,
+            status: Payment::STATUS_PENDING,
         );
+
+        // Generate a fresh reference for THIS Paystack attempt.
+        // We do NOT save it to the payment yet - only after Paystack succeeds.
+        // This avoids "Duplicate Transaction Reference" if the call fails and user retries.
+        // Add timestamp + random to avoid collisions with previous test runs on Paystack test mode.
+        $paystackReference = ReferenceGenerator::generate('payment').'-'.bin2hex(random_bytes(4));
 
         try {
             $response = $paystack->initialize(
-                reference: $payment->ref_id,
+                reference: $paystackReference,
                 amount: $totalAmount,
-                email: $user->email ?? $customer->email,
+                email: $email,
                 callbackUrl: route('packages.payment.callback', $solarPackage),
                 metadata: [
                     'payment_ref' => $payment->ref_id,
                     'package_id' => $solarPackage->id,
                     'package_name' => $solarPackage->name,
-                    'customer_id' => $customer->id,
-                    'customer_name' => $customer->name,
+                    'customer_id' => $customerId,
+                    'customer_name' => $customerData['customer_name'] ?? $customer?->name ?? $user?->name,
                 ],
             );
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('Paystack initialize failed for package: ' . $e->getMessage(), [
+            $detail = $e->getMessage();
+            if (method_exists($e, 'response') && $e->response) {
+                $json = $e->response->json();
+                $detail .= ' :: '.($json['message'] ?? $e->response->body());
+            }
+            Log::error('Paystack initialize failed for package: '.$detail, [
                 'payment' => $payment->ref_id,
                 'package' => $solarPackage->id,
+                'reference' => $paystackReference,
+                'email' => $email,
             ]);
 
-            return response()->json(['message' => 'Could not reach Paystack. Please try again.'], 502);
+            return response()->json(['message' => 'Could not reach Paystack. Please try again.', 'detail' => $detail], 502);
         }
 
         if (empty($response['status']) || empty($response['data']['authorization_url'] ?? null)) {
-            \Illuminate\Support\Facades\Log::error('Paystack initialize returned invalid response for package.', ['response' => $response]);
+            Log::error('Paystack initialize returned invalid response for package.', ['response' => $response]);
 
             return response()->json(['message' => 'Paystack did not return a payment link.'], 502);
         }
 
-        $payment->update(['gateway_reference' => $payment->ref_id]);
+        // Only now update the payment with the successful Paystack reference
+        $payment->update([
+            'gateway_reference' => $paystackReference,
+            'ref_id' => $paystackReference,
+        ]);
 
         return response()->json([
             'authorization_url' => $response['data']['authorization_url'],
-            'reference' => $payment->ref_id,
+            'reference' => $paystackReference,
         ]);
     }
 
-    public function packagePaymentCallback(Request $request, SolarPackage $solarPackage): \Inertia\Response
+    public function packagePaymentCallback(Request $request, SolarPackage $solarPackage): Response
     {
         $reference = $request->query('reference');
         $paystack = app(PaystackService::class);
@@ -632,7 +772,7 @@ class StorefrontController extends Controller
         try {
             $verification = $paystack->verify($reference);
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('Paystack verification failed in callback: ' . $e->getMessage(), ['reference' => $reference]);
+            Log::error('Paystack verification failed in callback: '.$e->getMessage(), ['reference' => $reference]);
 
             return redirect()->route('packages.show', $solarPackage)
                 ->with('error', 'Could not verify payment. Please contact support.');
@@ -649,7 +789,7 @@ class StorefrontController extends Controller
         }
     }
 
-    public function packageOffline(Request $request, SolarPackage $solarPackage): \Inertia\Response
+    public function packageOffline(Request $request, SolarPackage $solarPackage): Response
     {
         $user = $request->user();
 
@@ -675,7 +815,7 @@ class StorefrontController extends Controller
         $totalAmount = $solarPackage->package_price + ($solarPackage->installation_cost ?? 0);
 
         // Record offline payment intent
-        $payment = \App\Services\PaymentService::recordPayment(
+        $payment = PaymentService::recordPayment(
             type: 'payment_in',
             amount: $totalAmount,
             paymentMethod: 'bank_transfer',
@@ -685,8 +825,8 @@ class StorefrontController extends Controller
             supplierId: null,
             reference: null,
             userId: $user->id,
-            gateway: \App\Models\Payment::GATEWAY_LOCAL,
-            status: \App\Models\Payment::STATUS_PENDING,
+            gateway: Payment::GATEWAY_LOCAL,
+            status: Payment::STATUS_PENDING,
         );
 
         return redirect()->route('packages.show', $solarPackage)
@@ -725,6 +865,14 @@ class StorefrontController extends Controller
 
         AuditLogger::log('created', 'feedback', 0, 'New customer feedback via website');
 
+        NotificationService::notifyAdmins(
+            'New website feedback',
+            "{$validated['customer_name']} submitted feedback".($validated['rating'] ? " ({$validated['rating']}/5)" : '').'.',
+            'feedback',
+            route('admin.marketing.feedback.index'),
+            ['feedback.manage'],
+        );
+
         return back()->with('success', 'Thank you for your feedback!');
     }
 
@@ -740,6 +888,36 @@ class StorefrontController extends Controller
             ['name' => $validated['name'] ?? null, 'status' => 'subscribed']
         );
 
+        NotificationService::notifyAdmins(
+            'New newsletter subscriber',
+            "{$validated['email']} joined the newsletter".($validated['name'] ? " ({$validated['name']})" : '').'.',
+            'newsletter',
+            route('admin.marketing.subscribers.index'),
+            ['marketing.newsletter'],
+        );
+
         return back()->with('success', "You've been subscribed! Stay tuned for solar tips and offers.");
+    }
+
+    public function newsletterUnsubscribe(string $token): Response
+    {
+        $subscriber = NewsletterSubscriber::where('token', $token)
+            ->where('status', 'subscribed')
+            ->first();
+
+        if (! $subscriber) {
+            return Inertia::render('Newsletter/Unsubscribed', [
+                'status' => 'invalid',
+                'email' => null,
+            ]);
+        }
+
+        $email = $subscriber->email;
+        $subscriber->update(['status' => 'unsubscribed']);
+
+        return Inertia::render('Newsletter/Unsubscribed', [
+            'status' => 'unsubscribed',
+            'email' => $email,
+        ]);
     }
 }

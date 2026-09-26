@@ -1,10 +1,10 @@
-﻿<script setup>
+<script setup>
 import { useForm, Link } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
 import PageHeader from '@/Components/PageHeader.vue';
 import Pagination from '@/Components/Pagination.vue';
-import { naira, badgeClass } from '@/lib/format';
+import { naira, maskNaira, badgeClass } from '@/lib/format';
 import { useCan } from '@/composables/permissions';
 
 defineOptions({ layout: AdminLayout });
@@ -65,28 +65,28 @@ const statusClasses = {
             </div>
             <div class="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Gross</p>
-                <p class="mt-2 text-2xl font-bold text-slate-900">{{ naira(summary.gross) }}</p>
+                <p class="mt-2 text-2xl font-bold text-slate-900">{{ maskNaira('salary', summary.gross) }}</p>
             </div>
             <div class="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Bonuses</p>
-                <p class="mt-2 text-2xl font-bold text-slate-900">{{ naira(summary.bonus) }}</p>
+                <p class="mt-2 text-2xl font-bold text-slate-900">{{ maskNaira('salary', summary.bonus) }}</p>
             </div>
             <div class="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Net Payable</p>
-                <p class="mt-2 text-2xl font-bold text-slate-900">{{ naira(summary.net_payable) }}</p>
+                <p class="mt-2 text-2xl font-bold text-slate-900">{{ maskNaira('salary', summary.net_payable) }}</p>
             </div>
             <div class="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Paid</p>
-                <p class="mt-2 text-2xl font-bold text-emerald-700">{{ naira(summary.paid) }}</p>
+                <p class="mt-2 text-2xl font-bold text-emerald-700">{{ maskNaira('salary', summary.paid) }}</p>
             </div>
             <div class="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Advances</p>
-                <p class="mt-2 text-2xl font-bold text-amber-700">{{ naira(summary.advance) }}</p>
+                <p class="mt-2 text-2xl font-bold text-amber-700">{{ maskNaira('salary', summary.advance) }}</p>
             </div>
         </div>
 
         <div class="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs sm:flex-row">
-            <input v-model="form.search" type="search" placeholder="Search staff nameâ€¦" class="flex-1 rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" @keyup.enter="applyFilters" />
+            <input v-model="form.search" type="search" placeholder="Search staff name…" class="flex-1 rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" @keyup.enter="applyFilters" />
             <select v-model="form.staff_id" class="rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20">
                 <option value="">All staff</option>
                 <option v-for="s in staff" :key="s.id" :value="s.id">{{ s.name }}</option>
@@ -122,11 +122,11 @@ const statusClasses = {
                                 <p class="text-xs text-slate-400">{{ p.ref_id }}</p>
                             </td>
                             <td class="px-4 py-3 text-slate-600">{{ p.period_label }}</td>
-                            <td class="px-4 py-3 text-right text-slate-700">{{ naira(p.base_salary + p.allowance) }}</td>
-                            <td class="px-4 py-3 text-right text-slate-700">{{ naira(p.bonus) }}</td>
-                            <td class="px-4 py-3 text-right text-slate-700">{{ naira(p.advance) }}</td>
-                            <td class="px-4 py-3 text-right text-slate-700">{{ naira(p.deduction) }}</td>
-                            <td class="px-4 py-3 text-right font-semibold text-slate-900">{{ naira(p.amount_paid) }}</td>
+                            <td class="px-4 py-3 text-right text-slate-700">{{ maskNaira('salary', p.base_salary + p.allowance) }}</td>
+                            <td class="px-4 py-3 text-right text-slate-700">{{ maskNaira('salary', p.bonus) }}</td>
+                            <td class="px-4 py-3 text-right text-slate-700">{{ maskNaira('salary', p.advance) }}</td>
+                            <td class="px-4 py-3 text-right text-slate-700">{{ maskNaira('salary', p.deduction) }}</td>
+                            <td class="px-4 py-3 text-right font-semibold text-slate-900">{{ maskNaira('salary', p.amount_paid) }}</td>
                             <td class="px-4 py-3 text-center"><span :class="badgeClass(statusClasses[p.status])">{{ p.status }}</span></td>
                             <td class="px-4 py-3 text-right">
                                 <Link :href="`/admin/payroll/${p.id}`" class="rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100">View</Link>

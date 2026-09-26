@@ -5,13 +5,16 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Quotation;
 use App\Models\SolarCalculation;
+use App\Models\SolarPackage;
 use App\Services\AuditLogger;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class SolarLeadController extends Controller
 {
-    public function index(Request $request): \Inertia\Response
+    public function index(Request $request): Response
     {
         $tab = $request->get('tab', 'calculations');
 
@@ -51,7 +54,7 @@ class SolarLeadController extends Controller
         ]);
     }
 
-    public function show(Request $request, SolarCalculation $calculation): \Inertia\Response
+    public function show(Request $request, SolarCalculation $calculation): Response
     {
         $calculation->load('recommendedPackage');
 
@@ -59,10 +62,11 @@ class SolarLeadController extends Controller
             'record' => $calculation,
             'type' => 'calculation',
             'statuses' => ['new', 'contacted', 'quoted', 'approved', 'installation', 'completed', 'lost'],
+            'packages' => SolarPackage::where('is_visible_online', true)->get(['id', 'name', 'package_price']),
         ]);
     }
 
-    public function showQuotation(Quotation $quotation): \Inertia\Response
+    public function showQuotation(Quotation $quotation): Response
     {
         $quotation->load('solarPackage');
 
@@ -71,6 +75,36 @@ class SolarLeadController extends Controller
             'type' => 'quotation',
             'statuses' => ['new', 'contacted', 'quoted', 'approved', 'declined', 'converted'],
         ]);
+    }
+
+    public function createQuotation(Request $request, SolarCalculation $calculation): RedirectResponse
+    {
+        $data = $request->validate([
+            'solar_package_id' => ['required', 'exists:solar_packages,id'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $quotation = Quotation::create([
+            'ref_id' => ReferenceGenerator::generate('quotation'),
+            'customer_id' => null,
+            'customer_name' => $calculation->customer_name,
+            'customer_phone' => $calculation->customer_phone,
+            'customer_email' => $calculation->customer_email,
+            'location' => $calculation->location,
+            'appliances_json' => $calculation->appliances_json,
+            'recommended_system' => $calculation->recommended_inverter,
+            'solar_package_id' => $data['solar_package_id'],
+            'estimated_price' => $calculation->estimated_price,
+            'status' => 'quoted',
+            'notes' => $data['notes'],
+        ]);
+
+        $calculation->update(['lead_status' => 'quoted']);
+
+        AuditLogger::log('created', 'quotation', $quotation->id, "Created quotation {$quotation->ref_id} from calculation {$calculation->ref_id}");
+
+        return redirect()->route('admin.solar-leads.quotations.show', $quotation)
+            ->with('success', "Quotation {$quotation->ref_id} created successfully.");
     }
 
     public function updateStatus(Request $request)

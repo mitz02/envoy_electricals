@@ -1,7 +1,6 @@
 <script setup>
-import { Link } from '@inertiajs/vue3';
 import { router } from '@inertiajs/vue3';
-import { computed, ref, watch } from 'vue';
+import { computed } from 'vue';
 
 const props = defineProps({
     meta: { type: Object, required: true },
@@ -26,7 +25,14 @@ function go(pageNumber) {
     if (!pageNumber || pageNumber < 1 || pageNumber > props.meta.last_page) {
         return;
     }
-    router.get(window.location.pathname, { page: pageNumber }, { preserveState: true, preserveScroll: props.preserveScroll });
+
+    const query = Object.fromEntries(new URLSearchParams(window.location.search));
+    query.page = pageNumber;
+
+    router.get(window.location.pathname, query, {
+        preserveState: true,
+        preserveScroll: props.preserveScroll,
+    });
 }
 </script>
 

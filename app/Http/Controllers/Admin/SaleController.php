@@ -4,18 +4,25 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
+use App\Models\Payment;
 use App\Models\Product;
 use App\Models\Sale;
+use App\Models\Setting;
 use App\Services\AuditLogger;
+use App\Services\InvoicePdfService;
 use App\Services\SaleService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class SaleController extends Controller
 {
     public function __construct(protected SaleService $saleService) {}
 
-    public function index(Request $request): \Inertia\Response
+    public function index(Request $request): Response
     {
         $sales = Sale::query()
             ->with([
@@ -44,23 +51,42 @@ class SaleController extends Controller
         ]);
     }
 
-    public function create(): \Inertia\Response
+    public function create(): Response
     {
-        return Inertia::render('Admin/Sales/Form', [
-            'products' => Product::where('status', 'active')
-                ->with('images')
-                ->orderBy('name')
-                ->get()
-                ->map(fn ($p) => [
+        $storeId = session('admin_store_id');
+        $isAllStores = ! $storeId;
+
+        $products = Product::where('status', 'active')
+            ->with(['images'])
+            ->when($storeId, function ($q) use ($storeId) {
+                $q->whereHas('stores', fn ($q) => $q->where('stores.id', $storeId));
+            })
+            ->orderBy('name')
+            ->get()
+            ->map(function ($p) use ($storeId) {
+                $available = $p->current_quantity;
+                if ($storeId) {
+                    $pivot = $p->stores->firstWhere('id', $storeId)?->pivot;
+                    $available = $pivot ? $pivot->current_quantity : 0;
+                    $selling_price = $pivot ? $pivot->selling_price : $p->selling_price;
+                } else {
+                    $selling_price = $p->selling_price;
+                }
+
+                return [
                     'id' => $p->id,
                     'sku' => $p->sku,
                     'name' => $p->name,
                     'unit' => $p->unit,
-                    'selling_price' => $p->selling_price,
-                    'current_quantity' => $p->current_quantity,
+                    'selling_price' => $selling_price,
+                    'current_quantity' => $available,
                     'image' => $p->images->first()?->path ?? '/images/landing/solar_panels_sky.jpg',
-                ])
-                ->values(),
+                ];
+            })
+            ->values();
+
+        return Inertia::render('Admin/Sales/Form', [
+            'products' => $products,
             'customers' => Customer::withSum(
                 ['sales as outstanding' => fn ($q) => $q->where('status', 'completed')],
                 'balance',
@@ -75,11 +101,11 @@ class SaleController extends Controller
                     'outstanding' => (float) $c->outstanding,
                     'has_outstanding' => (float) $c->outstanding > 0,
                 ]),
-            'tax_rate' => (float) (\App\Models\Setting::where('key', 'tax.rate')->value('value') ?? 0),
+            'tax_rate' => (float) (Setting::where('key', 'tax.rate')->value('value') ?? 0),
         ]);
     }
 
-    public function store(Request $request): \Illuminate\Http\RedirectResponse
+    public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
             'sale_date' => ['required', 'date'],
@@ -99,7 +125,7 @@ class SaleController extends Controller
 
         try {
             $sale = $this->saleService->createSale($data, $data['items'], $request->user()->id);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return back()->withErrors($e->errors())->withInput();
         }
 
@@ -110,20 +136,26 @@ class SaleController extends Controller
         if ($sale->customer_id) {
             $sale->load('customer');
 
+            $excess = (float) ($sale->excess_applied ?? 0);
             $prior = (float) Sale::where('customer_id', $sale->customer_id)
                 ->where('status', 'completed')
                 ->where('id', '!=', $sale->id)
                 ->sum('balance');
 
+            if ($excess > 0) {
+                $message .= ' ₦'.number_format($excess, 2, '.', ',')
+                    ." of the payment was applied to clear {$sale->customer->name}'s previous outstanding balance.";
+            }
+
             if ($prior > 0) {
-                $message .= " Note: {$sale->customer->name} owes ₦" . number_format($prior, 2, '.', ',') . ' from previous invoices.';
+                $message .= " Note: {$sale->customer->name} owes ₦".number_format($prior, 2, '.', ',').' from previous invoices.';
             }
         }
 
         return redirect()->route('admin.sales.show', $sale)->with('success', $message);
     }
 
-    public function show(Sale $sale): \Inertia\Response
+    public function show(Sale $sale): Response
     {
         $sale->load([
             'salesperson',
@@ -134,7 +166,7 @@ class SaleController extends Controller
             ),
         ]);
 
-        $payments = \App\Models\Payment::where('document_type', 'sale')
+        $payments = Payment::where('document_type', 'sale')
             ->where('document_id', $sale->id)
             ->latest('payment_date')
             ->get();
@@ -146,18 +178,26 @@ class SaleController extends Controller
         ]);
     }
 
-    public function destroy(Sale $sale, Request $request): \Illuminate\Http\RedirectResponse
+    public function destroy(Sale $sale, Request $request): RedirectResponse
     {
         $request->validate(['void_reason' => ['required', 'string', 'max:500']]);
 
         try {
             $this->saleService->voidSale($sale, $request->void_reason, $request->user()->id);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return back()->withErrors($e->errors());
         }
 
         AuditLogger::log('voided', 'sale', $sale->id, "Voided sale {$sale->invoice_no}: {$request->void_reason}");
 
         return back()->with('success', 'Sale voided and stock restored.');
+    }
+
+    /**
+     * Download invoice as PDF.
+     */
+    public function downloadInvoice(Sale $sale, InvoicePdfService $pdf): BinaryFileResponse
+    {
+        return $pdf->download($sale);
     }
 }

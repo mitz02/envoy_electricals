@@ -1,10 +1,13 @@
-<script setup>
-import { Link, usePage } from '@inertiajs/vue3';
+﻿<script setup>
+import PublicLayout from '@/Layouts/PublicLayout.vue';
+import { usePage } from '@inertiajs/vue3';
 
 defineProps({
     programs: { type: Array, default: () => [] },
     stats: { type: Object, default: () => ({}) },
 });
+
+defineOptions({ layout: PublicLayout });
 
 const hasUser = !!usePage().props.auth?.user;
 
@@ -16,32 +19,13 @@ const levelStyles = {
 </script>
 
 <template>
+    <Head>
+        <title>Envoy Academy — Solar, Electrical & Installation Training in Nigeria</title>
+        <meta name="description" content="Join Envoy Academy as a trainee or apprentice. Practical solar, electrical & installation training with hands-on workshops, online progress tracking, and industry-recognized certificates." />
+        <link rel="canonical" href="https://envoyelectricals.com/portal" />
+    </Head>
+
     <div class="min-h-screen bg-[#FAF8F2] font-sans text-slate-800 antialiased">
-        <!-- Header -->
-        <header class="sticky top-0 z-40 bg-[#0D1527] shadow-sm">
-            <div class="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-                <Link href="/portal" class="flex items-center gap-2.5">
-                    <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-white p-1">
-                        <img src="/envoy_images/logo.png" alt="Envoy Electric" class="h-full w-full object-contain" />
-                    </div>
-                    <div class="flex flex-col leading-tight">
-                        <span class="text-sm font-bold text-white">Envoy Academy<span class="text-yellow-400">.</span></span>
-                        <span class="text-[10px] font-medium uppercase tracking-wider text-slate-400">Skills &amp; Certification</span>
-                    </div>
-                </Link>
-
-                <div class="flex items-center gap-2">
-                    <template v-if="hasUser">
-                        <Link href="/portal/dashboard" class="rounded-lg bg-yellow-400 px-4 py-2 text-xs font-bold text-[#0D1527] hover:bg-yellow-300 transition-colors">My Dashboard</Link>
-                    </template>
-                    <template v-else>
-                        <Link href="/portal/login" class="rounded-lg px-4 py-2 text-xs font-semibold text-slate-300 hover:text-white transition-colors">Sign In</Link>
-                        <Link href="/portal/register" class="rounded-lg bg-yellow-400 px-4 py-2 text-xs font-bold text-[#0D1527] hover:bg-yellow-300 transition-colors">Register Free</Link>
-                    </template>
-                </div>
-            </div>
-        </header>
-
         <!-- Hero -->
         <section class="relative overflow-hidden bg-[#0D1527]">
             <div class="absolute inset-0" aria-hidden="true">
@@ -53,8 +37,8 @@ const levelStyles = {
                     <i class="bi bi-mortarboard-fill"></i> Practical skills. Certified careers.
                 </span>
                 <h1 class="mt-6 max-w-2xl text-3xl font-black leading-tight tracking-tight text-white sm:text-5xl">
-                    Learn solar, electrical &amp; install skills with
-                    <span class="bg-gradient-to-r from-yellow-400 to-[#40e0d0] bg-clip-text text-transparent">Envoy Electric</span>
+                    Learn solar, electrical & install skills with
+                    <span class="bg-gradient-to-r from-yellow-400 to-[#40e0d0] bg-clip-text text-transparent">Envoy Electricals</span>
                 </h1>
                 <p class="mt-5 max-w-xl text-sm leading-relaxed text-slate-400 sm:text-base">
                     Join our academy as a trainee or apprentice, train alongside working professionals,
@@ -114,7 +98,7 @@ const levelStyles = {
                         <span class="text-[11px] font-medium text-slate-400">{{ p.ref_id }}</span>
                     </div>
                     <h3 class="mt-4 text-lg font-bold text-slate-950">{{ p.title }}</h3>
-                    <p class="mt-2 line-clamp-3 flex-1 text-sm leading-relaxed text-slate-500">{{ p.description || 'Practical, instructor-led training at Envoy Electric.' }}</p>
+                    <p class="mt-2 line-clamp-3 flex-1 text-sm leading-relaxed text-slate-500">{{ p.description || 'Practical, instructor-led training at Envoy Electricals.' }}</p>
                     <div class="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
                         <div class="flex items-center gap-4 text-xs text-slate-500">
                             <span class="inline-flex items-center gap-1.5"><i class="bi bi-clock"></i>{{ p.duration_weeks }} {{ p.duration_weeks === 1 ? 'week' : 'weeks' }}</span>
@@ -131,16 +115,23 @@ const levelStyles = {
                 </div>
             </div>
 
-            <div v-else class="mt-8 rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center text-sm text-slate-400">
-                Programs are being prepared — check back soon.
+            <div v-else class="mt-8 rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
+                <div class="inline-flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-slate-400 mb-4">
+                    <i class="bi bi-mortarboard text-3xl"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-slate-900 mb-2">No training programs yet</h3>
+                <p class="text-slate-500 mb-6 max-w-md mx-auto">
+                    We're currently preparing new training programs. Check back soon or contact us to express your interest.
+                </p>
+                <div class="flex flex-wrap items-center justify-center gap-3">
+                    <Link href="/contact" class="inline-flex items-center gap-2 rounded-xl bg-[#0D1527] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#0D1527]/90 transition-colors">
+                        <i class="bi bi-envelope"></i> Contact Us
+                    </Link>
+                    <Link href="/portal/register" class="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">
+                        <i class="bi bi-bell"></i> Notify Me
+                    </Link>
+                </div>
             </div>
         </section>
-
-        <footer class="mx-auto max-w-6xl px-4 pb-10 sm:px-6">
-            <div class="flex flex-col items-center justify-between gap-2 border-t border-slate-200 pt-4 text-xs text-slate-400 sm:flex-row">
-                <p>© 2026 Envoy Electricals Ltd. All rights reserved.</p>
-                <Link href="/" class="font-medium text-slate-500 hover:text-[#0D1527]">Back to website</Link>
-            </div>
-        </footer>
     </div>
 </template>

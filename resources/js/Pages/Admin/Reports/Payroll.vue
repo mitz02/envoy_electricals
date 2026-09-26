@@ -1,10 +1,10 @@
-﻿<script setup>
+<script setup>
 import { useForm, Link } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
 import PageHeader from '@/Components/PageHeader.vue';
 import Pagination from '@/Components/Pagination.vue';
-import { naira, badgeClass } from '@/lib/format';
+import { naira, maskNaira, badgeClass } from '@/lib/format';
 
 defineOptions({ layout: AdminLayout });
 
@@ -67,23 +67,23 @@ const statusClasses = {
             </div>
             <div class="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Gross Pay</p>
-                <p class="mt-2 text-2xl font-bold text-slate-900">{{ naira(summary.gross) }}</p>
+                <p class="mt-2 text-2xl font-bold text-slate-900">{{ maskNaira('salary', summary.gross) }}</p>
             </div>
             <div class="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Bonuses</p>
-                <p class="mt-2 text-2xl font-bold text-emerald-700">{{ naira(summary.bonus) }}</p>
+                <p class="mt-2 text-2xl font-bold text-emerald-700">{{ maskNaira('salary', summary.bonus) }}</p>
             </div>
             <div class="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Net Payable</p>
-                <p class="mt-2 text-2xl font-bold text-slate-900">{{ naira(summary.net_payable) }}</p>
+                <p class="mt-2 text-2xl font-bold text-slate-900">{{ maskNaira('salary', summary.net_payable) }}</p>
             </div>
             <div class="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Paid</p>
-                <p class="mt-2 text-2xl font-bold text-emerald-700">{{ naira(summary.paid) }}</p>
+                <p class="mt-2 text-2xl font-bold text-emerald-700">{{ maskNaira('salary', summary.paid) }}</p>
             </div>
             <div class="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Advances</p>
-                <p class="mt-2 text-2xl font-bold text-amber-700">{{ naira(summary.advance) }}</p>
+                <p class="mt-2 text-2xl font-bold text-amber-700">{{ maskNaira('salary', summary.advance) }}</p>
             </div>
         </div>
 
@@ -101,10 +101,10 @@ const statusClasses = {
                     </thead>
                     <tbody class="divide-y divide-slate-100">
                         <tr v-for="b in by_staff" :key="b.staff_id" class="hover:bg-slate-50">
-                            <td class="px-4 py-2 font-medium text-slate-900">{{ b.staff?.name || 'â€”' }}</td>
-                            <td class="px-4 py-2 text-right text-slate-700">{{ naira(b.base + b.allowance + b.bonus) }}</td>
-                            <td class="px-4 py-2 text-right font-semibold text-slate-900">{{ naira(b.amount_paid) }}</td>
-                            <td class="px-4 py-2 text-right font-semibold text-emerald-700">{{ naira(b.paid) }}</td>
+                            <td class="px-4 py-2 font-medium text-slate-900">{{ b.staff?.name || '—' }}</td>
+                            <td class="px-4 py-2 text-right text-slate-700">{{ maskNaira('salary', b.base + b.allowance + b.bonus) }}</td>
+                            <td class="px-4 py-2 text-right font-semibold text-slate-900">{{ maskNaira('salary', b.amount_paid) }}</td>
+                            <td class="px-4 py-2 text-right font-semibold text-emerald-700">{{ maskNaira('salary', b.paid) }}</td>
                         </tr>
                         <tr v-if="!by_staff.length">
                             <td colspan="4" class="px-4 py-8 text-center text-sm text-slate-400">No payroll for this period.</td>

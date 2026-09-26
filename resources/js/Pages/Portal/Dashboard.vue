@@ -12,8 +12,6 @@ const props = defineProps({
     certificateCount: { type: Number, default: 0 },
     available: { type: Array, default: () => [] },
     paystackConfigured: { type: Boolean, default: false },
-    bankDetails: { type: Object, default: () => ({}) },
-    whatsappNumber: { type: String, default: '' },
 });
 
 const journey = [
@@ -24,10 +22,10 @@ const journey = [
 ];
 
 const statusMeta = {
-    pending: { label: 'Enrolled · pending', cls: 'bg-amber-100 text-amber-700' },
-    active: { label: 'In progress', cls: 'bg-[#40e0d0]/15 text-teal-700' },
-    completed: { label: 'Completed', cls: 'bg-emerald-100 text-emerald-700' },
-    cancelled: { label: 'Cancelled', cls: 'bg-red-100 text-red-600' },
+    enrolled: { label: 'Enrolled', cls: 'bg-amber-100 text-amber-700' },
+    in_progress: { label: 'In progress', cls: 'bg-[#40e0d0]/15 text-teal-700' },
+    completed: { label: 'Qualified', cls: 'bg-emerald-100 text-emerald-700' },
+    withdrawn: { label: 'Withdrawn', cls: 'bg-red-100 text-red-600' },
 };
 
 const typeStyles = { beginner: 'bg-emerald-100 text-emerald-800', intermediate: 'bg-amber-100 text-amber-800', advanced: 'bg-red-100 text-red-700' };
@@ -60,20 +58,6 @@ const formatPrice = (price) => {
     if (!price || price === 0) return 'Free';
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 }).format(price);
 };
-
-const bank = computed(() => props.bankDetails || {});
-
-const waNumber = props.whatsappNumber || '2348097089259';
-
-const waLink = computed(() => {
-    const lines = [
-        `Hello Envoy Academy! I just enrolled in "${enrollTarget.value?.title || ''}".`,
-        `Amount: ${formatPrice(enrollTarget.value?.price)}`,
-        `Name: ${usePage().props.auth?.user?.name || ''}`,
-        'Please find my proof of payment below.',
-    ];
-    return `https://wa.me/${waNumber}?text=${encodeURIComponent(lines.filter(Boolean).join('\n'))}`;
-});
 
 const enrollOpen = ref(false);
 const enrollTarget = ref(null);
@@ -135,21 +119,14 @@ async function payOnline() {
     }
 }
 
-function enrollOffline() {
-    enrollBusy.value = true;
-    router.post(route('portal.enroll', enrollTarget.value.id), { mode: 'offline' }, { preserveScroll: true });
-}
-
 function enrollFree() {
     enrollBusy.value = true;
     router.post(route('portal.enroll', enrollTarget.value.id), {}, { preserveScroll: true });
 }
 
 function confirmEnroll() {
-    if (!chosenPay.value) return;
-    if (chosenPay.value === 'online') payOnline();
-    else if (chosenPay.value === 'offline') enrollOffline();
-    else enrollFree();
+    if (chosenPay.value !== 'online') return;
+    payOnline();
 }
 
 function enroll(p) {
@@ -271,6 +248,12 @@ function enroll(p) {
                             <div class="h-full rounded-full bg-gradient-to-r from-[#40e0d0] to-[#FACC15] transition-all duration-700" :style="{ width: e.progress + '%' }"></div>
                         </div>
 
+                        <div
+                            v-if="e.status === 'completed'"
+                            class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700"
+                        >
+                            <i class="bi bi-patch-check-fill"></i> Qualified — certificate ready
+                        </div>
                         <div
                             v-if="e.status === 'active'"
                             class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#40e0d0]/10 px-4 py-3 text-sm font-bold text-teal-700"
@@ -446,59 +429,26 @@ function enroll(p) {
                                 </span>
                             </button>
 
-                            <button
-                                @click="choose('offline')"
-                                :disabled="enrollBusy"
-                                class="flex items-center gap-4 rounded-2xl border-[1.5px] px-4 py-3.5 text-left transition disabled:cursor-not-allowed disabled:opacity-50"
-                                :class="chosenPay === 'offline' ? 'border-amber-400 bg-amber-50 shadow-[0_0_0_3px_rgba(251,191,36,0.18)]' : 'border-slate-200 bg-white hover:border-amber-300'"
+                            <Link
+                                :href="`/training/${enrollTarget?.id}/pay/bank-transfer`"
+                                class="flex items-center gap-4 rounded-2xl border-[1.5px] border-amber-200 bg-amber-50/60 px-4 py-3.5 text-left transition hover:border-amber-300 hover:shadow-[0_0_0_3px_rgba(251,191,36,0.15)]"
                             >
                                 <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
                                     <i class="bi bi-bank"></i>
                                 </span>
                                 <span class="min-w-0">
-                                    <span class="block text-sm font-black text-[#0D1527]">Enroll & pay offline</span>
-                                    <span class="block text-xs text-slate-500">Bank transfer — your seat is reserved and we confirm once payment clears.</span>
+                                    <span class="block text-sm font-black text-[#0D1527]">Pay by Bank Transfer</span>
+                                    <span class="block text-xs text-slate-500">A dedicated transfer page with our account details, reference and WhatsApp proof.</span>
                                 </span>
-                                <span class="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2" :class="chosenPay === 'offline' ? 'border-amber-400 bg-amber-400 text-[#0D1527]' : 'border-slate-300'">
-                                    <i v-if="chosenPay === 'offline'" class="bi bi-check text-xs font-black"></i>
+                                <span class="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0D1527] text-amber-400">
+                                    <i class="bi bi-arrow-right text-sm"></i>
                                 </span>
-                            </button>
+                            </Link>
                         </div>
 
                         <p v-if="!paystackConfigured" class="mt-3 flex items-center gap-1.5 text-xs font-semibold text-amber-700">
-                            <i class="bi bi-info-circle"></i> Online payment isn't available right now — please choose offline.
+                            <i class="bi bi-info-circle"></i> Online payment isn't available right now — please use bank transfer.
                         </p>
-
-                        <div v-if="chosenPay === 'offline'" class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                            <p class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-amber-700">
-                                <i class="bi bi-bank2"></i> Bank transfer details
-                            </p>
-                            <dl class="mt-2 space-y-1 text-sm">
-                                <div>
-                                    <dt class="inline text-slate-500">Account name: </dt>
-                                    <dd class="inline font-bold text-[#0D1527]">{{ bank.account_name || 'Envoy Electricals' }}</dd>
-                                </div>
-                                <div>
-                                    <dt class="inline text-slate-500">Account number: </dt>
-                                    <dd class="inline font-mono font-black text-[#0D1527]">{{ bank.account_number || '5168265608' }}</dd>
-                                </div>
-                                <div>
-                                    <dt class="inline text-slate-500">Bank: </dt>
-                                    <dd class="inline font-bold text-[#0D1527]">{{ bank.bank_name || 'Moniepoint MFB' }}</dd>
-                                </div>
-                            </dl>
-                            <p v-if="bank.instructions" class="mt-2 text-xs leading-relaxed text-slate-600">{{ bank.instructions }}</p>
-
-                            <a
-                                :href="waLink"
-                                target="_blank"
-                                rel="noopener"
-                                class="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-700 transition-all hover:bg-emerald-100 hover:shadow-[0_6px_20px_rgba(16,185,129,0.25)]"
-                            >
-                                <i class="bi bi-whatsapp text-lg leading-none"></i>
-                                Send proof of payment via WhatsApp
-                            </a>
-                        </div>
 
                         <p v-if="enrollError" class="mt-4 rounded-xl bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-600">{{ enrollError }}</p>
 
@@ -513,7 +463,6 @@ function enroll(p) {
                                     Continue to Paystack
                                     <span class="flex h-6 w-6 items-center justify-center rounded-full bg-yellow-400 text-[#0D1527]"><i class="bi bi-arrow-right text-xs font-black"></i></span>
                                 </span>
-                                <span v-else-if="chosenPay === 'offline'">Enroll & pay offline</span>
                                 <span v-else>Choose a payment option</span>
                             </button>
                             <button @click="closeEnroll" class="rounded-full px-4 py-3.5 text-sm font-bold text-slate-500 transition hover:text-[#0D1527]">Cancel</button>

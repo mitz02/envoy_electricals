@@ -1,5 +1,5 @@
 <script setup>
-import { Link } from '@inertiajs/vue3';
+import { Link, Head } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { cartItems, cartSubtotal, updateQuantity, removeItem, clearCart } from '@/lib/cart';
 import { naira } from '@/lib/format';
@@ -12,6 +12,9 @@ function imageUrl(item) {
 </script>
 
 <template>
+    <Head>
+        <meta name="robots" content="noindex, nofollow" />
+    </Head>
     <div class="mx-auto max-w-4xl px-4 py-10 sm:px-6">
         <h1 class="text-2xl font-black text-slate-900">Your Cart</h1>
         <p class="mt-1 text-sm text-slate-500">Review your items and proceed to checkout.</p>

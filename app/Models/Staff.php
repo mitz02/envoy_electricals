@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Traits\HasStoreScope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,12 +11,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Staff extends Model
 {
-    use SoftDeletes;
+    use HasStoreScope, SoftDeletes;
 
     protected $fillable = [
         'ref_id', 'user_id', 'name', 'position', 'phone', 'email',
         'date_joined', 'base_salary', 'housing_allowance', 'transport_allowance',
-        'other_allowance', 'is_active', 'notes',
+        'other_allowance', 'is_active', 'store_id', 'notes',
     ];
 
     protected $casts = [
@@ -70,5 +71,10 @@ class Staff extends Model
     public function getTotalDeductionsAttribute(): float
     {
         return round((float) $this->paidPayrolls()->sum('deduction'), 2);
+    }
+
+    public function store(): BelongsTo
+    {
+        return $this->belongsTo(Store::class);
     }
 }

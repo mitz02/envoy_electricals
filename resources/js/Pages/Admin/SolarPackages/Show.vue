@@ -62,6 +62,23 @@ const availabilityBadge = {
         <Link href="/admin/solar-packages" class="text-sm text-slate-500 hover:text-slate-900">← Back to packages</Link>
     </div>
 
+    <!-- Flow Explanation -->
+    <div class="mb-6 p-4 rounded-xl bg-blue-50 border border-blue-100">
+        <div class="flex items-start gap-3">
+            <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                <i class="bi bi-info-circle text-blue-600 text-sm" />
+            </div>
+            <div class="text-sm text-blue-800 space-y-1">
+                <p class="font-semibold">Package Usage Flow:</p>
+                <p><strong>1. Quotations:</strong> Admin creates quotation for lead → selects this package → customer gets formal quote.</p>
+                <p><strong>2. Calculator:</strong> Customer uses website calculator → system recommends this package based on load.</p>
+                <p><strong>3. POS/Sales:</strong> Staff creates sale → adds this package as a line item.</p>
+                <p><strong>4. Visibility:</strong> "Visible online" = shows on website. "Featured" = highlighted on homepage/packages page.</p>
+                <p><strong>Margin:</strong> Package price − Component costs = Gross margin. Target: ≥ 25%.</p>
+            </div>
+        </div>
+    </div>
+
     <div class="grid gap-4 lg:grid-cols-3">
         <!-- Left column: package profile -->
         <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">

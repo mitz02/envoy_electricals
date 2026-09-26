@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { ref } from 'vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import InputError from '@/Components/InputError.vue';
@@ -19,7 +19,6 @@ const showConfirm = ref(false);
 const types = [
     { value: 'trainee', label: 'Trainee', icon: 'bi-mortarboard-fill' },
     { value: 'apprentice', label: 'Apprentice', icon: 'bi-tools' },
-    { value: 'staff', label: 'Staff Member', icon: 'bi-person-badge-fill' },
 ];
 
 const submit = () => {
@@ -41,10 +40,12 @@ const registerFeatures = [
         eyebrow="Join Envoy Academy"
         title="Create Your"
         titleAccent="Academy Account"
-        subtitle="Sign up for a free trainee account and start your journey with Envoy Electric."
+        subtitle="Sign up for a free trainee account and start your journey with Envoy Electricals."
         :features="registerFeatures"
     >
-        <Head title="Portal Register" />
+        <Head title="Portal Register">
+            <meta name="robots" content="noindex, nofollow" />
+        </Head>
 
         <!-- Header -->
         <div class="mb-8">

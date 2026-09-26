@@ -9,18 +9,18 @@ use App\Services\StaffService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class PayrollController extends Controller
 {
-    public function index(Request $request): \Inertia\Response
+    public function index(Request $request): Response
     {
         $year = $request->get('period_year', now()->format('Y'));
         $month = str_pad((string) $request->get('period_month', now()->format('n')), 2, '0', STR_PAD_LEFT);
 
         $payrolls = Payroll::query()
             ->with(['staff'])
-            ->when($request->search, fn ($q, $s) => $q->whereHas('staff', fn (Builder $staff) =>
-                $staff->where('name', 'like', "%{$s}%")->orWhere('ref_id', 'like', "%{$s}%")
+            ->when($request->search, fn ($q, $s) => $q->whereHas('staff', fn (Builder $staff) => $staff->where('name', 'like', "%{$s}%")->orWhere('ref_id', 'like', "%{$s}%")
             ))
             ->when($request->staff_id, fn ($q, $id) => $q->where('staff_id', $id))
             ->when($request->status, fn ($q, $s) => $q->where('status', $s))
@@ -52,7 +52,7 @@ class PayrollController extends Controller
         ]);
     }
 
-    public function create(): \Inertia\Response
+    public function create(): Response
     {
         return Inertia::render('Admin/Payroll/Form', [
             'payroll' => null,
@@ -71,10 +71,10 @@ class PayrollController extends Controller
             return back()->withErrors(['amount' => $e->getMessage()]);
         }
 
-        return redirect()->route('admin.payroll.show', $payroll->id)->with('success', "Payroll prepared — net pay ₦" . number_format($payroll->amount_paid, 2) . '.');
+        return redirect()->route('admin.payroll.show', $payroll->id)->with('success', 'Payroll prepared — net pay ₦'.number_format($payroll->amount_paid, 2).'.');
     }
 
-    public function show(Payroll $payroll): \Inertia\Response
+    public function show(Payroll $payroll): Response
     {
         $payroll->load(['staff', 'creator', 'payments']);
 
@@ -84,7 +84,7 @@ class PayrollController extends Controller
         ]);
     }
 
-    public function edit(Payroll $payroll): \Inertia\Response
+    public function edit(Payroll $payroll): Response
     {
         abort_if($payroll->status !== Payroll::STATUS_PENDING, 403, 'Only pending payroll records can be edited.');
 
@@ -123,7 +123,7 @@ class PayrollController extends Controller
             return back()->withErrors(['pay' => $e->getMessage()]);
         }
 
-        return redirect()->route('admin.payroll.show', $payroll->id)->with('success', "Payroll marked as paid (₦" . number_format($payroll->amount_paid, 2) . ').');
+        return redirect()->route('admin.payroll.show', $payroll->id)->with('success', 'Payroll marked as paid (₦'.number_format($payroll->amount_paid, 2).').');
     }
 
     public function destroy(Request $request, Payroll $payroll)

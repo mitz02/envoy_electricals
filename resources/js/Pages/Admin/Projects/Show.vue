@@ -5,7 +5,7 @@ import AdminLayout from '@/Layouts/AdminLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
 import PageHeader from '@/Components/PageHeader.vue';
 import { useCan } from '@/composables/permissions';
-import { naira, formatDate, badgeClass } from '@/lib/format';
+import { naira, maskNaira, formatDate, badgeClass } from '@/lib/format';
 
 defineOptions({ layout: AdminLayout });
 
@@ -209,11 +209,11 @@ const canDelete = computed(() => has('projects.delete') || isOwner.value);
             </div>
             <div class="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Project Cost</p>
-                <p class="mt-2 text-2xl font-bold text-slate-900">{{ naira(project.project_cost) }}</p>
+                <p class="mt-2 text-2xl font-bold text-slate-900">{{ maskNaira('project_cost', project.project_cost) }}</p>
             </div>
             <div class="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Gross Profit</p>
-                <p class="mt-2 text-2xl font-bold" :class="project.gross_profit >= 0 ? 'text-emerald-700' : 'text-red-700'">{{ naira(project.gross_profit) }}</p>
+                <p class="mt-2 text-2xl font-bold" :class="project.gross_profit >= 0 ? 'text-emerald-700' : 'text-red-700'">{{ maskNaira('gross_profit', project.gross_profit) }}</p>
             </div>
         </div>
 
@@ -328,8 +328,8 @@ const canDelete = computed(() => has('projects.delete') || isOwner.value);
                                     <p class="text-xs text-slate-400">{{ m.product?.sku }} · stock: {{ m.product?.current_quantity }}</p>
                                 </td>
                                 <td class="px-4 py-3 text-right">{{ m.quantity }}</td>
-                                <td class="px-4 py-3 text-right">{{ naira(m.unit_cost, 2) }}</td>
-                                <td class="px-4 py-3 text-right font-semibold text-slate-900">{{ naira(m.total) }}</td>
+                                <td class="px-4 py-3 text-right">{{ maskNaira('inventory_value', m.unit_cost, 2) }}</td>
+                                <td class="px-4 py-3 text-right font-semibold text-slate-900">{{ maskNaira('inventory_value', m.total) }}</td>
                                 <td class="px-4 py-3 text-center">
                                     <span :class="m.issued_to_inventory ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'" class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium">
                                         {{ m.issued_to_inventory ? 'Issued' : 'Pending' }}

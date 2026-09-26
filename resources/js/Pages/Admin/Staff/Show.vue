@@ -1,4 +1,4 @@
-﻿<script setup>
+<script setup>
 import { useForm, Link } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
@@ -35,7 +35,7 @@ const statusClasses = {
 <template>
         <FlashMessages />
         <div class="mb-4 flex items-center gap-2">
-            <Link href="/admin/staff" class="text-sm text-slate-500 hover:text-slate-900">â† Back to staff</Link>
+            <Link href="/admin/staff" class="text-sm text-slate-500 hover:text-slate-900">← Back to staff</Link>
         </div>
 
         <div class="grid gap-4 lg:grid-cols-3">
@@ -50,10 +50,27 @@ const statusClasses = {
                 </div>
 
                 <dl class="mt-5 space-y-2 text-sm">
-                    <div class="flex justify-between"><dt class="text-slate-500">Phone</dt><dd class="font-medium text-slate-900">{{ staff.phone || 'â€”' }}</dd></div>
-                    <div class="flex justify-between"><dt class="text-slate-500">Email</dt><dd class="font-medium text-slate-900">{{ staff.email || 'â€”' }}</dd></div>
-                    <div class="flex justify-between"><dt class="text-slate-500">Date joined</dt><dd class="font-medium text-slate-900">{{ staff.date_joined ? formatDate(staff.date_joined) : 'â€”' }}</dd></div>
+                    <div class="flex justify-between"><dt class="text-slate-500">Phone</dt><dd class="font-medium text-slate-900">{{ staff.phone || '—' }}</dd></div>
+                    <div class="flex justify-between"><dt class="text-slate-500">Email</dt><dd class="font-medium text-slate-900">{{ staff.email || '—' }}</dd></div>
+                    <div class="flex justify-between"><dt class="text-slate-500">Date joined</dt><dd class="font-medium text-slate-900">{{ staff.date_joined ? formatDate(staff.date_joined) : '—' }}</dd></div>
                 </dl>
+
+                <div class="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Branch access</p>
+                    <div v-if="staff.user?.stores?.length" class="mt-2 flex flex-wrap gap-1.5">
+                        <span
+                            v-for="store in staff.user.stores"
+                            :key="store.id"
+                            class="rounded-full bg-[#0D1527] px-2.5 py-1 text-xs font-medium text-white"
+                        >{{ store.name }}</span>
+                    </div>
+                    <p v-else class="mt-1.5 text-sm text-slate-500">
+                        <i class="bi bi-unlock me-1 text-emerald-600" />Can see every branch.
+                    </p>
+                    <p class="mt-2 text-xs text-slate-500">
+                        {{ staff.user ? 'This login is limited to the branches ticked above. Everything else is hidden.' : 'This staff record has no login account yet.' }}
+                    </p>
+                </div>
 
                 <div class="mt-4 flex gap-2">
                     <Link v-if="canManage" :href="`/admin/staff/${staff.id}/edit`" class="rounded-lg bg-[#0D1527] px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800">Edit Profile</Link>

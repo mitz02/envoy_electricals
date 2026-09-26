@@ -62,6 +62,25 @@ class EnrollmentController extends Controller
         return redirect()->back()->with('success', $message);
     }
 
+    public function complete(Request $request, Enrollment $enrollment): RedirectResponse
+    {
+        $data = $request->validate([
+            'grade' => ['nullable', 'numeric', 'between:0,100'],
+        ]);
+
+        try {
+            app(AcademyService::class)->completeEnrollment(
+                $enrollment,
+                isset($data['grade']) ? (float) $data['grade'] : null,
+                $request->user()->id,
+            );
+        } catch (RuntimeException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Program marked as over — certificate issued.');
+    }
+
     public function withdraw(Request $request, Enrollment $enrollment): RedirectResponse
     {
         try {

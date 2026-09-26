@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Portal;
 
 use App\Http\Controllers\Controller;
-use App\Models\Trainee;
 use App\Services\AcademyService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;

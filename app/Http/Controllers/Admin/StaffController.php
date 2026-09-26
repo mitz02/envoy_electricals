@@ -4,15 +4,20 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Payroll;
+use App\Models\Position;
+use App\Models\Role;
 use App\Models\Staff;
-use App\Models\User;
 use App\Services\StaffService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class StaffController extends Controller
 {
-    public function index(Request $request): \Inertia\Response
+    public function index(Request $request): Response
     {
         $staff = Staff::query()
             ->withCount(['payrolls'])
@@ -46,11 +51,11 @@ class StaffController extends Controller
         ]);
     }
 
-    public function create(): \Inertia\Response
+    public function create(): Response
     {
         return Inertia::render('Admin/Staff/Form', [
             'staff' => null,
-            'users' => User::orderBy('name')->get(['id', 'name', 'email']),
+            'roles' => $this->assignableRoles(),
         ]);
     }
 
@@ -60,12 +65,12 @@ class StaffController extends Controller
 
         $staff = app(StaffService::class)->create($data, $request->user()->id);
 
-        return redirect()->route('admin.staff.show', $staff->id)->with('success', 'Staff profile created.');
+        return redirect()->route('admin.staff.show', $staff->id)->with('success', 'Staff profile and login account created.');
     }
 
-    public function show(Staff $staff): \Inertia\Response
+    public function show(Staff $staff): Response
     {
-        $staff->load(['user']);
+        $staff->load(['user.stores', 'user.role']);
 
         return Inertia::render('Admin/Staff/Show', [
             'staff' => $staff,
@@ -74,11 +79,13 @@ class StaffController extends Controller
         ]);
     }
 
-    public function edit(Staff $staff): \Inertia\Response
+    public function edit(Staff $staff): Response
     {
+        $staff->load('user.stores');
+
         return Inertia::render('Admin/Staff/Form', [
             'staff' => $staff,
-            'users' => User::orderBy('name')->get(['id', 'name', 'email']),
+            'roles' => $this->assignableRoles(),
         ]);
     }
 
@@ -98,21 +105,83 @@ class StaffController extends Controller
         return redirect()->route('admin.staff.index')->with('success', 'Staff record removed.');
     }
 
+    // Position management
+    public function positionsIndex(): Response
+    {
+        $positions = Position::ordered()->get(['id', 'name', 'description', 'is_active', 'sort_order']);
+
+        return Inertia::render('Admin/Staff/Positions', [
+            'positions' => $positions,
+        ]);
+    }
+
+    public function positionStore(Request $request)
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255', 'unique:positions,name'],
+            'description' => ['nullable', 'string'],
+            'is_active' => ['sometimes', 'boolean'],
+            'sort_order' => ['sometimes', 'integer', 'min:0'],
+        ]);
+
+        Position::create($data);
+
+        return back()->with('success', 'Position created.');
+    }
+
+    public function positionUpdate(Request $request, Position $position)
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255', 'unique:positions,name,'.$position->id],
+            'description' => ['nullable', 'string'],
+            'is_active' => ['sometimes', 'boolean'],
+            'sort_order' => ['sometimes', 'integer', 'min:0'],
+        ]);
+
+        $position->update($data);
+
+        return back()->with('success', 'Position updated.');
+    }
+
+    public function positionDestroy(Request $request, Position $position)
+    {
+        $position->delete();
+
+        return back()->with('success', 'Position deleted.');
+    }
+
+    protected function assignableRoles(): Collection
+    {
+        return Role::query()
+            ->where('slug', '!=', 'owner')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+    }
+
     protected function validated(Request $request, int $ignoreId = 0): array
     {
+        $ignoreUserId = $ignoreId ? Staff::find($ignoreId)?->user_id : null;
+
         return $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'position' => ['nullable', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:30'],
-            'email' => ['nullable', 'email', 'max:255', 'unique:staff,email,' . $ignoreId],
+            'email' => [
+                'required', 'email', 'max:255',
+                'unique:staff,email,'.$ignoreId,
+                Rule::unique('users', 'email')->ignore($ignoreUserId),
+            ],
+            'role_id' => ['required', 'exists:roles,id'],
+            'password' => $ignoreId === 0
+                ? ['required', 'confirmed', Rules\Password::defaults()]
+                : ['sometimes', 'nullable', 'confirmed', Rules\Password::defaults()],
             'date_joined' => ['nullable', 'date'],
             'base_salary' => ['required', 'numeric', 'min:0'],
             'housing_allowance' => ['nullable', 'numeric', 'min:0'],
             'transport_allowance' => ['nullable', 'numeric', 'min:0'],
             'other_allowance' => ['nullable', 'numeric', 'min:0'],
-            'user_id' => ['nullable', 'exists:users,id'],
             'is_active' => ['sometimes', 'boolean'],
             'notes' => ['nullable', 'string'],
+            'user_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
         ]);
     }
 }

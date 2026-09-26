@@ -1,8 +1,9 @@
-<script setup>
+﻿<script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { Head, Link } from '@inertiajs/vue3';
-import { products, currencyFormat, discountPercent, discountAmount } from '../data/products';
-import { cartCount, bumpCart } from '../lib/cart';
+import { Head } from '@inertiajs/vue3';
+import PublicLayout from '@/Layouts/PublicLayout.vue';
+
+defineOptions({ layout: PublicLayout });
 
 const props = defineProps({
     canLogin: {
@@ -17,21 +18,16 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    whatsappNumber: {
+        type: String,
+        default: '',
+    },
 });
 
-// Featured products for the showcase grid (real products from the store)
-const shopProducts = computed(() =>
-    props.featuredProducts.length ? props.featuredProducts : products.slice(0, 8).map((p) => ({
-        id: p.id,
-        name: p.name,
-        price: p.price,
-        image: p.image,
-        category: p.category,
-    }))
-);
+// Featured products for the showcase grid (real products added by admin)
+const shopProducts = computed(() => props.featuredProducts);
 
-// Navigation / Drawer state
-const isMobileMenuOpen = ref(false);
+// Contact Modal state
 const isContactModalOpen = ref(false);
 const contactSuccess = ref(false);
 const contactForm = ref({
@@ -69,7 +65,7 @@ const heroSlides = [
         subtitle:
             'We design, install, and maintain high-performance solar systems that turn sunlight into reliable, affordable power — built to last for decades.',
         cta: { label: 'Explore Solutions', href: '#solutions' },
-        image: '/images/landing/hero_solar_panels.jpg',
+        image: '/images/landing/hero_ng_1.jpg',
     },
     {
         badge: 'SMART SOLAR TECHNOLOGY',
@@ -78,7 +74,7 @@ const heroSlides = [
         subtitle:
             "Smart inverters, sleek panels, and battery storage in perfect sync — clean energy so seamless you'll forget the grid ever existed.",
         cta: { label: 'Shop the Range', href: '#shop' },
-        image: '/images/landing/solar_panels_sky.jpg',
+        image: '/images/landing/hero_ng_2.jpg',
     },
     {
         badge: 'ENGINEERED FOR EXCELLENCE',
@@ -87,7 +83,7 @@ const heroSlides = [
         subtitle:
             'Go off-grid or stay hybrid — our lithium storage and solar systems cut electricity costs by up to 90% and keep you running through any outage.',
         cta: { label: 'Size My System', href: '/calculator' },
-        image: '/images/landing/solar_farm_wide.jpg',
+        image: '/images/landing/hero_ng_3.jpg',
     },
 ];
 
@@ -118,13 +114,40 @@ function goToHero(index) {
     restartHeroTimer();
 }
 
-onMounted(restartHeroTimer);
+// Scroll-reveal observer
+function observeReveal() {
+    if (!('IntersectionObserver' in window)) {
+        document.querySelectorAll('.reveal').forEach((el) => el.classList.add('reveal-visible'));
+        return;
+    }
+    const io = new IntersectionObserver(
+        (entries) => {
+            entries.forEach((entry) => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('reveal-visible');
+                    io.unobserve(entry.target);
+                }
+            });
+        },
+        { threshold: 0.1, rootMargin: '0px 0px -40px 0px' }
+    );
+    document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
+}
+
+onMounted(() => {
+    restartHeroTimer();
+    observeReveal();
+    updateSolutionPerView();
+    window.addEventListener('resize', updateSolutionPerView);
+    startSolutionAutoplay();
+});
 onUnmounted(() => {
     if (heroTimer) clearInterval(heroTimer);
+    window.removeEventListener('resize', updateSolutionPerView);
+    stopSolutionAutoplay();
 });
 
-// Section 3: Solar Solutions carousel state
-const activeSolutionIndex = ref(0);
+// Section 3: Solar Solutions carousel
 const solutions = [
     {
         id: 1,
@@ -158,15 +181,135 @@ const solutions = [
         image: '/envoy_images/engineers-rooftop.jpg',
         icon: 'service',
     },
+    {
+        id: 5,
+        title: 'System Design & Engineering',
+        description:
+            'Custom solar system design backed by load analysis, energy audits, and 3D site modelling — delivering the perfect panel and inverter configuration for your exact power profile.',
+        image: '/images/landing/engineers_blueprint.jpg',
+        icon: 'design',
+    },
+    {
+        id: 6,
+        title: 'Solar Water Pumping',
+        description:
+            'Submersible and surface solar water pumps for boreholes, farms, and irrigation — reliable, fuel-free water supply driven purely by free solar energy, day in and day out.',
+        image: '/images/landing/hydro_plant.jpg',
+        icon: 'pump',
+    },
+    {
+        id: 7,
+        title: 'Commercial & Industrial Solar',
+        description:
+            'Tailored solar rooftop and carport systems for businesses and factories that slash operating costs and lock in predictable, greener electricity for decades.',
+        image: '/images/landing/solar_city.jpg',
+        icon: 'building',
+    },
+    {
+        id: 8,
+        title: 'Solar Farm & Utility Projects',
+        description:
+            'Ground-mount arrays and large-scale solar farms engineered for communities and enterprises — from feasibility study and land assessment to commissioning and grid integration.',
+        image: '/images/landing/solar_farm_wide.jpg',
+        icon: 'farm',
+    },
 ];
 
+const solutionPerView = ref(4);
+const activeSolutionIndex = ref(0);
+const solutionWrapJump = ref(false);
+const solutionAutoplayPaused = ref(false);
+let solutionAutoplay = null;
+let solutionSwiping = false;
+let solutionStartX = 0;
+
+const solutionIndexLimit = computed(() => Math.max(0, solutions.length - solutionPerView.value));
+const solutionPages = computed(() => Math.ceil(solutions.length / solutionPerView.value));
+const solutionPageIndex = computed(() =>
+    Math.min(Math.floor(activeSolutionIndex.value / solutionPerView.value), solutionPages.value - 1)
+);
+
+function updateSolutionPerView() {
+    const w = window.innerWidth;
+    let perView = 4;
+    if (w < 640) perView = 1;
+    else if (w < 1024) perView = 2;
+    solutionPerView.value = perView;
+    activeSolutionIndex.value = Math.min(activeSolutionIndex.value, Math.max(0, solutions.length - perView));
+}
+
+function stopSolutionAutoplay() {
+    if (solutionAutoplay) {
+        clearInterval(solutionAutoplay);
+        solutionAutoplay = null;
+    }
+}
+
+function startSolutionAutoplay() {
+    stopSolutionAutoplay();
+    solutionAutoplay = setInterval(nextSolution, 6000);
+}
+
+function restartSolutionAutoplay() {
+    if (!solutionAutoplayPaused.value) startSolutionAutoplay();
+}
+
 function nextSolution() {
-    activeSolutionIndex.value = (activeSolutionIndex.value + 1) % solutions.length;
+    if (activeSolutionIndex.value >= solutionIndexLimit.value) {
+        solutionWrapJump.value = true;
+        activeSolutionIndex.value = 0;
+        requestAnimationFrame(() => {
+            solutionWrapJump.value = false;
+        });
+    } else {
+        activeSolutionIndex.value += 1;
+    }
+    restartSolutionAutoplay();
 }
 
 function prevSolution() {
-    activeSolutionIndex.value =
-        (activeSolutionIndex.value - 1 + solutions.length) % solutions.length;
+    if (activeSolutionIndex.value <= 0) {
+        solutionWrapJump.value = true;
+        activeSolutionIndex.value = solutionIndexLimit.value;
+        requestAnimationFrame(() => {
+            solutionWrapJump.value = false;
+        });
+    } else {
+        activeSolutionIndex.value -= 1;
+    }
+    restartSolutionAutoplay();
+}
+
+function goToSolutionPage(page) {
+    activeSolutionIndex.value = Math.min(page * solutionPerView.value, solutionIndexLimit.value);
+    restartSolutionAutoplay();
+}
+
+function solutionHover(active) {
+    solutionAutoplayPaused.value = active;
+    if (active) stopSolutionAutoplay();
+    else restartSolutionAutoplay();
+}
+
+function solutionPointerDown(e) {
+    solutionSwiping = true;
+    solutionStartX = e.clientX;
+    stopSolutionAutoplay();
+}
+
+function solutionPointerMove(e) {
+    if (!solutionSwiping) return;
+    const dx = e.clientX - solutionStartX;
+    if (Math.abs(dx) > 45) {
+        solutionSwiping = false;
+        if (dx < 0) nextSolution();
+        else prevSolution();
+    }
+}
+
+function solutionPointerUp() {
+    solutionSwiping = false;
+    if (!solutionAutoplayPaused.value) startSolutionAutoplay();
 }
 
 // Section 5: Gallery showcase state
@@ -206,77 +349,40 @@ function galleryPrev() {
         (galleryIndex.value - 1 + filteredGallery.value.length) % filteredGallery.value.length;
 }
 
-// Section: Solar Products catalog (shared mock data)
-// `products`, `currencyFormat` imported from data/products.js
-const cartToastVisible = ref(false);
-const cartToastName = ref('');
-let cartToastTimer = null;
-function addToCart(product) {
-    bumpCart();
-    cartToastName.value = product.name;
-    cartToastVisible.value = true;
-    clearTimeout(cartToastTimer);
-    cartToastTimer = setTimeout(() => {
-        cartToastVisible.value = false;
-    }, 2600);
-}
+const formatNaira = (value) => '₦' + Number(value).toLocaleString('en-NG');
 
-const formatNaira = currencyFormat;
-const productDiscountPercent = discountPercent;
-const productDiscountAmount = discountAmount;
-
-const activeProductCategory = ref('Services');
-const filteredProducts = computed(() => {
-    if (activeProductCategory.value === 'All') return products;
-    return products.filter((p) => p.category === activeProductCategory.value);
-});
-
-// Newsletter state
-const newsletterEmail = ref('');
-const newsletterSubscribed = ref(false);
-function subscribeNewsletter() {
-    if (newsletterEmail.value) {
-        newsletterSubscribed.value = true;
-        setTimeout(() => {
-            newsletterSubscribed.value = false;
-            newsletterEmail.value = '';
-        }, 3000);
-    }
-}
-
-// Workflow Process Steps (Image 1: 02, 03, 04, 01)
+// Workflow Process Steps (ordered 01 → 04)
 const workflowSteps = [
+    {
+        badge: '01',
+        title: 'Project Planning',
+        description: 'We begin every project with a thorough site survey and energy audit, sizing the ideal solar system for your specific power needs and budget.',
+        image: '/envoy_images/workflow-team.jpg',
+    },
     {
         badge: '02',
         title: 'Initial Installation',
-        description: 'We offer professional solar installation services .Best experts',
+        description: 'Our certified technicians carry out safe, precise solar system installations — from rooftop panel mounting to inverter and battery wiring, done right the first time.',
         image: '/envoy_images/gallery-solar-field.jpg',
     },
     {
         badge: '03',
         title: 'Quality Control',
-        description: 'We offer professional solar installation services .Best experts',
+        description: 'Every installation undergoes a rigorous multi-point inspection, performance testing, and safety certification before handover to the customer.',
         image: '/envoy_images/workflow-laptop.jpg',
     },
     {
         badge: '04',
-        title: 'Repair & monitoring',
-        description: 'We offer professional solar installation services .Best experts',
+        title: 'Repair \u0026 Monitoring',
+        description: 'We provide ongoing system health monitoring, remote diagnostics, and prompt repair services to keep your solar investment running at peak efficiency.',
         image: '/envoy_images/workflow-tablet.jpg',
-    },
-    {
-        badge: '01',
-        title: 'Project Planning',
-        description: 'We offer professional solar installation services .Best experts',
-        image: '/envoy_images/workflow-team.jpg',
     },
 ];
 
 // Free Estimate CTA state (Image 2)
-const estimateInput = ref('');
-function handleEstimateSubmit() {
-    if (estimateInput.value) {
-        contactForm.value.message = `Free Solar Estimate request: ${estimateInput.value}`;
+function handleEstimateSubmit(value) {
+    if (value) {
+        contactForm.value.message = `Free Solar Estimate request: ${value}`;
     }
     isContactModalOpen.value = true;
 }
@@ -312,279 +418,12 @@ const faqs = [
 </script>
 
 <template>
-    <Head title="Factorex Manufacturing — Clean & Sustainable Solar Energy Solutions" />
+    <Head title="Envoy Electricals — Premium Solar Panels, Inverters & Battery Storage in Nigeria" />
 
-    <div class="min-h-screen bg-white text-slate-900 font-sans antialiased selection:bg-yellow-400 selection:text-slate-900">
-        <!-- ========================================================= -->
-        <!-- HEADER / NAVIGATION BAR (Exact Match to Screenshot) -->
-        <!-- ========================================================= -->
-        <header class="sticky top-0 left-0 right-0 z-40 border-b border-slate-200 bg-white shadow-sm">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between">
-                <!-- Logo -->
-                <a href="#hero" class="flex items-center gap-3 group">
-                    <img src="/envoy_images/logo.png" alt="Envoy Electric" class="h-9 sm:h-10 w-auto object-contain drop-shadow" />
-                </a>
-
-                <!-- Desktop Navigation -->
-                <nav class="hidden lg:flex items-center gap-8">
-                    <Link
-                        :href="route('home')"
-                        class="group relative py-1 text-sm font-semibold transition-colors duration-200"
-                        :class="route().current('home') ? 'text-[#016cbb]' : 'text-slate-700 hover:text-slate-950'"
-                    >
-                        Home
-                        <span
-                            class="absolute left-0 -bottom-0.5 h-0.5 rounded-full bg-gradient-to-r from-[#FACC15] to-[#016cbb] transition-all duration-300"
-                            :class="route().current('home') ? 'w-full' : 'w-0 group-hover:w-full'"
-                        ></span>
-                    </Link>
-                    <Link
-                        :href="route('about')"
-                        class="group relative py-1 text-sm font-semibold transition-colors duration-200"
-                        :class="route().current('about') ? 'text-[#016cbb]' : 'text-slate-700 hover:text-slate-950'"
-                    >
-                        About
-                        <span
-                            class="absolute left-0 -bottom-0.5 h-0.5 rounded-full bg-gradient-to-r from-[#FACC15] to-[#016cbb] transition-all duration-300"
-                            :class="route().current('about') ? 'w-full' : 'w-0 group-hover:w-full'"
-                        ></span>
-                    </Link>
-                    <Link
-                        :href="route('contact')"
-                        class="group relative py-1 text-sm font-semibold transition-colors duration-200"
-                        :class="route().current('contact') ? 'text-[#016cbb]' : 'text-slate-700 hover:text-slate-950'"
-                    >
-                        Contact Us
-                        <span
-                            class="absolute left-0 -bottom-0.5 h-0.5 rounded-full bg-gradient-to-r from-[#FACC15] to-[#016cbb] transition-all duration-300"
-                            :class="route().current('contact') ? 'w-full' : 'w-0 group-hover:w-full'"
-                        ></span>
-                    </Link>
-                    <Link
-                        :href="route('calculator')"
-                        class="group relative py-1 text-sm font-semibold transition-colors duration-200"
-                        :class="route().current('calculator') ? 'text-[#016cbb]' : 'text-slate-700 hover:text-slate-950'"
-                    >
-                        Load Calculator
-                        <span
-                            class="absolute left-0 -bottom-0.5 h-0.5 rounded-full bg-gradient-to-r from-[#FACC15] to-[#016cbb] transition-all duration-300"
-                            :class="route().current('calculator') ? 'w-full' : 'w-0 group-hover:w-full'"
-                        ></span>
-                    </Link>
-                    <Link
-                        href="/training"
-                        class="group relative py-1 text-sm font-semibold transition-colors duration-200 text-slate-700 hover:text-slate-950"
-                    >
-                        Training
-                        <span
-                            class="absolute left-0 -bottom-0.5 h-0.5 rounded-full bg-gradient-to-r from-[#FACC15] to-[#016cbb] transition-all duration-300 w-0 group-hover:w-full"
-                        ></span>
-                    </Link>
-                    <Link
-                        :href="route('shop')"
-                        class="group relative py-1 text-sm font-semibold transition-colors duration-200"
-                        :class="route().current('shop') ? 'text-[#016cbb]' : 'text-slate-700 hover:text-slate-950'"
-                    >
-                        Shop
-                        <span
-                            class="absolute left-0 -bottom-0.5 h-0.5 rounded-full bg-gradient-to-r from-[#FACC15] to-[#016cbb] transition-all duration-300"
-                            :class="route().current('shop') ? 'w-full' : 'w-0 group-hover:w-full'"
-                        ></span>
-                    </Link>
-                </nav>
-
-                <!-- Desktop Navigation Actions -->
-                <div class="flex items-center gap-3 sm:gap-4">
-                    <!-- "Let's talk" Pill Button -->
-                    <button
-                        type="button"
-                        @click="isContactModalOpen = true"
-                        class="inline-flex items-center justify-center px-5 sm:px-6 py-2 rounded-full border border-slate-300 bg-white hover:bg-slate-950 hover:text-white hover:border-slate-950 text-slate-900 text-xs sm:text-sm font-medium transition-all duration-300"
-                    >
-                        Let's talk
-                    </button>
-
-                    <!-- Profile / Login Icon Button -->
-                    <Link
-                        v-if="$page.props.auth?.user"
-                        :href="route('dashboard')"
-                        title="Dashboard"
-                        class="w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-slate-300 bg-white hover:border-yellow-400 hover:bg-yellow-400 hover:text-slate-950 flex items-center justify-center text-slate-900 transition-all duration-200"
-                    >
-                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                    </Link>
-                    <Link
-                        v-else
-                        :href="route('login')"
-                        title="Sign In"
-                        class="w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-slate-300 bg-white hover:border-yellow-400 hover:bg-yellow-400 hover:text-slate-950 flex items-center justify-center text-slate-900 transition-all duration-200"
-                    >
-                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                    </Link>
-
-                    <!-- Hamburger Menu Toggle Button (2 dark lines) -->
-                    <button
-                        type="button"
-                        @click="isMobileMenuOpen = !isMobileMenuOpen"
-                        class="w-8 sm:w-9 flex flex-col justify-center items-end gap-1.5 p-1 group focus:outline-none"
-                        aria-label="Toggle menu"
-                    >
-                        <span class="w-6 sm:w-7 h-[2px] bg-slate-900 transition-all duration-300 group-hover:bg-yellow-400"></span>
-                        <span class="w-6 sm:w-7 h-[2px] bg-slate-900 transition-all duration-300 group-hover:bg-yellow-400"></span>
-                    </button>
-                </div>
-            </div>
-        </header>
-
-        <!-- Slide-out Menu Drawer -->
-        <div
-            v-if="isMobileMenuOpen"
-            class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex justify-end transition-opacity duration-300"
-            @click.self="isMobileMenuOpen = false"
-        >
-            <div class="w-full max-w-sm bg-[#0B132B] h-full p-8 flex flex-col justify-between shadow-2xl border-l border-white/10">
-                <div>
-                    <div class="flex items-center justify-between pb-6 border-b border-white/10">
-                        <div class="flex items-center gap-3">
-                            <img src="/envoy_images/logo.png" alt="Envoy Electric" class="h-10 w-auto object-contain bg-white rounded-lg p-1" />
-                        </div>
-                        <button
-                            type="button"
-                            @click="isMobileMenuOpen = false"
-                            class="text-white/70 hover:text-white text-2xl font-bold p-1"
-                        >
-                            ✕
-                        </button>
-                    </div>
-
-                    <nav class="mt-8 space-y-4">
-                        <a
-                            href="#hero"
-                            @click="isMobileMenuOpen = false"
-                            class="block text-lg font-semibold text-white/90 hover:text-yellow-400 transition"
-                        >
-                            Home
-                        </a>
-                        <a
-                            href="#solutions"
-                            @click="isMobileMenuOpen = false"
-                            class="block text-lg font-semibold text-white/90 hover:text-yellow-400 transition"
-                        >
-                            Solar Solutions
-                        </a>
-                        <a
-                            href="#whatwedo"
-                            @click="isMobileMenuOpen = false"
-                            class="block text-lg font-semibold text-white/90 hover:text-yellow-400 transition"
-                        >
-                            What We Do
-                        </a>
-                        <a
-                            href="#gallery"
-                            @click="isMobileMenuOpen = false"
-                            class="block text-lg font-semibold text-white/90 hover:text-yellow-400 transition"
-                        >
-                            Gallery
-                        </a>
-                        <a
-                            href="#services"
-                            @click="isMobileMenuOpen = false"
-                            class="block text-lg font-semibold text-white/90 hover:text-yellow-400 transition"
-                        >
-                            Renewable Offers
-                        </a>
-                        <Link
-                            href="/training"
-                            @click="isMobileMenuOpen = false"
-                            class="block text-lg font-semibold text-white/90 hover:text-yellow-400 transition"
-                        >
-                            Training
-                        </Link>
-                        <a
-                            href="#shop"
-                            @click="isMobileMenuOpen = false"
-                            class="flex items-center justify-between text-lg font-semibold text-white/90 hover:text-yellow-400 transition"
-                        >
-                            <span>Shop Products</span>
-                            <span class="relative flex items-center justify-center">
-                                <svg class="w-5 h-5 text-white/80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <circle cx="9" cy="21" r="1" />
-                                    <circle cx="20" cy="21" r="1" />
-                                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-                                </svg>
-                                <span
-                                    v-if="cartCount > 0"
-                                    class="absolute -top-2 -right-2 min-w-[18px] h-[18px] rounded-full bg-[#E4312B] text-white text-[10px] font-black flex items-center justify-center px-1"
-                                >
-                                    {{ cartCount }}
-                                </span>
-                            </span>
-                        </a>
-                        <a
-                            :href="route('about')"
-                            @click="isMobileMenuOpen = false"
-                            class="block text-lg font-semibold text-white/90 hover:text-yellow-400 transition"
-                        >
-                            About Us
-                        </a>
-                        <a
-                            :href="route('contact')"
-                            @click="isMobileMenuOpen = false"
-                            class="block text-lg font-semibold text-white/90 hover:text-yellow-400 transition"
-                        >
-                            Contact
-                        </a>
-                        <a
-                            :href="route('calculator')"
-                            @click="isMobileMenuOpen = false"
-                            class="block text-lg font-semibold text-white/90 hover:text-yellow-400 transition"
-                        >
-                            Load Calculator
-                        </a>
-                        <button
-                            type="button"
-                            @click="isMobileMenuOpen = false; isContactModalOpen = true"
-                            class="block w-full text-left text-lg font-semibold text-yellow-400 hover:text-yellow-300 transition pt-2"
-                        >
-                            Consultation Request
-                        </button>
-                    </nav>
-                </div>
-
-                <div class="pt-6 border-t border-white/10 space-y-3">
-                    <button
-                        type="button"
-                        @click="isMobileMenuOpen = false; isContactModalOpen = true"
-                        class="w-full py-3 bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-bold rounded-full text-center transition"
-                    >
-                        Let's Talk
-                    </button>
-                    <Link
-                        v-if="!$page.props.auth?.user"
-                        :href="route('login')"
-                        class="w-full py-3 border border-white/30 text-white font-semibold rounded-full text-center block hover:bg-white/10 transition"
-                    >
-                        Sign In / Staff Portal
-                    </Link>
-                    <Link
-                        v-else
-                        :href="route('dashboard')"
-                        class="w-full py-3 border border-white/30 text-white font-semibold rounded-full text-center block hover:bg-white/10 transition"
-                    >
-                        Dashboard
-                    </Link>
-                </div>
-            </div>
-        </div>
-
-        <!-- ========================================================= -->
-        <!-- 1. HERO SECTION — CINEMATIC SLIDER (Exact Match to Design) -->
-        <!-- ========================================================= -->
-        <section
+    <!-- ========================================================= -->
+    <!-- 1. HERO SECTION — CINEMATIC SLIDER (Exact Match to Design) -->
+    <!-- ========================================================= -->
+    <section
             id="hero"
             class="relative min-h-[65vh] flex flex-col justify-between overflow-hidden bg-slate-950 select-none"
             @mouseenter="pauseHeroTimer"
@@ -795,16 +634,16 @@ const faqs = [
         <!-- ========================================================= -->
         <section class="py-20 sm:py-28 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
             <!-- Giant Headline -->
-            <div class="text-center max-w-5xl mx-auto mb-16">
+            <div class="text-center max-w-5xl mx-auto mb-16 reveal">
                 <h2 class="text-2xl sm:text-3xl md:text-4xl lg:text-[40px] font-black uppercase tracking-tight text-slate-950 leading-tight sm:leading-snug">
-                    SMART ENERGY SOLUTIONS, QUALITY SOLAR GOODS<br />& SKILLED SERVICE FOR A SUSTAINABLE FUTURE
+                    QUALITY SOLAR GOODS<br />& SKILLED SERVICE
                 </h2>
             </div>
 
             <!-- 2-Column Grid -->
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-stretch">
                 <!-- Left / Center Column: Slanted Mosaic Photographic Collage (lg:col-span-8) -->
-                <div class="lg:col-span-8 relative min-h-[380px] sm:min-h-[500px] flex flex-col justify-center">
+                <div class="lg:col-span-8 relative min-h-[380px] sm:min-h-[500px] flex flex-col justify-center reveal reveal-left">
                     <!-- Slanted Grid with sharp diagonal cuts & white borders -->
                     <div class="relative w-full h-[400px] sm:h-[480px] md:h-[540px] overflow-hidden rounded-xl bg-white">
                         <!-- Panel 1: Top Left Polygon (Engineer in yellow safety gear looking right) -->
@@ -843,7 +682,7 @@ const faqs = [
                 </div>
 
                 <!-- Right Column: Stacked Card with Image & Cream Content Box (lg:col-span-4) -->
-                <div class="lg:col-span-4 flex flex-col rounded-xl overflow-hidden shadow-sm border border-slate-200/80">
+                <div class="lg:col-span-4 flex flex-col rounded-xl overflow-hidden shadow-sm border border-slate-200/80 reveal reveal-right" style="transition-delay: 120ms;">
                     <!-- Top Image: Clean Ground Solar Panels -->
                     <div class="h-56 sm:h-64 overflow-hidden bg-slate-100">
                         <img
@@ -856,7 +695,7 @@ const faqs = [
                     <!-- Bottom Cream/Ivory Card -->
                     <div class="flex-1 bg-[#FAF7EE] p-6 sm:p-8 flex flex-col justify-between">
                         <p class="text-slate-700 text-sm sm:text-base leading-relaxed font-normal">
-                            Factorex brings expert guidance and reliable technology to every project. Whether you're looking to lower your energy bills, increase property value, or achieve complete energy independence, we offer customized solutions to meet your energy goals.
+                            Envoy Electricals brings expert guidance and trusted technology to every project. Whether you want to reduce your electricity bills, increase your property value, or achieve complete energy independence, we deliver customised solar solutions tailored to your exact energy needs.
                         </p>
 
                         <div class="mt-8">
@@ -882,7 +721,7 @@ const faqs = [
         <section id="solutions" class="relative bg-[#0A1024] text-white pt-20 pb-28 sm:pb-32 overflow-hidden">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <!-- Section Header with Title & Arrow Navigation -->
-                <div class="flex items-center justify-between mb-12 sm:mb-14">
+                <div class="flex items-center justify-between mb-12 sm:mb-14 reveal">
                     <h2 class="text-2xl sm:text-4xl md:text-5xl font-black uppercase tracking-wider text-white">
                         SOLAR SOLUTIONS
                     </h2>
@@ -908,65 +747,120 @@ const faqs = [
                     </div>
                 </div>
 
-                <!-- 4 Solution Cards Grid — each card has icon top-left + diagonal triangle photo top-right -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                <!-- Sliding Solution Cards -->
+                <div
+                    class="-mx-3 reveal"
+                    @mouseenter="solutionHover(true)"
+                    @mouseleave="solutionHover(false)"
+                >
                     <div
-                        v-for="sol in solutions"
-                        :key="sol.id"
-                        class="bg-white text-slate-900 rounded-lg flex flex-col overflow-hidden shadow-lg transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl group"
+                        class="overflow-hidden select-none touch-pan-y"
+                        @pointerdown="solutionPointerDown"
+                        @pointermove="solutionPointerMove"
+                        @pointerup="solutionPointerUp"
+                        @pointercancel="solutionPointerUp"
                     >
-                        <!-- ======== CARD TOP: icon badge left + triangular photo cutout right ======== -->
-                        <div class="relative h-36 shrink-0 bg-white">
-                            <!-- Dark navy circular icon badge — top left -->
-                            <div class="absolute top-4 left-4 z-20 w-[52px] h-[52px] rounded-full bg-[#0D1527] text-yellow-400 flex items-center justify-center shadow-md">
-                                <svg v-if="sol.icon === 'battery'" class="w-[26px] h-[26px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                                    <rect x="1" y="6" width="18" height="13" rx="2" />
-                                    <path d="M23 11v4M7 12h8" />
-                                </svg>
-                                <svg v-else-if="sol.icon === 'solar'" class="w-[26px] h-[26px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                                    <path d="M3 9.5 12 3l9 6.5V21H3V9.5z" />
-                                    <path d="M9 21V13h6v8" />
-                                    <path d="M10 6h4M9 9h6" stroke-width="1.3" />
-                                </svg>
-                                <svg v-else-if="sol.icon === 'inverter'" class="w-[26px] h-[26px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                                    <rect x="2" y="2" width="20" height="20" rx="3" />
-                                    <path d="M6 12h2.5l2-4 2.5 8L15.5 12H18" stroke-width="1.8" />
-                                </svg>
-                                <svg v-else class="w-[26px] h-[26px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                                    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94L14.7 6.3z" />
-                                </svg>
-                            </div>
-
-                            <!-- Triangular diagonal photo cutout — top right corner, matching mockup shape -->
-                            <div class="absolute top-0 right-0 w-44 h-36 overflow-hidden [clip-path:polygon(42%_0%,100%_0%,100%_100%,0%_100%)]">
-                                <img
-                                    :src="sol.image"
-                                    :alt="sol.title"
-                                    class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
-                                />
-                            </div>
-                        </div>
-
-                        <!-- ======== CARD BODY: Title + Description ======== -->
-                        <div class="px-5 pt-4 pb-3 flex-1">
-                            <h3 class="text-[15px] font-bold text-slate-900 leading-snug mb-2.5">
-                                {{ sol.title }}
-                            </h3>
-                            <p class="text-[12.5px] text-slate-500 leading-relaxed">
-                                {{ sol.description }}
-                            </p>
-                        </div>
-
-                        <!-- ======== CARD FOOTER: Learn More pill button ======== -->
-                        <div class="px-5 pt-2 pb-5">
-                            <button
-                                type="button"
-                                @click="isContactModalOpen = true"
-                                class="inline-flex items-center px-5 py-1.5 rounded-full border border-slate-800 text-[12.5px] font-semibold text-slate-900 hover:bg-slate-900 hover:text-white transition-colors duration-200"
+                        <div
+                            class="flex transition-transform duration-500 ease-out"
+                            :class="solutionWrapJump ? 'transition-none' : ''"
+                            :style="{ transform: `translateX(-${(activeSolutionIndex * 100) / solutionPerView}%)` }"
+                        >
+                            <div
+                                v-for="(sol, solIdx) in solutions"
+                                :key="sol.id"
+                                class="shrink-0 px-3"
+                                :style="{ width: `${100 / solutionPerView}%` }"
                             >
-                                Learn More
-                            </button>
+                                <div
+                                    class="bg-white text-slate-900 rounded-lg flex flex-col overflow-hidden shadow-lg transition-all duration-300 hover:shadow-2xl group h-full"
+                                >
+                                    <!-- ======== CARD TOP: icon badge left + triangular photo cutout right ======== -->
+                                    <div class="relative h-36 shrink-0 bg-white">
+                                        <!-- Dark navy circular icon badge — top left -->
+                                        <div class="absolute top-4 left-4 z-20 w-[52px] h-[52px] rounded-full bg-[#0D1527] text-yellow-400 flex items-center justify-center shadow-md">
+                                            <svg v-if="sol.icon === 'battery'" class="w-[26px] h-[26px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                                <rect x="1" y="6" width="18" height="13" rx="2" />
+                                                <path d="M23 11v4M7 12h8" />
+                                            </svg>
+                                            <svg v-else-if="sol.icon === 'solar'" class="w-[26px] h-[26px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                                <path d="M3 9.5 12 3l9 6.5V21H3V9.5z" />
+                                                <path d="M9 21V13h6v8" />
+                                                <path d="M10 6h4M9 9h6" stroke-width="1.3" />
+                                            </svg>
+                                            <svg v-else-if="sol.icon === 'inverter'" class="w-[26px] h-[26px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                                <rect x="2" y="2" width="20" height="20" rx="3" />
+                                                <path d="M6 12h2.5l2-4 2.5 8L15.5 12H18" stroke-width="1.8" />
+                                            </svg>
+                                            <svg v-else-if="sol.icon === 'design'" class="w-[26px] h-[26px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                                <rect x="3" y="4" width="18" height="16" rx="2" />
+                                                <path d="M3 9h18M9 20V9M12 12l3 3" />
+                                            </svg>
+                                            <svg v-else-if="sol.icon === 'pump'" class="w-[26px] h-[26px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                                <path d="M12 3s6 6.3 6 11a6 6 0 1 1-12 0C6 9.3 12 3 12 3z" />
+                                                <path d="M9 14a3 3 0 0 0 3 3" stroke-width="1.4" />
+                                            </svg>
+                                            <svg v-else-if="sol.icon === 'building'" class="w-[26px] h-[26px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                                <rect x="4" y="3" width="16" height="18" rx="1.5" />
+                                                <path d="M8 21v-6h8v6M8 7h.01M12 7h.01M16 7h.01M8 11h.01M12 11h.01M16 11h.01" stroke-width="2" />
+                                            </svg>
+                                            <svg v-else-if="sol.icon === 'farm'" class="w-[26px] h-[26px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                                <circle cx="12" cy="5.5" r="2.2" stroke-width="1.5" />
+                                                <path d="M12 1.6v.7M7.2 4l.5.5M16.8 4l-.5.5" stroke-width="1.4" stroke-linecap="round" />
+                                                <rect x="5" y="12" width="14" height="3.5" rx="1" />
+                                                <path d="M8.5 15.5V20h7v-4.5" />
+                                            </svg>
+                                            <svg v-else class="w-[26px] h-[26px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94L14.7 6.3z" />
+                                            </svg>
+                                        </div>
+
+                                        <!-- Triangular diagonal photo cutout — top right corner, matching mockup shape -->
+                                        <div class="absolute top-0 right-0 w-44 h-36 overflow-hidden [clip-path:polygon(42%_0%,100%_0%,100%_100%,0%_100%)]">
+                                            <img
+                                                :src="sol.image"
+                                                :alt="sol.title"
+                                                loading="lazy"
+                                                class="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <!-- ======== CARD BODY: Title + Description ======== -->
+                                    <div class="px-5 pt-4 pb-3 flex-1">
+                                        <h3 class="text-[15px] font-bold text-slate-900 leading-snug mb-2.5">
+                                            {{ sol.title }}
+                                        </h3>
+                                        <p class="text-[12.5px] text-slate-500 leading-relaxed">
+                                            {{ sol.description }}
+                                        </p>
+                                    </div>
+
+                                    <!-- ======== CARD FOOTER: Learn More pill button ======== -->
+                                    <div class="px-5 pt-2 pb-5">
+                                        <button
+                                            type="button"
+                                            @click="isContactModalOpen = true"
+                                            class="inline-flex items-center px-5 py-1.5 rounded-full border border-slate-800 text-[12.5px] font-semibold text-slate-900 hover:bg-slate-900 hover:text-white transition-colors duration-200"
+                                        >
+                                            Learn More
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
+                    </div>
+
+                    <!-- Carousel dots -->
+                    <div class="flex items-center justify-center gap-2 mt-9">
+                        <button
+                            v-for="(_, p) in solutionPages"
+                            :key="p"
+                            type="button"
+                            :aria-label="`Go to slide ${p + 1}`"
+                            :class="p === solutionPageIndex ? 'w-8 bg-yellow-400' : 'w-2.5 bg-white/25 hover:bg-white/60'"
+                            class="h-2.5 rounded-full transition-all duration-300"
+                            @click="goToSolutionPage(p)"
+                        />
                     </div>
                 </div>
             </div>
@@ -999,11 +893,11 @@ const faqs = [
                 </div>
 
                 <!-- Sun disc peeking over the horizon -->
-                <div class="absolute bottom-3 left-1/2 -translate-x-1/2 w-28 h-28 rounded-full bg-gradient-to-t from-yellow-500 via-yellow-400 to-amber-300 shadow-[0_0_60px_14px_rgba(250,204,21,0.4)]"></div>
+                <div class="absolute bottom-3 left-1/2 -translate-x-1/2 w-16 h-16 rounded-full bg-gradient-to-t from-yellow-500 via-yellow-400 to-amber-300 shadow-[0_0_40px_8px_rgba(250,204,21,0.4)]"></div>
 
                 <!-- Pulsing halo rings -->
-                <div class="absolute bottom-6 left-1/2 -translate-x-1/2 w-44 h-44 rounded-full border border-yellow-400/50 sol-pulse"></div>
-                <div class="absolute bottom-1 left-1/2 -translate-x-1/2 w-72 h-72 rounded-full border border-yellow-400/30 sol-pulse-slow"></div>
+                <div class="absolute bottom-4 left-1/2 -translate-x-1/2 w-28 h-28 rounded-full border border-yellow-400/50 sol-pulse"></div>
+                <div class="absolute bottom-1 left-1/2 -translate-x-1/2 w-44 h-44 rounded-full border border-yellow-400/30 sol-pulse-slow"></div>
 
                 <!-- Turquoise horizon tick -->
                 <div class="absolute bottom-12 left-1/2 -translate-x-1/2 w-2/3 h-px bg-gradient-to-r from-transparent via-[#40e0d0]/70 to-transparent"></div>
@@ -1026,7 +920,7 @@ const faqs = [
 
             <div class="max-w-7xl mx-auto relative">
                 <!-- Section Header -->
-                <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-14 sm:mb-16">
+                <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-14 sm:mb-16 reveal">
                     <div class="max-w-xl">
                         <span class="inline-flex items-center gap-2 text-[#016cbb] text-xs font-bold uppercase tracking-[0.3em] mb-4">
                             <span class="w-8 h-px bg-[#016cbb]"></span>
@@ -1046,7 +940,7 @@ const faqs = [
                 <!-- 3 Service Pillars -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6 lg:gap-8">
                     <!-- 01 Solar Installation -->
-                    <div class="group relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-[#111C36] to-[#0A1020] px-7 sm:px-8 pt-7 sm:pt-8 pb-9 sm:pb-10 flex flex-col min-h-[440px] transition-all duration-500 hover:-translate-y-2 hover:border-yellow-400/40 hover:shadow-2xl hover:shadow-yellow-400/10">
+                    <div class="reveal group relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-[#111C36] to-[#0A1020] px-7 sm:px-8 pt-7 sm:pt-8 pb-9 sm:pb-10 flex flex-col min-h-[440px] transition-all duration-500 hover:-translate-y-2 hover:border-yellow-400/40 hover:shadow-2xl hover:shadow-yellow-400/10" style="transition-delay: 80ms;">
                         <!-- Top accent line -->
                         <span class="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-transparent via-yellow-400 to-transparent opacity-80"></span>
                         <!-- Ghost number -->
@@ -1095,7 +989,7 @@ const faqs = [
                     </div>
 
                     <!-- 02 Solar & Electrical Products -->
-                    <div class="group relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-[#111C36] to-[#0A1020] px-7 sm:px-8 pt-7 sm:pt-8 pb-9 sm:pb-10 flex flex-col min-h-[440px] transition-all duration-500 hover:-translate-y-2 hover:border-[#40e0d0]/40 hover:shadow-2xl hover:shadow-[#40e0d0]/10">
+                    <div class="reveal group relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-[#111C36] to-[#0A1020] px-7 sm:px-8 pt-7 sm:pt-8 pb-9 sm:pb-10 flex flex-col min-h-[440px] transition-all duration-500 hover:-translate-y-2 hover:border-[#40e0d0]/40 hover:shadow-2xl hover:shadow-[#40e0d0]/10" style="transition-delay: 160ms;">
                         <!-- Top accent line -->
                         <span class="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-transparent via-[#40e0d0] to-transparent opacity-80"></span>
                         <!-- Ghost number -->
@@ -1131,10 +1025,10 @@ const faqs = [
 
                         <div class="mt-auto pt-7">
                             <a
-                                href="#shop"
+                                href="/shop"
                                 class="group/btn inline-flex items-center gap-2.5 rounded-full border border-[#40e0d0]/40 px-5 py-2.5 text-sm font-bold text-[#40e0d0] transition-all duration-300 hover:bg-[#40e0d0] hover:text-slate-950"
                             >
-                                Shop Products
+                                Buy Our Products
                                 <i class="bi bi-arrow-right transition-transform duration-300 group-hover/btn:translate-x-1"></i>
                             </a>
                         </div>
@@ -1143,7 +1037,7 @@ const faqs = [
                     </div>
 
                     <!-- 03 Professional Trainings -->
-                    <div id="training" class="group relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-[#111C36] to-[#0A1020] px-7 sm:px-8 pt-7 sm:pt-8 pb-9 sm:pb-10 flex flex-col min-h-[440px] transition-all duration-500 hover:-translate-y-2 hover:border-emerald-400/40 hover:shadow-2xl hover:shadow-emerald-400/10">
+                    <div id="training" class="reveal group relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-[#111C36] to-[#0A1020] px-7 sm:px-8 pt-7 sm:pt-8 pb-9 sm:pb-10 flex flex-col min-h-[440px] transition-all duration-500 hover:-translate-y-2 hover:border-emerald-400/40 hover:shadow-2xl hover:shadow-emerald-400/10" style="transition-delay: 240ms;">
                         <!-- Top accent line -->
                         <span class="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-transparent via-emerald-400 to-transparent opacity-80"></span>
                         <!-- Ghost number -->
@@ -1225,7 +1119,7 @@ const faqs = [
 
             <div class="max-w-7xl mx-auto relative">
                 <!-- Header + Filters -->
-                <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-9">
+                <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-9 reveal">
                     <div class="max-w-xl">
                         <span class="inline-flex items-center gap-2 text-[#40e0d0] text-xs font-bold uppercase tracking-[0.3em] mb-3">
                             <span class="w-8 h-px bg-[#40e0d0]"></span>
@@ -1244,7 +1138,7 @@ const faqs = [
                 </div>
 
                 <!-- Masonry Grid -->
-                <div class="columns-1 sm:columns-2 lg:columns-3 gap-4">
+                <div class="columns-1 sm:columns-2 lg:columns-3 gap-4 reveal" style="transition-delay: 100ms;">
                     <button
                         v-for="(image, index) in filteredGallery"
                         :key="image.src"
@@ -1438,13 +1332,13 @@ const faqs = [
         <!-- ========================================================= -->
         <!-- 5b. SECTION: POPULAR SERVICES & PRODUCTS (Mockup Style)     -->
         <!-- ========================================================= -->
-        <section id="shop" class="relative overflow-hidden bg-white">
+        <section v-if="shopProducts.length" id="shop" class="relative overflow-hidden bg-white">
             <!-- Top Navy Banner -->
             <div class="relative overflow-hidden bg-[#0D1527] pt-16 pb-36 sm:pt-20 sm:pb-44 px-4 sm:px-6 lg:px-8">
                 <!-- Ambient glows -->
                 <span class="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-yellow-400/15 blur-3xl pointer-events-none"></span>
                 <span class="absolute bottom-0 -left-24 w-72 h-72 rounded-full bg-[#40e0d0]/10 blur-3xl pointer-events-none"></span>
-                <div class="relative max-w-7xl mx-auto flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+                <div class="relative max-w-7xl mx-auto flex flex-col md:flex-row md:items-end md:justify-between gap-6 reveal">
                     <div class="max-w-2xl">
                         <span class="inline-flex items-center gap-2 text-[#40e0d0] text-xs font-bold uppercase tracking-[0.3em] mb-3">
                             <span class="w-8 h-px bg-[#40e0d0]"></span>
@@ -1468,9 +1362,9 @@ const faqs = [
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-24 sm:-mt-28 relative z-10 pb-20 sm:pb-28">
 
                 <!-- POPULAR PRODUCTS GRID -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 reveal" style="transition-delay: 80ms;">
                     <div
-                        v-for="product in shopProducts"
+                        v-for="(product, prodIdx) in shopProducts"
                         :key="product.id"
                         class="group flex flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-[0_10px_30px_rgba(0,0,0,0.06)] hover:shadow-[0_20px_40px_rgba(13,21,39,0.16)] hover:-translate-y-1.5 transition-all duration-300"
                     >
@@ -1509,11 +1403,11 @@ const faqs = [
 
 
         <!-- ========================================================= -->
-        <!-- 6. SECTION 6: BEST OFFER FOR RENEWABLE ENERGY (Image 5 bottom half) -->
+        <!-- 6. SECTION 6: BEST OFFER FOR SOLAR ENERGY -->
         <!-- ========================================================= -->
         <section id="services" class="border-t border-slate-200 bg-white relative">
             <div class="max-w-7xl mx-auto">
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-slate-200 items-stretch">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-slate-200 items-stretch reveal">
                     <!-- Column 1: Blue Card with Background Photo & Yellow Arrow Pointer -->
                     <div class="relative bg-[#1A365D] text-white p-8 flex flex-col justify-between overflow-hidden min-h-[320px]">
                         <!-- Background Image -->
@@ -1529,7 +1423,7 @@ const faqs = [
                         <!-- Card Content -->
                         <div class="relative z-10">
                             <h3 class="text-2xl sm:text-3xl font-black uppercase tracking-wide leading-tight text-white">
-                                BEST OFFER FOR<br />RENEWABLE<br />ENERGY
+                                BEST OFFER FOR<br />SOLAR<br />ENERGY
                             </h3>
                         </div>
 
@@ -1549,12 +1443,12 @@ const faqs = [
                         ></div>
                     </div>
 
-                    <!-- Column 2: Turbine Services -->
+                    <!-- Column 2: Battery Storage Solutions -->
                     <div class="p-8 flex flex-col justify-between min-h-[320px] bg-white hover:bg-slate-50 transition-colors">
                         <div>
-                            <h3 class="text-xl font-bold text-slate-900 mb-3">Turbine Services</h3>
+                            <h3 class="text-xl font-bold text-slate-900 mb-3">Battery Storage Solutions</h3>
                             <p class="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal">
-                                High-output commercial wind turbine supply, structural foundation engineering, and integrated solar-wind hybrid grid balancing.
+                                Advanced lithium-ion and deep-cycle battery storage systems engineered for uninterrupted backup power, peak shaving, and complete off-grid energy independence.
                             </p>
                         </div>
                         <div class="pt-6">
@@ -1568,7 +1462,7 @@ const faqs = [
                         </div>
                     </div>
 
-                    <!-- Column 3: Hydropower Plants (with yellow accent pointer) -->
+                    <!-- Column 3: Solar Inverter Installation -->
                     <div class="p-8 flex flex-col justify-between min-h-[320px] bg-white hover:bg-slate-50 transition-colors relative">
                         <!-- Yellow Triangle Pointer at top-right -->
                         <div
@@ -1576,9 +1470,9 @@ const faqs = [
                         ></div>
 
                         <div>
-                            <h3 class="text-xl font-bold text-slate-900 mb-3">Hydropower Plants</h3>
+                            <h3 class="text-xl font-bold text-slate-900 mb-3">Solar Inverter Installation</h3>
                             <p class="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal">
-                                Sustainable run-of-river mini-hydro installations generating uninterrupted 24-hour clean baseload electricity for rural and industrial zones.
+                                High-efficiency hybrid, on-grid, and off-grid inverter setups configured by certified technicians to seamlessly regulate and convert DC solar power to AC electricity.
                             </p>
                         </div>
                         <div class="pt-6">
@@ -1590,14 +1484,17 @@ const faqs = [
                                 Learn More
                             </button>
                         </div>
+
+                        <!-- Bottom Right Yellow Angled Block -->
+                        <div class="hidden lg:block absolute bottom-0 right-0 w-32 h-6 bg-yellow-400 [clip-path:polygon(20%_0,100%_0,100%_100%,0_100%)]"></div>
                     </div>
 
-                    <!-- Column 4: Solar Panel Services -->
+                    <!-- Column 4: Solar Panel Sales & Services -->
                     <div class="p-8 flex flex-col justify-between min-h-[320px] bg-white hover:bg-slate-50 transition-colors relative">
                         <div>
-                            <h3 class="text-xl font-bold text-slate-900 mb-3">Solar Panel Services</h3>
+                            <h3 class="text-xl font-bold text-slate-900 mb-3">Solar Panel Sales &amp; Installation</h3>
                             <p class="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal">
-                                Full-scope turnkey solar engineering, procurement, construction (EPC), energy audits, and continuous utility monitoring services.
+                                Tier-1 solar panels, inverters, and batteries plus precision rooftop and ground-mounted installations — turnkey design, procurement, and maintenance all in one place.
                             </p>
                         </div>
                         <div class="pt-6">
@@ -1620,58 +1517,94 @@ const faqs = [
         <!-- ========================================================= -->
         <!-- 7. SECTION 7: PROCESS WORKFLOW (Image 1 from user) -->
         <!-- ========================================================= -->
-        <section class="py-20 sm:py-28 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto relative bg-white overflow-hidden">
-            <!-- Continuous Curved Dashed Line connecting circles (desktop/tablet) -->
-            <svg
-                class="absolute top-[38%] left-0 w-full h-32 -translate-y-1/2 pointer-events-none hidden md:block"
-                viewBox="0 0 1200 120"
-                fill="none"
-                preserveAspectRatio="none"
-            >
-                <path
-                    d="M 150,65 C 280,115 360,15 450,65 C 570,115 670,15 750,65 C 870,115 970,25 1050,65"
-                    stroke="#94A3B8"
-                    stroke-width="1.8"
-                    stroke-dasharray="6 6"
-                    fill="none"
-                />
-            </svg>
+        <section id="process" class="relative py-20 sm:py-28 px-4 sm:px-6 lg:px-8 bg-white overflow-hidden">
+            <!-- Ambient brand glow -->
+            <div class="absolute -top-24 -right-20 w-72 h-72 rounded-full bg-[#40e0d0]/10 blur-3xl pointer-events-none"></div>
+            <div class="absolute -bottom-24 -left-20 w-72 h-72 rounded-full bg-yellow-400/10 blur-3xl pointer-events-none"></div>
 
-            <!-- 4 Circles Grid matching 02, 03, 04, 01 in mockup -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-8 text-center relative z-10">
-                <div
-                    v-for="step in workflowSteps"
-                    :key="step.title"
-                    class="flex flex-col items-center group"
-                >
-                    <!-- Circular Node with Green Number Badge -->
-                    <div class="relative w-44 h-44 sm:w-52 sm:h-52 rounded-full p-2 bg-white shadow-xl border border-slate-100 mb-6">
-                        <!-- Numbered Green Badge -->
-                        <div
-                            class="absolute top-1 left-2 sm:top-2 sm:left-3 w-10 h-10 rounded-full bg-[#43A047] text-white font-extrabold text-sm flex items-center justify-center shadow-md border-2 border-white z-20"
-                        >
-                            {{ step.badge }}
-                        </div>
-
-                        <!-- Circular Photo -->
-                        <div class="w-full h-full rounded-full overflow-hidden">
-                            <img
-                                :src="step.image"
-                                :alt="step.title"
-                                class="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-500"
-                            />
-                        </div>
-                    </div>
-
-                    <!-- Step Title -->
-                    <h3 class="text-xl sm:text-2xl font-bold text-[#0D1527] mb-2.5 tracking-tight">
-                        {{ step.title }}
-                    </h3>
-
-                    <!-- Step Description -->
-                    <p class="text-xs sm:text-sm text-slate-500 max-w-[230px] mx-auto leading-relaxed font-normal">
-                        {{ step.description }}
+            <div class="max-w-7xl mx-auto relative">
+                <!-- Section Header -->
+                <div class="max-w-2xl mx-auto text-center mb-14 sm:mb-20 relative z-10 reveal">
+                    <span class="inline-flex items-center gap-2 text-[#016cbb] text-xs font-bold uppercase tracking-[0.3em] mb-4">
+                        <span class="w-8 h-px bg-[#016cbb]"></span>
+                        How We Work
+                        <span class="w-8 h-px bg-[#016cbb]"></span>
+                    </span>
+                    <h2 class="text-3xl sm:text-5xl font-black uppercase tracking-tight text-[#0D1527] leading-tight">
+                        A Proven<br class="sm:hidden" />
+                        <span class="text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-[#016cbb]">4-Step Process</span>
+                    </h2>
+                    <p class="mt-4 text-slate-500 text-sm sm:text-base leading-relaxed max-w-xl mx-auto">
+                        Every project follows the same disciplined workflow — from the first site survey to installation, quality sign-off and long-term monitoring.
                     </p>
+                </div>
+
+                <!-- Continuous Curved Dashed Line connecting circles (desktop/tablet) -->
+                <svg
+                    class="absolute top-[31%] left-0 w-full h-32 -translate-y-1/2 pointer-events-none hidden md:block"
+                    viewBox="0 0 1200 120"
+                    fill="none"
+                    preserveAspectRatio="none"
+                >
+                    <path
+                        d="M 150,65 C 280,115 360,15 450,65 C 570,115 670,15 750,65 C 870,115 970,25 1050,65"
+                        stroke="#40e0d0"
+                        stroke-width="1.8"
+                        stroke-dasharray="6 6"
+                        stroke-opacity="0.45"
+                        fill="none"
+                    />
+                </svg>
+
+                <!-- 4 Circles Grid in logical order -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-8 text-center relative z-10 reveal" style="transition-delay: 100ms;">
+                    <div
+                        v-for="(step, stepIdx) in workflowSteps"
+                        :key="step.title"
+                        class="flex flex-col items-center group"
+                        :style="{ transitionDelay: `${100 + stepIdx * 80}ms` }"
+                    >
+                        <!-- Circular Node with Number Badge -->
+                        <div class="relative w-44 h-44 sm:w-52 sm:h-52 rounded-full p-2 bg-white shadow-xl border border-slate-100 mb-6 transition-all duration-300 group-hover:border-[#40e0d0]/60 group-hover:shadow-2xl group-hover:shadow-[#40e0d0]/10">
+                            <!-- Numbered Yellow Badge -->
+                            <div
+                                class="absolute top-1 left-2 sm:top-2 sm:left-3 w-10 h-10 rounded-full bg-[#FACC15] text-[#0D1527] font-extrabold text-sm flex items-center justify-center shadow-md border-2 border-white z-20 group-hover:scale-110 group-hover:-rotate-6 transition-transform duration-300"
+                            >
+                                {{ step.badge }}
+                            </div>
+
+                            <!-- Circular Photo -->
+                            <div class="w-full h-full rounded-full overflow-hidden">
+                                <img
+                                    :src="step.image"
+                                    :alt="step.title"
+                                    class="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-500"
+                                />
+                            </div>
+                        </div>
+
+                        <!-- Step Title -->
+                        <h3 class="text-xl sm:text-2xl font-bold text-[#0D1527] mb-2.5 tracking-tight">
+                            {{ step.title }}
+                        </h3>
+
+                        <!-- Step Description -->
+                        <p class="text-xs sm:text-sm text-slate-600 max-w-[230px] mx-auto leading-relaxed font-normal">
+                            {{ step.description }}
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Bottom CTA strip -->
+                <div class="mt-14 sm:mt-16 flex justify-center">
+                    <button
+                        type="button"
+                        @click="isContactModalOpen = true"
+                        class="group/btn inline-flex items-center gap-3 rounded-full bg-[#0D1527] hover:bg-slate-800 text-white font-bold px-7 py-3.5 shadow-lg shadow-[#0D1527]/20 transition-all duration-300"
+                    >
+                        Start Your Solar Project
+                        <i class="bi bi-arrow-right text-[#FACC15] transition-transform duration-300 group-hover/btn:translate-x-1"></i>
+                    </button>
                 </div>
             </div>
         </section>
@@ -1683,7 +1616,7 @@ const faqs = [
             <div class="absolute -bottom-24 -left-16 w-72 h-72 rounded-full bg-yellow-300/20 blur-3xl pointer-events-none"></div>
             <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-5 gap-12 lg:gap-16 relative">
                 <!-- Left: Intro + Support card -->
-                <div class="lg:col-span-2">
+                <div class="lg:col-span-2 reveal reveal-left" style="transition-delay: 80ms;">
                     <span class="inline-flex items-center gap-2 text-[#016cbb] text-xs font-bold uppercase tracking-[0.3em] mb-4">
                         <span class="w-8 h-px bg-[#016cbb]"></span>
                         Need Answers?
@@ -1718,7 +1651,7 @@ const faqs = [
                 </div>
 
                 <!-- Right: Accordion -->
-                <div class="lg:col-span-3">
+                <div class="lg:col-span-3 reveal reveal-right">
                     <div class="space-y-4">
                         <div
                             v-for="(f, i) in faqs"
@@ -1760,179 +1693,7 @@ const faqs = [
         <!-- ========================================================= -->
         <!-- 8. FOOTER                                                  -->
         <!-- ========================================================= -->
-        <footer id="contact" class="relative bg-[#111827] text-white overflow-hidden">
-            <!-- Subtle background: gradient mesh + fine cross-hatch -->
-            <div class="absolute inset-0 pointer-events-none" aria-hidden="true">
-                <div class="absolute inset-0 bg-gradient-to-br from-[#0D1527] via-[#111827] to-[#0F1A2E]"></div>
-                <div class="absolute inset-0 opacity-[0.035]" style="background-image: repeating-linear-gradient(0deg,transparent,transparent 39px,rgba(255,255,255,.08) 39px,rgba(255,255,255,.08) 40px), repeating-linear-gradient(90deg,transparent,transparent 39px,rgba(255,255,255,.08) 39px,rgba(255,255,255,.08) 40px);"></div>
-                <!-- Corner glow accents -->
-                <div class="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full bg-yellow-400/[0.04] blur-[100px]"></div>
-                <div class="absolute -bottom-40 -right-40 w-[500px] h-[500px] rounded-full bg-[#40e0d0]/[0.04] blur-[100px]"></div>
-            </div>
-
-            <!-- CTA Section -->
-            <div class="relative max-w-7xl mx-auto px-6 sm:px-12 lg:px-16 pt-14 pb-14 z-10">
-                <div class="flex flex-col lg:flex-row items-center lg:items-center justify-between gap-10">
-                    <div class="lg:max-w-lg text-center lg:text-left">
-                        <div class="inline-flex items-center gap-2.5 mb-5">
-                            <span class="w-10 h-[2px] bg-[#40e0d0]"></span>
-                            <span class="text-[#40e0d0] text-[11px] font-bold uppercase tracking-[0.25em]">Free &amp; No-Obligation</span>
-                        </div>
-                        <h2 class="text-[26px] sm:text-[32px] lg:text-[38px] font-black uppercase leading-[1.1] tracking-tight">
-                            Get Your Free<br class="hidden sm:block" /> Solar Estimate
-                        </h2>
-                        <p class="mt-3 text-slate-400 text-sm leading-relaxed max-w-md mx-auto lg:mx-0">Tell us about your energy needs and our engineers will design the perfect system for you — completely free.</p>
-                    </div>
-
-                    <div class="w-full max-w-md">
-                        <div class="bg-white/10 backdrop-blur-sm border border-white/10 rounded-2xl p-3 flex items-center gap-3">
-                            <div class="flex-1 pl-3">
-                                <input
-                                    type="text"
-                                    v-model="estimateInput"
-                                    placeholder="Enter your phone or email"
-                                    class="w-full bg-transparent border-0 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:ring-0 py-1"
-                                    @keyup.enter="handleEstimateSubmit"
-                                />
-                            </div>
-                            <button
-                                type="button"
-                                @click="handleEstimateSubmit"
-                                class="shrink-0 px-6 py-3 rounded-xl bg-gradient-to-r from-yellow-400 to-amber-400 text-slate-950 text-sm font-bold hover:brightness-110 transition-all duration-200 shadow-lg shadow-yellow-400/20"
-                            >
-                                Get Started
-                            </button>
-                        </div>
-                        <p class="mt-3 text-center text-[11px] text-slate-500">Our engineers typically reply within 24 hours.</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Thin accent line -->
-            <div class="relative z-10 max-w-7xl mx-auto px-6 sm:px-12 lg:px-16">
-                <div class="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
-            </div>
-
-            <!-- Main Footer Grid -->
-            <div class="relative max-w-7xl mx-auto px-6 sm:px-12 lg:px-16 pt-12 pb-12 z-10">
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-10 lg:gap-8">
-
-                    <!-- Column 1: Brand (spans 4 cols) -->
-                    <div class="lg:col-span-4">
-                        <p class="text-slate-400 text-[13px] leading-relaxed mb-7 max-w-xs">
-                            Clean, affordable, and sustainable solar energy. We design, supply, install, and maintain quality solar power systems across Nigeria.
-                        </p>
-                        <!-- Newsletter -->
-                        <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-2">Newsletter</label>
-                        <div class="flex items-center gap-2 max-w-xs">
-                            <input
-                                v-model="newsletterEmail"
-                                type="email"
-                                placeholder="Your email"
-                                class="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-yellow-400/50 transition"
-                                @keyup.enter="subscribeNewsletter"
-                            />
-                            <button
-                                type="button"
-                                @click="subscribeNewsletter"
-                                class="shrink-0 h-[38px] px-4 rounded-lg bg-yellow-400 text-slate-950 text-xs font-bold hover:bg-yellow-300 transition"
-                                title="Subscribe"
-                            >
-                                Join
-                            </button>
-                        </div>
-                        <p v-if="newsletterSubscribed" class="mt-2 text-xs font-semibold text-[#40e0d0]">You're subscribed — welcome aboard!</p>
-                    </div>
-
-                    <!-- Column 2: Explore (spans 3 cols) -->
-                    <div class="lg:col-span-3">
-                        <h4 class="text-xs font-bold text-white mb-5 uppercase tracking-[0.15em]">Explore</h4>
-                        <ul class="space-y-3">
-                            <li><Link :href="route('shop')" class="text-[13px] text-slate-400 hover:text-yellow-400 transition-colors duration-150">Shop Solar Products</Link></li>
-                            <li><Link :href="route('packages')" class="text-[13px] text-slate-400 hover:text-yellow-400 transition-colors duration-150">Solar Packages</Link></li>
-                            <li><Link :href="route('projects')" class="text-[13px] text-slate-400 hover:text-yellow-400 transition-colors duration-150">Our Projects</Link></li>
-                            <li><Link :href="route('calculator')" class="text-[13px] text-slate-400 hover:text-yellow-400 transition-colors duration-150">Load Calculator</Link></li>
-                            <li><Link :href="route('about')" class="text-[13px] text-slate-400 hover:text-yellow-400 transition-colors duration-150">About Us</Link></li>
-                            <li><Link :href="route('contact')" class="text-[13px] text-slate-400 hover:text-yellow-400 transition-colors duration-150">Contact Us</Link></li>
-                        </ul>
-                    </div>
-
-                    <!-- Column 3: Contact (spans 3 cols) -->
-                    <div class="lg:col-span-3">
-                        <h4 class="text-xs font-bold text-white mb-5 uppercase tracking-[0.15em]">Contact</h4>
-                        <ul class="space-y-4">
-                            <li class="flex items-start gap-3">
-                                <span class="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0 mt-0.5">
-                                    <svg class="w-3.5 h-3.5 text-yellow-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.6 19.79 19.79 0 0 1 1.62 5.07 2 2 0 0 1 3.59 3h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 10.6a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 18z" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                                </span>
-                                <div>
-                                    <p class="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Phone</p>
-                                    <p class="text-[13px] text-slate-300">+234 809 708 9259</p>
-                                </div>
-                            </li>
-                            <li class="flex items-start gap-3">
-                                <span class="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0 mt-0.5">
-                                    <svg class="w-3.5 h-3.5 text-[#40e0d0]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                                </span>
-                                <div>
-                                    <p class="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Email</p>
-                                    <p class="text-[13px] text-slate-300">hello@envoyelectric.com.ng</p>
-                                </div>
-                            </li>
-                            <li class="flex items-start gap-3">
-                                <span class="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0 mt-0.5">
-                                    <svg class="w-3.5 h-3.5 text-yellow-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                                </span>
-                                <div>
-                                    <p class="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Address</p>
-                                    <p class="text-[13px] text-slate-300 leading-relaxed">Shop 1, Peace Avenue Junction,<br>opp Goddy Royal Hotel, Futa Southgate Road, Akure</p>
-                                </div>
-                            </li>
-                        </ul>
-                    </div>
-
-                    <!-- Column 4: Follow Us + Hours (spans 2 cols) -->
-                    <div class="lg:col-span-2">
-                        <h4 class="text-xs font-bold text-white mb-5 uppercase tracking-[0.15em]">Follow Us</h4>
-                        <div class="flex items-center gap-2 mb-8">
-                            <a href="#" class="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center hover:bg-yellow-400 hover:text-slate-950 hover:border-yellow-400 transition-all duration-200" title="Instagram">
-                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
-                            </a>
-                            <a href="#" class="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center hover:bg-yellow-400 hover:text-slate-950 hover:border-yellow-400 transition-all duration-200" title="X / Twitter">
-                                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                            </a>
-                            <a href="#" class="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center hover:bg-yellow-400 hover:text-slate-950 hover:border-yellow-400 transition-all duration-200" title="Facebook">
-                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-                            </a>
-                            <a href="#" class="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center hover:bg-yellow-400 hover:text-slate-950 hover:border-yellow-400 transition-all duration-200" title="LinkedIn">
-                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
-                            </a>
-                        </div>
-                        <h4 class="text-xs font-bold text-white mb-3 uppercase tracking-[0.15em]">Open Hours</h4>
-                        <div class="space-y-1">
-                            <p class="text-[13px] text-slate-300">Mon – Fri: <span class="text-white font-medium">8 AM – 6 PM</span></p>
-                            <p class="text-[13px] text-slate-300">Saturday: <span class="text-white font-medium">9 AM – 4 PM</span></p>
-                            <p class="text-[13px] text-slate-500">Sunday: Closed</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Bottom bar -->
-            <div class="relative z-10 border-t border-white/[0.06]">
-                <div class="max-w-7xl mx-auto px-6 sm:px-12 lg:px-16 py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <p class="text-[11px] text-slate-600">&copy; 2026 Envoy Electric. All rights reserved.</p>
-                    <nav class="flex items-center gap-5 text-[11px] text-slate-500">
-                        <a href="#hero" class="hover:text-white transition">Back to top</a>
-                        <Link :href="route('about')" class="hover:text-white transition">Privacy</Link>
-                        <Link :href="route('about')" class="hover:text-white transition">Terms</Link>
-                    </nav>
-                </div>
-            </div>
-        </footer>
-
-        <!-- ========================================================= -->
-        <!-- CONSULTATION / "LET'S TALK" MODAL DIALOG -->
+        <SiteFooter @estimate="handleEstimateSubmit" />
         <!-- ========================================================= -->
         <div
             v-if="isContactModalOpen"
@@ -1955,7 +1716,7 @@ const faqs = [
                     </div>
                     <h3 class="text-2xl font-black text-slate-900">Request Solar Consultation</h3>
                     <p class="text-sm text-slate-600 mt-1">
-                        Connect directly with our senior solar engineers for customized project planning and pricing.
+                        Connect directly with our senior solar engineers for customised project planning and pricing.
                     </p>
                 </div>
 
@@ -1964,7 +1725,7 @@ const faqs = [
                         ✓
                     </div>
                     <h4 class="text-lg font-bold text-slate-900">Consultation Request Received!</h4>
-                    <p class="text-sm text-slate-600">A Factorex solar specialist will reach out within 24 business hours.</p>
+                    <p class="text-sm text-slate-600">An Envoy Electricals solar specialist will reach out within 24 business hours.</p>
                 </div>
 
                 <form v-else @submit.prevent="submitContact" class="space-y-4">
@@ -2011,8 +1772,8 @@ const faqs = [
                             <option value="Solar Panel Installation">Solar Panel Installation</option>
                             <option value="Battery Storage Solution">Battery Storage Solution</option>
                             <option value="Solar Inverter Installation">Solar Inverter Installation</option>
-                            <option value="Turbine Services">Turbine Services</option>
-                            <option value="Hydropower Plants">Hydropower Plants</option>
+                            <option value="Electrical Products &amp; Supply">Electrical Products &amp; Supply</option>
+                            <option value="Technician Training">Technician Training</option>
                             <option value="Maintenance & Energy Audit">Maintenance & Energy Audit</option>
                         </select>
                     </div>
@@ -2039,32 +1800,6 @@ const faqs = [
                 </form>
             </div>
         </div>
-
-        <!-- Cart Toast -->
-        <transition
-            enter-active-class="transition-all duration-300 ease-out"
-            enter-from-class="opacity-0 translate-y-4"
-            enter-to-class="opacity-100 translate-y-0"
-            leave-active-class="transition-all duration-200 ease-in"
-            leave-from-class="opacity-100 translate-y-0"
-            leave-to-class="opacity-0 translate-y-4"
-        >
-            <div
-                v-if="cartToastVisible"
-                class="fixed bottom-6 right-6 z-[60] flex items-center gap-3 bg-white shadow-2xl border border-slate-100 rounded-xl py-3 px-4 max-w-xs"
-            >
-                <span class="w-9 h-9 shrink-0 rounded-full bg-[#47B247] text-white flex items-center justify-center">
-                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <path d="M20 6L9 17l-5-5" />
-                    </svg>
-                </span>
-                <div class="min-w-0">
-                    <p class="text-sm font-bold text-slate-900">Added to Cart</p>
-                    <p class="text-xs text-slate-500 truncate">{{ cartToastName }}</p>
-                </div>
-            </div>
-        </transition>
-    </div>
 </template>
 
 <style>
@@ -2245,5 +1980,22 @@ const faqs = [
 
 .sol-pulse-slow {
     animation: sol-pulse 4.2s ease-out infinite;
+}
+
+/* ---- Scroll-reveal animations ---- */
+.reveal {
+    opacity: 0;
+    transform: translateY(28px);
+    transition: opacity 0.75s cubic-bezier(0.22, 1, 0.36, 1), transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: opacity, transform;
+}
+.reveal.reveal-left  { transform: translateX(-36px); }
+.reveal.reveal-right { transform: translateX(36px); }
+.reveal.reveal-zoom  { transform: scale(0.92); }
+
+.reveal.reveal-visible {
+    opacity: 1;
+    transform: none;
+    will-change: auto;
 }
 </style>

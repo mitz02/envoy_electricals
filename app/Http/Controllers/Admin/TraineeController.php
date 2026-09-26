@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Certificate;
 use App\Models\Enrollment;
 use App\Models\Trainee;
+use App\Models\Training;
 use App\Services\AcademyService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -128,7 +129,7 @@ class TraineeController extends Controller
                 'grade' => $c->grade,
                 'training' => ['id' => $c->training->id, 'title' => $c->training->title],
             ]),
-            'trainings' => \App\Models\Training::active()
+            'trainings' => Training::active()
                 ->orderBy('title')
                 ->get(['id', 'ref_id', 'title'])
                 ->map(fn ($t) => [
@@ -168,7 +169,7 @@ class TraineeController extends Controller
             'type' => ['required', 'in:staff,apprentice,trainee'],
             'name' => ['required', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:30'],
-            'email' => ['nullable', 'email', 'max:255', 'unique:trainees,email,' . $ignore],
+            'email' => ['nullable', 'email', 'max:255', 'unique:trainees,email,'.$ignore],
             'date_of_birth' => ['nullable', 'date'],
             'gender' => ['nullable', 'in:male,female,other'],
             'address' => ['nullable', 'string', 'max:255'],

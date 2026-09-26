@@ -5,14 +5,15 @@ namespace Tests\Feature;
 use App\Models\Customer;
 use App\Models\Payment;
 use App\Models\Product;
-use App\Models\ProductCategory;
 use App\Models\Role;
+use App\Models\Sale;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Services\InventoryService;
 use App\Services\PaymentService;
 use App\Services\PurchaseService;
 use App\Services\SaleService;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -24,7 +25,7 @@ class PaymentFeatureTest extends TestCase
 
     protected function owner(): User
     {
-        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $this->seed(RolesAndPermissionsSeeder::class);
 
         return User::factory()->create([
             'role_id' => Role::where('slug', 'owner')->first()->id,
@@ -34,15 +35,15 @@ class PaymentFeatureTest extends TestCase
     protected function product(string $name): Product
     {
         return Product::create([
-            'ref_id' => 'EV-PROD-' . str_pad((string) random_int(1000, PHP_INT_MAX), 6, '0', STR_PAD_LEFT),
+            'ref_id' => 'EV-PROD-'.str_pad((string) random_int(1000, PHP_INT_MAX), 6, '0', STR_PAD_LEFT),
             'name' => $name,
-            'sku' => 'PAY-' . strtoupper(substr(md5((string) mt_rand()), 0, 8)),
+            'sku' => 'PAY-'.strtoupper(substr(md5((string) mt_rand()), 0, 8)),
             'unit' => 'piece',
             'selling_price' => 120000,
         ]);
     }
 
-    protected function saleWithBalance(User $user, float $total = 240000): \App\Models\Sale
+    protected function saleWithBalance(User $user, float $total = 240000): Sale
     {
         $inventory = app(InventoryService::class);
         $saleService = app(SaleService::class);
@@ -51,6 +52,7 @@ class PaymentFeatureTest extends TestCase
             'name' => 'Mr Balance',
             'email' => 'bal@customer.test',
             'phone' => '08000000001',
+            'customer_type' => 'regular',
         ]);
         $product = $this->product('PV Panel 550W');
         $inventory->setOpeningStock($product, 10, 95000);

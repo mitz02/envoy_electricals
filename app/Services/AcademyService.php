@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Certificate;
 use App\Models\Enrollment;
+use App\Models\Role;
 use App\Models\Staff;
 use App\Models\Trainee;
 use App\Models\Training;
@@ -121,6 +122,14 @@ class AcademyService
 
             AuditLogger::log('created', 'enrollment', $enrollment->id, "Enrolled {$trainee->name} ({$trainee->ref_id}) in {$training->title}", userId: $userId);
 
+            NotificationService::notifyAdmins(
+                'New training enrollment',
+                "{$trainee->name} enrolled in {$training->title} ({$enrollment->ref_id}).",
+                'enrollment',
+                route('admin.trainees.show', $trainee->id),
+                ['training.view'],
+            );
+
             return $enrollment;
         });
     }
@@ -150,6 +159,32 @@ class AcademyService
         }
 
         AuditLogger::log('updated', 'enrollment', $enrollment->id, "Progress set to {$progress}% for enrollment {$enrollment->ref_id}", userId: $userId);
+
+        return $enrollment;
+    }
+
+    /**
+     * Mark an enrollment as over (100% complete) and ensure a download-ready certificate exists.
+     *
+     * @throws RuntimeException
+     */
+    public function completeEnrollment(Enrollment $enrollment, ?float $grade, ?int $userId): Enrollment
+    {
+        if ($enrollment->status === Enrollment::STATUS_WITHDRAWN) {
+            throw new RuntimeException('A withdrawn enrollment cannot be completed.');
+        }
+
+        $enrollment->update([
+            'progress' => 100,
+            'grade' => $grade ?? $enrollment->grade,
+            'status' => Enrollment::STATUS_COMPLETED,
+        ]);
+
+        if (! $enrollment->certificate()->where('status', Certificate::STATUS_ISSUED)->exists()) {
+            $this->issueCertificate($enrollment, $enrollment->grade, $userId);
+        }
+
+        AuditLogger::log('updated', 'enrollment', $enrollment->id, "Marked enrollment {$enrollment->ref_id} as completed", userId: $userId);
 
         return $enrollment;
     }
@@ -251,9 +286,13 @@ class AcademyService
                 'email' => $email,
                 'phone' => $data['phone'] ?? null,
                 'password' => $data['password'] ?? '',
-                'role_id' => \App\Models\Role::where('slug', 'trainee')->value('id'),
+                'role_id' => Role::where('slug', 'trainee')->value('id'),
                 'is_active' => true,
             ]);
+
+            if ($data['notify_created'] ?? true) {
+                app(UserMailService::class)->newAccount($user, $data['password'] ?? null, 'trainee');
+            }
         }
 
         return $user;

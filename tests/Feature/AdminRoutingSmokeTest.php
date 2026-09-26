@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\Role;
 use App\Models\User;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -12,10 +14,10 @@ class AdminRoutingSmokeTest extends TestCase
 
     public function test_all_admin_pages_render_for_owner(): void
     {
-        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $this->seed(RolesAndPermissionsSeeder::class);
 
         $owner = User::factory()->create([
-            'role_id' => \App\Models\Role::where('slug', 'owner')->first()->id,
+            'role_id' => Role::where('slug', 'owner')->first()->id,
         ]);
 
         $paths = [
@@ -47,6 +49,29 @@ class AdminRoutingSmokeTest extends TestCase
             '/admin/reports/profit',
             '/admin/reports/expenses',
             '/admin/audit-logs',
+        ];
+
+        foreach ($paths as $path) {
+            $this->actingAs($owner)->get($path)->assertOk();
+        }
+    }
+
+    public function test_report_routes_tolerate_null_querystring_filters(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $owner = User::factory()->create([
+            'role_id' => Role::where('slug', 'owner')->first()->id,
+        ]);
+
+        $paths = [
+            '/admin/reports/sales?from=null&to=null&group=week',
+            '/admin/reports/sales?from=null&to=null&group=month',
+            '/admin/reports/purchases?from=null&to=null',
+            '/admin/reports/expenses?from=null&to=null',
+            '/admin/reports/profit?from=null&to=null',
+            '/admin/reports/projects?from=null&to=null',
+            '/admin/reports/export?type=sales&from=null&to=null',
         ];
 
         foreach ($paths as $path) {

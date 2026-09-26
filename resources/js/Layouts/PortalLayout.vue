@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { ref, computed } from 'vue';
 import { Link, usePage, router } from '@inertiajs/vue3';
 import FlashMessages from '@/Components/FlashMessages.vue';
@@ -66,7 +66,7 @@ function logout() {
             <div class="relative z-10 px-6 pt-6">
                 <div class="flex items-center gap-3">
                     <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white p-1 shadow-lg ring-1 ring-white/10">
-                        <img src="/envoy_images/logo.png" alt="Envoy Electric" class="h-full w-full object-contain" />
+                        <img src="/envoy_images/logo.png" alt="Envoy Electricals" class="h-full w-full object-contain" />
                     </div>
                     <div class="flex flex-col leading-tight">
                         <span class="text-[15px] font-black tracking-tight text-white">Envoy Academy<span class="text-yellow-400">.</span></span>
@@ -154,7 +154,7 @@ function logout() {
                     </button>
                     <Link href="/portal/dashboard" class="flex items-center gap-2.5">
                         <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-white p-1">
-                            <img src="/envoy_images/logo.png" alt="Envoy Electric" class="h-full w-full object-contain" />
+                            <img src="/envoy_images/logo.png" alt="Envoy Electricals" class="h-full w-full object-contain" />
                         </div>
                         <div class="flex flex-col leading-tight">
                             <span class="text-sm font-black text-white">Envoy Academy<span class="text-yellow-400">.</span></span>

@@ -4,7 +4,7 @@ import { useForm } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
 import PageHeader from '@/Components/PageHeader.vue';
-import { naira, formatDate, formatDateTime, badgeClass } from '@/lib/format';
+import { naira, maskNaira, formatDate, formatDateTime, badgeClass } from '@/lib/format';
 import { useCan } from '@/composables/permissions';
 
 defineOptions({ layout: AdminLayout });
@@ -90,8 +90,8 @@ function statusBadge(status) {
                             <tr v-for="item in purchase.items" :key="item.id">
                                 <td class="px-3 py-2 text-slate-700">{{ item.product?.name }}</td>
                                 <td class="px-3 py-2 text-center text-slate-600">{{ item.quantity }}</td>
-                                <td class="px-3 py-2 text-right text-slate-700">{{ naira(item.unit_cost) }}</td>
-                                <td class="px-3 py-2 text-right font-semibold text-slate-900">{{ naira(item.total) }}</td>
+                                <td class="px-3 py-2 text-right text-slate-700">{{ maskNaira('cost_price', item.unit_cost) }}</td>
+                                <td class="px-3 py-2 text-right font-semibold text-slate-900">{{ maskNaira('cost_price', item.total) }}</td>
                             </tr>
                         </tbody>
                     </table>

@@ -162,7 +162,7 @@ onMounted(() => {
                             <div class="w-12 h-12 rounded-xl bg-teal-400/10 flex items-center justify-center group-hover:bg-teal-400/20 transition-colors">
                                 <i class="bi bi-shop text-teal-400 text-xl group-hover:scale-110 transition-transform"></i>
                             </div>
-                            <span class="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">Shop Products</span>
+                            <span class="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">Buy Our Products</span>
                         </Link>
 
                         <Link href="/calculator" class="group flex flex-col items-center gap-2 rounded-xl p-4 bg-slate-900/50 hover:bg-slate-800/50 transition-colors">

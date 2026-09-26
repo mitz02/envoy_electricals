@@ -1,4 +1,4 @@
-﻿<script setup>
+<script setup>
 import { useForm, Link } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
@@ -60,7 +60,7 @@ function statusBadge(status) {
         </div>
 
         <div class="mb-4 grid gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs sm:grid-cols-6">
-            <input v-model="form.search" type="search" placeholder="Ref, customer, supplierâ€¦" class="rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20 sm:col-span-2" @keyup.enter="applyFilters" />
+            <input v-model="form.search" type="search" placeholder="Ref, customer, supplier…" class="rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20 sm:col-span-2" @keyup.enter="applyFilters" />
             <select v-model="form.type" class="rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" @change="applyFilters">
                 <option value="">All Types</option>
                 <option value="payment_in">Payment In</option>
@@ -106,7 +106,7 @@ function statusBadge(status) {
                             </td>
                             <td class="px-4 py-3">
                                 <span class="font-medium text-slate-800">
-                                    {{ p.customer?.name ?? p.supplier?.name ?? 'â€”' }}
+                                    {{ p.customer?.name ?? p.supplier?.name ?? '—' }}
                                 </span>
                             </td>
                             <td class="px-4 py-3 text-slate-600 capitalize">{{ p.payment_method }}</td>

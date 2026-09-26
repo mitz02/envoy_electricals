@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
+use App\Models\Product;
 use App\Models\SolarPackage;
 use App\Models\SolarPackageItem;
-use App\Models\Product;
 use Illuminate\Database\Seeder;
 
 class SolarPackageSeeder extends Seeder
@@ -223,7 +223,7 @@ class SolarPackageSeeder extends Seeder
             $items = $packageData['items'];
             unset($packageData['items']);
 
-            $packageData['ref_id'] = "SOL-PKG-{$year}-" . str_pad($baseCount + $index + 1, 6, '0', STR_PAD_LEFT);
+            $packageData['ref_id'] = "SOL-PKG-{$year}-".str_pad($baseCount + $index + 1, 6, '0', STR_PAD_LEFT);
 
             $package = SolarPackage::create($packageData);
 

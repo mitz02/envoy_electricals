@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { useForm, Link } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
@@ -35,7 +35,7 @@ function inputType(kind) {
     <FlashMessages />
     <PageHeader
         title="Website Settings"
-        subtitle="Control the public Envoy Electric website content."
+        subtitle="Control the public Envoy Electricals website content."
     />
 
     <div class="mb-4 flex items-center justify-between rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">

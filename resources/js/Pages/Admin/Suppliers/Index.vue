@@ -1,6 +1,6 @@
-﻿<script setup>
-import { ref } from 'vue';
-import { useForm, Link } from '@inertiajs/vue3';
+<script setup>
+import { ref, watch } from 'vue';
+import { useForm, Link, router } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
 import PageHeader from '@/Components/PageHeader.vue';
@@ -17,6 +17,13 @@ const props = defineProps({
 const searchForm = useForm({ search: props.filters.search ?? '' });
 const showModal = ref(false);
 const editing = ref(null);
+
+watch(
+    () => props.filters.search,
+    (value) => {
+        searchForm.search = value ?? '';
+    },
+);
 
 const form = useForm({
     name: '',
@@ -67,7 +74,16 @@ function remove(supplier) {
 }
 
 function applyFilters() {
-    window.location.search = new URLSearchParams(searchForm.data()).toString();
+    router.get(
+        '/admin/suppliers',
+        { search: searchForm.search || undefined },
+        { preserveState: true, preserveScroll: true, replace: true },
+    );
+}
+
+function clearFilters() {
+    searchForm.search = '';
+    applyFilters();
 }
 </script>
 
@@ -76,8 +92,9 @@ function applyFilters() {
         <PageHeader title="Suppliers" subtitle="Track suppliers and what you owe them." />
 
         <div class="mb-4 flex gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
-            <input v-model="searchForm.search" type="search" placeholder="Search supplier name, phone, emailâ€¦" class="flex-1 rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" @keyup.enter="applyFilters" />
+            <input v-model="searchForm.search" type="search" placeholder="Search supplier name, phone, email…" class="flex-1 rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" @keyup.enter="applyFilters" />
             <button class="rounded-lg bg-[#0D1527] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0D1527]/90" @click="applyFilters">Search</button>
+            <button v-if="filters.search" class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50" @click="clearFilters">Clear</button>
             <button class="rounded-lg bg-[#0D1527] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0D1527]/90" @click="openCreate">Add Supplier</button>
         </div>
 
@@ -99,8 +116,8 @@ function applyFilters() {
                                 <Link :href="`/admin/suppliers/${s.id}`" class="font-medium text-slate-900 hover:text-slate-600">{{ s.name }}</Link>
                                 <p class="text-xs text-slate-400">{{ s.ref_id }}</p>
                             </td>
-                            <td class="px-4 py-3 text-slate-600">{{ s.contact_person || 'â€”' }}</td>
-                            <td class="px-4 py-3 text-slate-600">{{ s.phone || 'â€”' }}</td>
+                            <td class="px-4 py-3 text-slate-600">{{ s.contact_person || '—' }}</td>
+                            <td class="px-4 py-3 text-slate-600">{{ s.phone || '—' }}</td>
                             <td class="px-4 py-3 text-right font-semibold text-slate-900">{{ naira(s.total_purchases) }}</td>
                             <td class="px-4 py-3 text-right">
                                 <button class="rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100" @click="openEdit(s)">Edit</button>
@@ -108,7 +125,10 @@ function applyFilters() {
                             </td>
                         </tr>
                         <tr v-if="!suppliers.data.length">
-                            <td colspan="5" class="px-4 py-12 text-center text-sm text-slate-400">No suppliers yet.</td>
+                            <td colspan="5" class="px-4 py-12 text-center text-sm text-slate-400">
+                                <template v-if="filters.search">No suppliers match "{{ filters.search }}".</template>
+                                <template v-else>No suppliers yet.</template>
+                            </td>
                         </tr>
                     </tbody>
                 </table>

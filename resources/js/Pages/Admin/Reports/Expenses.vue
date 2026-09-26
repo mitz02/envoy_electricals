@@ -1,4 +1,4 @@
-﻿<script setup>
+<script setup>
 import { computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
@@ -56,7 +56,7 @@ const exportLink = computed(() => {
                     <tbody class="divide-y divide-slate-100">
                         <tr v-for="e in expenses.data" :key="e.id" class="hover:bg-slate-50">
                             <td class="px-4 py-3 text-slate-600">{{ formatDate(e.expense_date) }}</td>
-                            <td class="px-4 py-3 text-slate-700">{{ e.category?.name ?? 'â€”' }}</td>
+                            <td class="px-4 py-3 text-slate-700">{{ e.category?.name ?? '—' }}</td>
                             <td class="px-4 py-3">
                                 <p class="font-medium text-slate-900">{{ e.description }}</p>
                                 <p v-if="e.paid_to" class="text-xs text-slate-400">{{ e.paid_to }}</p>

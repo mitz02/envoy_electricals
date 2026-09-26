@@ -1,9 +1,27 @@
 ﻿<script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { Head, useForm } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 
 defineOptions({ layout: PublicLayout });
+
+const props = defineProps({
+    canLogin: {
+        type: Boolean,
+        default: true,
+    },
+    canRegister: {
+        type: Boolean,
+        default: true,
+    },
+    whatsappNumber: {
+        type: String,
+        default: '',
+    },
+});
+
+const whatsapp = computed(() => (props.whatsappNumber || '2348097089259').replace(/\D/g, ''));
+const whatsappUrl = computed(() => `https://wa.me/${whatsapp.value}`);
 
 const isContactModalOpen = ref(false);
 
@@ -154,7 +172,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <Head title="Contact Us — Envoy Electricals" />
+    <Head title="Contact Envoy Electricals — Solar Installation & Electrical Supplies, Akure Nigeria" />
 
     <!-- ===================== HERO ===================== -->
     <section class="relative overflow-hidden">

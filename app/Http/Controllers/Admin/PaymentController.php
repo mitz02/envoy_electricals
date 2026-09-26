@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\PaymentLinkMail;
+use App\Models\Customer;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Models\Purchase;
 use App\Models\Sale;
+use App\Models\Setting;
 use App\Services\AuditLogger;
 use App\Services\OrderService;
 use App\Services\PaymentService;
@@ -17,8 +20,10 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class PaymentController extends Controller
 {
@@ -29,7 +34,7 @@ class PaymentController extends Controller
         protected PaystackService $paystack
     ) {}
 
-    public function index(Request $request): \Inertia\Response
+    public function index(Request $request): Response
     {
         $payments = Payment::query()
             ->with(['customer:id,name,phone', 'supplier:id,name'])
@@ -139,7 +144,7 @@ class PaymentController extends Controller
         }
 
         $email = $sale->customer?->email
-            ?? \App\Models\Setting::where('key', 'business.email')->value('value')
+            ?? Setting::where('key', 'business.email')->value('value')
             ?? $request->user()->email;
 
         if (! $email) {
@@ -181,7 +186,7 @@ class PaymentController extends Controller
                 ],
             );
         } catch (\Throwable $e) {
-            Log::error('Paystack initialize failed: ' . $e->getMessage(), ['payment' => $payment->ref_id]);
+            Log::error('Paystack initialize failed: '.$e->getMessage(), ['payment' => $payment->ref_id]);
 
             return response()->json(['message' => 'Could not reach Paystack. Please try again.'], 502);
         }
@@ -197,6 +202,116 @@ class PaymentController extends Controller
         return response()->json([
             'authorization_url' => $response['data']['authorization_url'],
             'reference' => $payment->ref_id,
+        ]);
+    }
+
+    /**
+     * Send Paystack payment link to customer via email.
+     */
+    public function sendPaymentLinkEmail(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'document_type' => ['required', 'in:sale'],
+            'document_id' => ['required', 'integer'],
+            'custom_message' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        if (! $this->paystack->isConfigured()) {
+            return response()->json(['message' => 'Paystack is not configured on this server.'], 503);
+        }
+
+        $sale = Sale::with('customer')->findOrFail($data['document_id']);
+
+        if ($sale->status !== 'completed') {
+            return response()->json(['message' => 'This sale is no longer payable.'], 422);
+        }
+
+        $balance = round((float) $sale->balance, 2);
+        if ($balance <= 0) {
+            return response()->json(['message' => 'There is no outstanding balance on this invoice.'], 422);
+        }
+
+        $email = $sale->customer?->email;
+        if (! $email) {
+            return response()->json(['message' => 'Customer does not have an email address.'], 422);
+        }
+
+        // Create or reuse a pending Paystack payment for this invoice
+        $payment = Payment::where('document_type', 'sale')
+            ->where('document_id', $sale->id)
+            ->where('gateway', Payment::GATEWAY_PAYSTACK)
+            ->where('status', Payment::STATUS_PENDING)
+            ->latest('id')
+            ->first();
+
+        $payment ??= PaymentService::recordPayment(
+            type: 'payment_in',
+            amount: $balance,
+            paymentMethod: 'paystack',
+            documentType: 'sale',
+            documentId: $sale->id,
+            customerId: $sale->customer_id,
+            supplierId: null,
+            reference: null,
+            userId: $request->user()->id,
+            gateway: Payment::GATEWAY_PAYSTACK,
+            status: Payment::STATUS_PENDING,
+        );
+
+        try {
+            $response = $this->paystack->initialize(
+                reference: $payment->ref_id,
+                amount: $balance,
+                email: $email,
+                callbackUrl: route('admin.sales.show', $sale),
+                metadata: [
+                    'payment_ref' => $payment->ref_id,
+                    'invoice' => $sale->invoice_no,
+                    'customer_name' => $sale->customer?->name,
+                ],
+            );
+        } catch (\Throwable $e) {
+            Log::error('Paystack initialize failed: '.$e->getMessage(), ['payment' => $payment->ref_id]);
+
+            return response()->json(['message' => 'Could not reach Paystack. Please try again.'], 502);
+        }
+
+        if (empty($response['status']) || empty($response['data']['authorization_url'] ?? null)) {
+            Log::error('Paystack initialize returned an invalid response.', ['response' => $response]);
+
+            return response()->json(['message' => 'Paystack did not return a payment link.'], 502);
+        }
+
+        $payment->update(['gateway_reference' => $payment->ref_id]);
+
+        $paymentUrl = $response['data']['authorization_url'];
+
+        // Send email to customer
+        try {
+            Mail::to($email, $sale->customer->name)->send(
+                new PaymentLinkMail(
+                    customer: $sale->customer,
+                    sale: $sale,
+                    paymentUrl: $paymentUrl,
+                    customMessage: $data['custom_message'] ?? null,
+                )
+            );
+        } catch (\Throwable $e) {
+            Log::error('Payment link email failed to send', [
+                'customer_email' => $email,
+                'sale_id' => $sale->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Payment link generated but email failed to send.',
+                'authorization_url' => $paymentUrl,
+            ], 207);
+        }
+
+        return response()->json([
+            'message' => 'Payment link sent to customer email.',
+            'authorization_url' => $paymentUrl,
         ]);
     }
 }

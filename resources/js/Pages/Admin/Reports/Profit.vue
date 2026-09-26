@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
-import { naira } from '@/lib/format';
+import { naira, maskNaira, maskPercent } from '@/lib/format';
 
 defineOptions({ layout: AdminLayout });
 
@@ -14,7 +14,7 @@ const props = defineProps({
 });
 
 const exportLink = computed(() => '/admin/reports/export?type=expenses');
-const marginPct = computed(() => (props.summary.gross_margin ?? 0).toFixed(1) + '%');
+const marginPct = computed(() => maskPercent('profit_margin', props.summary.gross_margin ?? props.summary.net_margin ?? 0));
 
 function marginColor(value) {
     if (value >= 30) {
@@ -51,7 +51,7 @@ function marginColor(value) {
             </div>
             <div class="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">COGS</p>
-                <p class="mt-2 text-2xl font-bold text-slate-900">{{ naira(summary.cogs) }}</p>
+                <p class="mt-2 text-2xl font-bold text-slate-900">{{ maskNaira('cogs', summary.cogs) }}</p>
             </div>
             <div class="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Expenses</p>
@@ -66,12 +66,12 @@ function marginColor(value) {
         <div class="mt-6 grid gap-6 lg:grid-cols-2">
             <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
                 <p class="text-sm font-semibold text-emerald-900">Gross Profit</p>
-                <p class="mt-2 text-3xl font-extrabold text-emerald-900">{{ naira(summary.gross_profit) }}</p>
+                <p class="mt-2 text-3xl font-extrabold text-emerald-900">{{ maskNaira('gross_profit', summary.gross_profit) }}</p>
                 <p class="mt-1 text-sm font-semibold" :class="marginColor(summary.gross_margin)">Margin {{ marginPct }}</p>
             </div>
             <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
                 <p class="text-sm font-semibold text-slate-900">Net Profit</p>
-                <p class="mt-2 text-3xl font-extrabold" :class="summary.net_profit >= 0 ? 'text-emerald-700' : 'text-red-700'">{{ naira(summary.net_profit) }}</p>
+                <p class="mt-2 text-3xl font-extrabold" :class="summary.net_profit >= 0 ? 'text-emerald-700' : 'text-red-700'">{{ maskNaira('net_profit', summary.net_profit) }}</p>
                 <p class="mt-1 text-sm text-slate-500">After expenses</p>
             </div>
         </div>

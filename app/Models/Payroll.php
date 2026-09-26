@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,7 +13,9 @@ class Payroll extends Model
     protected $table = 'payroll';
 
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_PAID = 'paid';
+
     public const STATUS_CANCELLED = 'cancelled';
 
     protected $fillable = [
@@ -64,6 +67,6 @@ class Payroll extends Model
 
     public function getPeriodLabelAttribute(): string
     {
-        return \Carbon\Carbon::createFromFormat('Y-m', $this->period)->format('F Y');
+        return Carbon::createFromFormat('Y-m', $this->period)->format('F Y');
     }
 }

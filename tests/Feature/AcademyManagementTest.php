@@ -10,8 +10,9 @@ use App\Models\Trainee;
 use App\Models\Training;
 use App\Models\User;
 use App\Services\AcademyService;
-use App\Services\PaystackService;
 use App\Services\PaymentService;
+use App\Services\PaystackService;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -21,7 +22,7 @@ class AcademyManagementTest extends TestCase
 
     protected function owner(): User
     {
-        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $this->seed(RolesAndPermissionsSeeder::class);
 
         return User::factory()->create([
             'role_id' => Role::where('slug', 'owner')->first()->id,
@@ -31,7 +32,7 @@ class AcademyManagementTest extends TestCase
     protected function training(array $overrides = []): Training
     {
         return Training::create(array_merge([
-            'ref_id' => 'TRG-' . now()->format('Y') . '-000001',
+            'ref_id' => 'TRG-'.now()->format('Y').'-000001',
             'title' => 'Solar Installation Basics',
             'description' => 'Foundations of solar installation.',
             'duration_weeks' => 6,
@@ -78,7 +79,7 @@ class AcademyManagementTest extends TestCase
         ]);
 
         $training = Training::where('title', 'Advanced Inverters')->first();
-        $this->assertStringStartsWith('TRG-' . now()->format('Y') . '-', $training->ref_id);
+        $this->assertStringStartsWith('TRG-'.now()->format('Y').'-', $training->ref_id);
     }
 
     public function test_training_program_rejects_invalid_level(): void
@@ -120,7 +121,7 @@ class AcademyManagementTest extends TestCase
     public function test_admin_can_create_trainee_with_login(): void
     {
         $owner = $this->owner();
-        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $this->seed(RolesAndPermissionsSeeder::class);
 
         $this->actingAs($owner)
             ->post('/admin/trainees', [
@@ -197,7 +198,37 @@ class AcademyManagementTest extends TestCase
         ]);
 
         $certificate = $enrollment->certificate;
-        $this->assertStringStartsWith('CERT-' . now()->format('Y') . '-', $certificate->certificate_no);
+        $this->assertStringStartsWith('CERT-'.now()->format('Y').'-', $certificate->certificate_no);
+    }
+
+    public function test_marking_enrollment_over_issues_certificate(): void
+    {
+        $owner = $this->owner();
+        $trainee = $this->trainee();
+        $training = $this->training();
+
+        $enrollment = app(AcademyService::class)->enroll($trainee, $training->id, $owner->id);
+
+        $this->actingAs($owner)
+            ->post("/admin/enrollments/{$enrollment->id}/complete", [
+                'grade' => 88,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $enrollment->refresh();
+        $this->assertSame(Enrollment::STATUS_COMPLETED, $enrollment->status);
+        $this->assertSame(100, $enrollment->progress);
+        $this->assertSame(88.0, (float) $enrollment->grade);
+
+        $this->assertDatabaseHas('certificates', [
+            'enrollment_id' => $enrollment->id,
+            'trainee_id' => $trainee->id,
+            'training_id' => $training->id,
+            'status' => Certificate::STATUS_ISSUED,
+        ]);
+
+        $this->assertSame(1, $trainee->certificates()->count());
     }
 
     public function test_partial_progress_does_not_issue_certificate(): void
@@ -237,7 +268,7 @@ class AcademyManagementTest extends TestCase
 
     public function test_role_without_training_permission_is_denied(): void
     {
-        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+        $this->seed(RolesAndPermissionsSeeder::class);
 
         $sales = User::factory()->create([
             'role_id' => Role::where('slug', 'sales')->first()->id,
@@ -413,7 +444,7 @@ class AcademyManagementTest extends TestCase
         $fake->shouldReceive('isSuccessfulVerification')->andReturn(true);
         $this->app->instance(PaystackService::class, $fake);
 
-        $callbackUrl = route('training.payment.callback', $training) . '?reference=PAY-TEST-REF';
+        $callbackUrl = route('training.payment.callback', $training).'?reference=PAY-TEST-REF';
 
         $this->get($callbackUrl)
             ->assertRedirect(route('portal.dashboard'))

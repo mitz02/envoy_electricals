@@ -4,24 +4,29 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Expense;
+use App\Models\Payroll;
 use App\Models\Product;
 use App\Models\Project;
 use App\Models\Purchase;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Models\Staff;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class ReportController extends Controller
 {
     protected array $filters = ['from', 'to'];
 
-    public function sales(Request $request): \Inertia\Response
+    public function sales(Request $request): Response
     {
-        $from = $request->date('from');
-        $to = $request->date('to');
+        $fromRaw = $request->input('from');
+        $toRaw = $request->input('to');
+        $from = ($fromRaw && $fromRaw !== 'null' && $fromRaw !== 'undefined') ? $request->date('from') : null;
+        $to = ($toRaw && $toRaw !== 'null' && $toRaw !== 'undefined') ? $request->date('to') : null;
         $groupBy = $request->get('group', 'day');
 
         $query = Sale::where('status', 'completed')
@@ -33,7 +38,7 @@ class ReportController extends Controller
                 ->groupBy('period')->orderBy('period')->get(),
             'month' => $query->selectRaw("strftime('%Y-%m', sale_date) as period, SUM(total) as total, COUNT(*) as count")
                 ->groupBy('period')->orderBy('period')->get(),
-            default => $query->selectRaw("date(sale_date) as period, SUM(total) as total, COUNT(*) as count")
+            default => $query->selectRaw('date(sale_date) as period, SUM(total) as total, COUNT(*) as count')
                 ->groupBy('period')->orderBy('period')->get(),
         };
 
@@ -68,26 +73,76 @@ class ReportController extends Controller
         ]);
     }
 
-    public function inventory(Request $request): \Inertia\Response
+    public function inventory(Request $request): Response
     {
-        $products = Product::query()
-            ->with(['category'])
-            ->when($request->search, fn ($q, $s) => $q->where('name', 'like', "%{$s}%")->orWhere('sku', 'like', "%{$s}%"))
-            ->when($request->status, fn ($q, $s) => match ($s) {
-                'low' => $q->whereRaw('current_quantity <= reorder_level')->where('current_quantity', '>', 0),
-                'out' => $q->where('current_quantity', '<=', 0),
-                default => $q,
-            })
-            ->orderByDesc(DB::raw('current_quantity * average_cost'))
-            ->paginate(20)
-            ->withQueryString();
+        $storeId = session('admin_store_id');
 
-        $summary = [
-            'total_value' => round((float) Product::sum(DB::raw('current_quantity * average_cost')), 2),
-            'low' => Product::whereRaw('current_quantity <= reorder_level')->where('current_quantity', '>', 0)->count(),
-            'out' => Product::where('current_quantity', '<=', 0)->count(),
-            'unit_cost' => Product::where('current_quantity', '>', 0)->count(),
-        ];
+        if ($storeId) {
+            $products = Product::query()
+                ->join('product_store', function ($join) use ($storeId) {
+                    $join->on('products.id', '=', 'product_store.product_id')
+                        ->where('product_store.store_id', '=', $storeId);
+                })
+                ->select(
+                    'products.id',
+                    'products.ref_id',
+                    'products.sku',
+                    'products.name',
+                    'products.category_id',
+                    'product_store.current_quantity',
+                    'product_store.reorder_level',
+                    'product_store.average_cost',
+                    'product_store.selling_price'
+                )
+                ->with(['category'])
+                ->when($request->search, fn ($q, $s) => $q->where('products.name', 'like', "%{$s}%")->orWhere('products.sku', 'like', "%{$s}%"))
+                ->when($request->status, fn ($q, $s) => match ($s) {
+                    'low' => $q->whereRaw('product_store.current_quantity <= product_store.reorder_level')->where('product_store.current_quantity', '>', 0),
+                    'out' => $q->where('product_store.current_quantity', '<=', 0),
+                    default => $q,
+                })
+                ->orderByDesc(DB::raw('product_store.current_quantity * product_store.average_cost'))
+                ->paginate(20)
+                ->withQueryString();
+
+            $summary = [
+                'total_value' => round((float) DB::table('product_store')
+                    ->where('store_id', $storeId)
+                    ->sum(DB::raw('current_quantity * average_cost')), 2),
+                'low' => DB::table('product_store')
+                    ->where('store_id', $storeId)
+                    ->where('current_quantity', '>', 0)
+                    ->whereRaw('current_quantity <= reorder_level')
+                    ->count(),
+                'out' => DB::table('product_store')
+                    ->where('store_id', $storeId)
+                    ->where('current_quantity', '<=', 0)
+                    ->count(),
+                'unit_cost' => DB::table('product_store')
+                    ->where('store_id', $storeId)
+                    ->where('current_quantity', '>', 0)
+                    ->count(),
+            ];
+        } else {
+            $products = Product::query()
+                ->with(['category'])
+                ->when($request->search, fn ($q, $s) => $q->where('name', 'like', "%{$s}%")->orWhere('sku', 'like', "%{$s}%"))
+                ->when($request->status, fn ($q, $s) => match ($s) {
+                    'low' => $q->whereRaw('current_quantity <= reorder_level')->where('current_quantity', '>', 0),
+                    'out' => $q->where('current_quantity', '<=', 0),
+                    default => $q,
+                })
+                ->orderByDesc(DB::raw('current_quantity * average_cost'))
+                ->paginate(20)
+                ->withQueryString();
+
+            $summary = [
+                'total_value' => round((float) Product::sum(DB::raw('current_quantity * average_cost')), 2),
+                'low' => Product::whereRaw('current_quantity <= reorder_level')->where('current_quantity', '>', 0)->count(),
+                'out' => Product::where('current_quantity', '<=', 0)->count(),
+                'unit_cost' => Product::where('current_quantity', '>', 0)->count(),
+            ];
+        }
 
         return Inertia::render('Admin/Reports/Inventory', [
             'products' => $products,
@@ -96,14 +151,14 @@ class ReportController extends Controller
         ]);
     }
 
-    public function profit(Request $request): \Inertia\Response
+    public function profit(Request $request): Response
     {
         if (! $request->user()->hasPermission('reports.profit')) {
             abort(403);
         }
 
-        $from = $request->date('from');
-        $to = $request->date('to');
+        $from = $this->rangeDate($request, 'from');
+        $to = $this->rangeDate($request, 'to');
 
         $salesQuery = Sale::where('status', 'completed')->when($from, fn ($q, $d) => $q->whereDate('sale_date', '>=', $d))
             ->when($to, fn ($q, $d) => $q->whereDate('sale_date', '<=', $d));
@@ -112,7 +167,7 @@ class ReportController extends Controller
         $cogs = round((float) SaleItem::whereHas('sale', fn ($q) => $q->where('status', 'completed')
             ->when($from, fn ($q2, $d) => $q2->whereDate('sale_date', '>=', $d))
             ->when($to, fn ($q2, $d) => $q2->whereDate('sale_date', '<=', $d)))
-            ->sum('unit_cost'), 2);
+            ->sum(DB::raw('unit_cost * quantity')), 2);
         $grossProfit = round($revenue - $cogs, 2);
         $grossMargin = $revenue > 0 ? round(($grossProfit / $revenue) * 100, 2) : 0;
 
@@ -135,7 +190,7 @@ class ReportController extends Controller
             ->when($from, fn ($q2, $d) => $q2->whereDate('sale_date', '>=', $d))
             ->when($to, fn ($q2, $d) => $q2->whereDate('sale_date', '<=', $d)))
             ->with('product')
-            ->selectRaw('product_id, SUM(quantity) as qty, SUM(total) as revenue, SUM(unit_cost) as cost, SUM(profit) as profit')
+            ->selectRaw('product_id, SUM(quantity) as qty, SUM(total) as revenue, SUM(unit_cost * quantity) as cost, SUM(profit) as profit')
             ->groupBy('product_id')->orderByDesc('profit')->take(15)->get();
 
         return Inertia::render('Admin/Reports/Profit', [
@@ -149,10 +204,10 @@ class ReportController extends Controller
         ]);
     }
 
-    public function purchases(Request $request): \Inertia\Response
+    public function purchases(Request $request): Response
     {
-        $from = $request->date('from');
-        $to = $request->date('to');
+        $from = $this->rangeDate($request, 'from');
+        $to = $this->rangeDate($request, 'to');
 
         $purchases = Purchase::where('status', 'completed')
             ->when($from, fn ($q, $d) => $q->whereDate('purchase_date', '>=', $d))
@@ -175,10 +230,10 @@ class ReportController extends Controller
         ]);
     }
 
-    public function expenses(Request $request): \Inertia\Response
+    public function expenses(Request $request): Response
     {
-        $from = $request->date('from');
-        $to = $request->date('to');
+        $from = $this->rangeDate($request, 'from');
+        $to = $this->rangeDate($request, 'to');
 
         $expenses = Expense::where('status', 'recorded')
             ->when($from, fn ($q, $d) => $q->whereDate('expense_date', '>=', $d))
@@ -195,12 +250,12 @@ class ReportController extends Controller
         ]);
     }
 
-    public function projects(Request $request): \Inertia\Response
+    public function projects(Request $request): Response
     {
-        $from = $request->date('from');
-        $to = $request->date('to');
+        $from = $this->rangeDate($request, 'from');
+        $to = $this->rangeDate($request, 'to');
 
-        $projects = \App\Models\Project::query()
+        $projects = Project::query()
             ->with('customer')
             ->when($from, fn ($q, $d) => $q->whereDate('start_date', '>=', $d))
             ->when($to, fn ($q, $d) => $q->whereDate('start_date', '<=', $d))
@@ -210,12 +265,12 @@ class ReportController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        $base = \App\Models\Project::whereNotIn('status', ['cancelled'])
+        $base = Project::whereNotIn('status', ['cancelled'])
             ->when($from, fn ($q, $d) => $q->whereDate('start_date', '>=', $d))
             ->when($to, fn ($q, $d) => $q->whereDate('start_date', '<=', $d));
 
         $summary = [
-            'active' => (clone $base)->whereIn('status', \App\Models\Project::ACTIVE_STATUSES)->count(),
+            'active' => (clone $base)->whereIn('status', Project::ACTIVE_STATUSES)->count(),
             'completed' => (clone $base)->where('status', 'completed')->count(),
             'contract_value' => round((float) (clone $base)->sum('contract_value'), 2),
             'received' => round((float) (clone $base)->sum('amount_received'), 2),
@@ -224,7 +279,7 @@ class ReportController extends Controller
             'outstanding' => round((float) (clone $base)->where('balance', '>', 0)->sum('balance'), 2),
         ];
 
-        $byStatus = \App\Models\Project::query()
+        $byStatus = Project::query()
             ->when($from, fn ($q, $d) => $q->whereDate('start_date', '>=', $d))
             ->when($to, fn ($q, $d) => $q->whereDate('start_date', '<=', $d))
             ->selectRaw('status, COUNT(*) as count, SUM(gross_profit) as profit')
@@ -236,17 +291,17 @@ class ReportController extends Controller
             'projects' => $projects,
             'summary' => $summary,
             'by_status' => $byStatus,
-            'statuses' => \App\Models\Project::STATUSES,
+            'statuses' => Project::STATUSES,
             'filters' => ['from' => $from?->toDateString(), 'to' => $to?->toDateString(), 'status' => $request->get('status')],
         ]);
     }
 
-    public function payroll(Request $request): \Inertia\Response
+    public function payroll(Request $request): Response
     {
         $year = $request->get('period_year', now()->format('Y'));
         $month = str_pad((string) $request->get('period_month', now()->format('n')), 2, '0', STR_PAD_LEFT);
 
-        $query = \App\Models\Payroll::query()->forPeriod($year, $month)
+        $query = Payroll::query()->forPeriod($year, $month)
             ->when($request->staff_id, fn ($q, $id) => $q->where('staff_id', $id));
 
         $summary = [
@@ -259,7 +314,7 @@ class ReportController extends Controller
             'paid' => round((float) (clone $query)->paid()->sum('amount_paid'), 2),
         ];
 
-        $byStaff = \App\Models\Payroll::query()->forPeriod($year, $month)
+        $byStaff = Payroll::query()->forPeriod($year, $month)
             ->with('staff')
             ->selectRaw('staff_id, COUNT(*) as runs, SUM(base_salary) as base, SUM(allowance) as allowance,
                 SUM(bonus) as bonus, SUM(advance) as advance, SUM(deduction) as deduction, SUM(amount_paid) as amount_paid,
@@ -268,7 +323,7 @@ class ReportController extends Controller
             ->orderByDesc('paid')
             ->get();
 
-        $rows = \App\Models\Payroll::query()->forPeriod($year, $month)
+        $rows = Payroll::query()->forPeriod($year, $month)
             ->with('staff')
             ->latest('id')
             ->paginate(20)
@@ -278,7 +333,7 @@ class ReportController extends Controller
             'rows' => $rows,
             'by_staff' => $byStaff,
             'summary' => $summary,
-            'staff' => \App\Models\Staff::orderBy('name')->get(['id', 'name']),
+            'staff' => Staff::orderBy('name')->get(['id', 'name']),
             'filters' => ['period_year' => $year, 'period_month' => $month, 'staff_id' => $request->get('staff_id')],
         ]);
     }
@@ -286,8 +341,10 @@ class ReportController extends Controller
     public function export(Request $request)
     {
         $type = $request->query('type', 'sales');
-        $from = $request->date('from');
-        $to = $request->date('to');
+        $fromRaw = $request->query('from');
+        $toRaw = $request->query('to');
+        $from = ($fromRaw && $fromRaw !== 'null' && $fromRaw !== 'undefined') ? $request->date('from') : null;
+        $to = ($toRaw && $toRaw !== 'null' && $toRaw !== 'undefined') ? $request->date('to') : null;
 
         $rows = match ($type) {
             'sales' => Sale::where('status', 'completed')
@@ -323,7 +380,7 @@ class ReportController extends Controller
                     'SKU' => $p->sku, 'Name' => $p->name, 'Qty' => $p->current_quantity,
                     'Avg Cost' => $p->average_cost, 'Selling Price' => $p->selling_price,
                 ]),
-            'projects' => \App\Models\Project::with('customer')
+            'projects' => Project::with('customer')
                 ->when($from, fn ($q, $d) => $q->whereDate('start_date', '>=', $d))
                 ->when($to, fn ($q, $d) => $q->whereDate('start_date', '<=', $d))
                 ->get()
@@ -334,7 +391,7 @@ class ReportController extends Controller
                     'Balance' => $p->balance, 'Project Cost' => $p->project_cost,
                     'Gross Profit' => $p->gross_profit, 'Start Date' => $p->start_date?->toDateString(),
                 ]),
-            'payroll' => \App\Models\Payroll::with('staff')
+            'payroll' => Payroll::with('staff')
                 ->when($request->period_year && $request->period_month, fn ($q) => $q->forPeriod(
                     $request->period_year,
                     str_pad((string) $request->period_month, 2, '0', STR_PAD_LEFT)
@@ -351,7 +408,7 @@ class ReportController extends Controller
             default => collect(),
         };
 
-        $filename = strtolower($type) . '_' . now()->format('Ymd_His') . '.csv';
+        $filename = strtolower($type).'_'.now()->format('Ymd_His').'.csv';
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
@@ -360,5 +417,16 @@ class ReportController extends Controller
             }
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
+    private function rangeDate(Request $request, string $key): ?Carbon
+    {
+        $raw = $request->input($key);
+
+        if (! $raw || $raw === 'null' || $raw === 'undefined') {
+            return null;
+        }
+
+        return $request->date($key);
     }
 }

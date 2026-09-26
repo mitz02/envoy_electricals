@@ -30,6 +30,12 @@ function toggleOwing() {
     form.owing = !form.owing;
     applyFilters();
 }
+
+const typeBadge = {
+    walk_in: 'bg-slate-100 text-slate-700',
+    regular: 'bg-emerald-100 text-emerald-800',
+    corporate: 'bg-amber-100 text-amber-800',
+};
 </script>
 
 <template>
@@ -76,6 +82,7 @@ function toggleOwing() {
                         <th class="px-4 py-3 text-right font-semibold text-slate-600">Lifetime Purchases</th>
                         <th class="px-4 py-3 text-right font-semibold text-slate-600">Outstanding</th>
                         <th class="px-4 py-3 text-center font-semibold text-slate-600">Type</th>
+                        <th class="px-4 py-3 text-left font-semibold text-slate-600">Branch</th>
                         <th class="px-4 py-3 text-right font-semibold text-slate-600">Action</th>
                     </tr>
                 </thead>
@@ -96,7 +103,17 @@ function toggleOwing() {
                             <span v-else class="text-slate-300">—</span>
                         </td>
                         <td class="px-4 py-3 text-center">
-                            <span class="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium capitalize text-slate-700">{{ c.customer_type }}</span>
+                            <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize" :class="typeBadge[c.customer_type] || typeBadge.walk_in">{{ c.customer_type }}</span>
+                        </td>
+                        <td class="px-4 py-3">
+                            <span v-if="c.store" class="inline-flex items-center gap-1.5 rounded-full bg-[#40e0d0]/10 px-2.5 py-0.5 text-xs font-semibold text-[#0D1527]">
+                                <i class="bi bi-shop text-[10px]"></i>
+                                {{ c.store.name }}
+                            </span>
+                            <span v-else class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500">
+                                <i class="bi bi-globe2 text-[10px]"></i>
+                                Unassigned
+                            </span>
                         </td>
                         <td class="px-4 py-3 text-right">
                             <Link :href="`/admin/customers/${c.id}`" class="mr-2 rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100">View</Link>
@@ -104,7 +121,7 @@ function toggleOwing() {
                         </td>
                     </tr>
                     <tr v-if="!customers.data.length">
-                        <td colspan="7" class="px-4 py-12 text-center text-sm text-slate-400">No customers found.</td>
+                        <td colspan="8" class="px-4 py-12 text-center text-sm text-slate-400">No customers found.</td>
                     </tr>
                 </tbody>
             </table>

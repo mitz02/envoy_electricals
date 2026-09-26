@@ -36,6 +36,11 @@ class Order extends Model
         return $this->belongsTo(Customer::class);
     }
 
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
     /**
      * Payments recorded against this order in the payments ledger.
      */

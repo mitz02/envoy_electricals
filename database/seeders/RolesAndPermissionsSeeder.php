@@ -2,9 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\ExpenseCategory;
 use App\Models\Permission;
-use App\Models\ProductCategory;
 use App\Models\Role;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +14,10 @@ class RolesAndPermissionsSeeder extends Seeder
         // ---- Permissions grouped by module ----
         $permissions = [
             ['dashboard', 'dashboard.view', 'View dashboard'],
+            ['stores', 'stores.view', 'View stores'],
+            ['stores', 'stores.create', 'Create stores'],
+            ['stores', 'stores.edit', 'Edit stores'],
+            ['stores', 'stores.delete', 'Delete stores'],
             ['products', 'products.view', 'View products'],
             ['products', 'products.create', 'Create products'],
             ['products', 'products.edit', 'Edit products'],
@@ -74,6 +76,14 @@ class RolesAndPermissionsSeeder extends Seeder
             ['training', 'training.manage', 'Manage training, enrollments & certificates'],
         ];
 
+        $isMysql = DB::connection()->getDriverName() === 'mysql';
+
+        // MySQL refuses to TRUNCATE a table referenced by a foreign key, so the
+        // checks are toggled off for the reset only (no-op on other drivers).
+        if ($isMysql) {
+            DB::statement('SET FOREIGN_KEY_CHECKS = 0;');
+        }
+
         DB::table('permissions')->truncate();
 
         foreach ($permissions as [$module, $slug, $description]) {
@@ -89,6 +99,10 @@ class RolesAndPermissionsSeeder extends Seeder
         DB::table('roles')->truncate();
         DB::table('role_permission')->truncate();
 
+        if ($isMysql) {
+            DB::statement('SET FOREIGN_KEY_CHECKS = 1;');
+        }
+
         $owner = Role::create(['name' => 'Owner / Super Admin', 'slug' => 'owner', 'description' => 'Full access to everything.']);
         $manager = Role::create(['name' => 'Manager', 'slug' => 'manager', 'description' => 'Sales, purchases, inventory, customers, projects, expenses, reports.']);
         $sales = Role::create(['name' => 'Sales Staff', 'slug' => 'sales', 'description' => 'Create sales, view stock, record payments.']);
@@ -96,9 +110,11 @@ class RolesAndPermissionsSeeder extends Seeder
         $accountant = Role::create(['name' => 'Accountant', 'slug' => 'accountant', 'description' => 'Sales, purchases, expenses, payments, financial reports.']);
         $content = Role::create(['name' => 'Content Manager', 'slug' => 'content', 'description' => 'Website content, media, testimonials, newsletters.']);
         $trainee = Role::create(['name' => 'Trainee', 'slug' => 'trainee', 'description' => 'Academy trainee with portal access only.']);
+        Role::create(['name' => 'Buyer', 'slug' => 'buyer', 'description' => 'Registered online customer with a buyer account only.']);
 
         $manager->permissions()->sync($this->ids([
-            'dashboard.view', 'products.view', 'products.create', 'products.edit',
+            'dashboard.view', 'stores.view', 'stores.create', 'stores.edit',
+            'products.view', 'products.create', 'products.edit',
             'inventory.view', 'inventory.adjust', 'purchases.view', 'purchases.create', 'purchases.edit',
             'suppliers.manage', 'sales.view', 'sales.create', 'customers.manage',
             'expenses.view', 'expenses.create', 'expenses.edit', 'projects.view',

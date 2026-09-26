@@ -3,15 +3,14 @@
 namespace App\Http\Controllers\Portal\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Models\Role;
 use App\Models\Trainee;
-use App\Models\User;
 use App\Services\AcademyService;
+use App\Services\UserMailService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\Rules;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -38,7 +37,7 @@ class RegisteredUserController extends Controller
             'email' => 'required|string|lowercase|email|max:255|unique:users,email',
             'phone' => ['nullable', 'string', 'max:30'],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
-            'type' => ['required', Rule::in([Trainee::TYPE_STAFF, Trainee::TYPE_APPRENTICE, Trainee::TYPE_TRAINEE])],
+            'type' => ['required', Rule::in([Trainee::TYPE_APPRENTICE, Trainee::TYPE_TRAINEE])],
         ]);
 
         $trainee = app(AcademyService::class)->createTrainee([
@@ -48,7 +47,10 @@ class RegisteredUserController extends Controller
             'type' => $validated['type'],
             'password' => $validated['password'],
             'create_login' => true,
+            'notify_created' => false,
         ], null);
+
+        app(UserMailService::class)->welcome($trainee->user, 'portal');
 
         Auth::login($trainee->user);
 

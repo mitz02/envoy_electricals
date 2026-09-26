@@ -1,4 +1,4 @@
-﻿<script setup>
+<script setup>
 import { useForm, Link } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
@@ -39,7 +39,7 @@ function remove(t) {
 }
 
 function stars(rating) {
-    return 'â˜…'.repeat(rating || 0) + 'â˜†'.repeat(Math.max(0, 5 - (rating || 0)));
+    return '★'.repeat(rating || 0) + '☆'.repeat(Math.max(0, 5 - (rating || 0)));
 }
 </script>
 
@@ -53,7 +53,7 @@ function stars(rating) {
     />
 
     <div class="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs sm:flex-row">
-        <input v-model="form.search" type="search" placeholder="Search author or contentâ€¦" class="flex-1 rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" @keyup.enter="applyFilters" />
+        <input v-model="form.search" type="search" placeholder="Search author or content…" class="flex-1 rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" @keyup.enter="applyFilters" />
         <select v-model="form.published" class="rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" @change="applyFilters">
             <option value="">All</option>
             <option value="1">Published</option>
@@ -79,7 +79,7 @@ function stars(rating) {
                     <tr v-for="t in testimonials.data" :key="t.id" class="hover:bg-slate-50">
                         <td class="px-4 py-3">
                             <p class="font-medium text-slate-900">{{ t.author_name }}</p>
-                            <p class="text-xs text-slate-400">{{ t.author_role || 'â€”' }}</p>
+                            <p class="text-xs text-slate-400">{{ t.author_role || '—' }}</p>
                         </td>
                         <td class="px-4 py-3 max-w-xs truncate text-slate-600" :title="t.content">{{ t.content }}</td>
                         <td class="px-4 py-3 text-center text-amber-500">{{ stars(t.rating) }}</td>

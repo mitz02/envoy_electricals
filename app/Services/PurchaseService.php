@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\PurchaseItem;
 use App\Models\StockMovement;
+use App\Models\Store;
 use App\Models\Supplier;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -18,11 +19,18 @@ class PurchaseService
     /**
      * Create a purchase and automatically add quantities to inventory.
      *
-     * @param array $items Each: ['product_id' => int, 'quantity' => int, 'unit_cost' => float]
+     * @param  array  $items  Each: ['product_id' => int, 'quantity' => int, 'unit_cost' => float]
      */
     public function createPurchase(array $data, array $items, int $userId): Purchase
     {
-        return DB::transaction(function () use ($data, $items, $userId) {
+        $storeId = (int) ($data['store_id']
+            ?? session('admin_store_id')
+            ?? auth()->user()?->store_id
+            ?? Store::where('is_default', true)->value('id')
+            ?? Store::value('id')
+            ?? 1);
+
+        return DB::transaction(function () use ($data, $items, $userId, $storeId) {
             $subtotal = 0;
             $preparedItems = [];
 
@@ -50,17 +58,16 @@ class PurchaseService
             }
             $balance = round($total - $amountPaid, 2);
 
-            $customerId = null;
             $supplierId = null;
 
-            if (!empty($data['supplier_id'])) {
+            if (! empty($data['supplier_id'])) {
                 $supplierId = (int) $data['supplier_id'];
-            } elseif (!empty($data['supplier_name'])) {
+            } elseif (! empty($data['supplier_name'])) {
                 $supplier = Supplier::create([
                     'ref_id' => ReferenceGenerator::generate('supplier'),
                     'name' => $data['supplier_name'],
                     'phone' => $data['supplier_phone'] ?? null,
-                    'contact_person' => $data['supplier_contact'] ?? null,
+                    'contact_person' => null,
                 ]);
                 $supplierId = $supplier->id;
             }
@@ -70,6 +77,7 @@ class PurchaseService
                 'ref_id' => $refId,
                 'purchase_date' => $data['purchase_date'] ?? now()->toDateString(),
                 'invoice_no' => $data['invoice_no'] ?? null,
+                'store_id' => $storeId,
                 'supplier_id' => $supplierId,
                 'subtotal' => $subtotal,
                 'discount' => $discount,
@@ -91,6 +99,8 @@ class PurchaseService
                     'total' => $pi['line_total'],
                 ]);
 
+                $pi['product']->refresh();
+
                 $this->inventory->inbound(
                     product: $pi['product'],
                     quantity: $pi['quantity'],
@@ -100,6 +110,7 @@ class PurchaseService
                     documentType: 'purchase',
                     documentId: $purchase->id,
                     userId: $userId,
+                    storeId: $storeId,
                 );
             }
 
@@ -114,6 +125,7 @@ class PurchaseService
                     supplierId: $supplierId,
                     reference: $refId,
                     userId: $userId,
+                    storeId: $storeId,
                 );
             }
 
@@ -128,21 +140,63 @@ class PurchaseService
         }
 
         return DB::transaction(function () use ($purchase, $reason, $userId) {
-            $purchase->load('items');
+            $movements = StockMovement::withoutGlobalScope('store')
+                ->where('document_type', 'purchase')
+                ->where('document_id', $purchase->id)
+                ->where('type', StockMovement::TYPE_PURCHASE)
+                ->orderByDesc('id')
+                ->get();
 
-            foreach ($purchase->items as $item) {
-                $product = Product::findOrFail($item->product_id);
-                $this->inventory->outbound(
-                    product: $product,
-                    quantity: $item->quantity,
-                    type: StockMovement::TYPE_ADJUSTMENT,
-                    reference: 'VOID:' . $purchase->ref_id,
-                    reason: 'Purchase voided: ' . $reason,
-                    documentType: 'purchase',
-                    documentId: $purchase->id,
-                    userId: $userId,
-                    allowNegative: true,
-                );
+            if ($movements->isNotEmpty()) {
+                foreach ($movements as $movement) {
+                    $product = Product::findOrFail($movement->product_id);
+                    $quantity = (int) abs($movement->quantity_change);
+
+                    // Movement rows now record the branch's before/after, but cost
+                    // reversal is a product-level calculation, so derive the global
+                    // quantity that existed before the purchase was received.
+                    $globalQuantityBeforePurchase = max(0, (int) $product->current_quantity - $quantity);
+
+                    $this->inventory->reverseInboundCost(
+                        product: $product,
+                        quantity: $quantity,
+                        unitCost: (float) $movement->unit_cost,
+                        prevQuantity: $globalQuantityBeforePurchase,
+                        storeId: $purchase->store_id,
+                    );
+
+                    $this->inventory->outbound(
+                        product: $product,
+                        quantity: $quantity,
+                        type: StockMovement::TYPE_ADJUSTMENT,
+                        reference: 'VOID:'.$purchase->ref_id,
+                        reason: 'Purchase voided: '.$reason,
+                        documentType: 'purchase',
+                        documentId: $purchase->id,
+                        userId: $userId,
+                        allowNegative: true,
+                        storeId: $purchase->store_id,
+                    );
+                }
+            } else {
+                $purchase->load('items');
+
+                foreach ($purchase->items as $item) {
+                    $product = Product::findOrFail($item->product_id);
+
+                    $this->inventory->outbound(
+                        product: $product,
+                        quantity: $item->quantity,
+                        type: StockMovement::TYPE_ADJUSTMENT,
+                        reference: 'VOID:'.$purchase->ref_id,
+                        reason: 'Purchase voided: '.$reason,
+                        documentType: 'purchase',
+                        documentId: $purchase->id,
+                        userId: $userId,
+                        allowNegative: true,
+                        storeId: $purchase->store_id,
+                    );
+                }
             }
 
             $purchase->update([
@@ -176,7 +230,7 @@ class PurchaseService
         ?string $paymentDate = null
     ): Payment {
         if ($purchase->status !== 'completed') {
-            throw ValidationException::withMessages(['amount' => 'Payments cannot be recorded on a ' . $purchase->status . ' purchase.']);
+            throw ValidationException::withMessages(['amount' => 'Payments cannot be recorded on a '.$purchase->status.' purchase.']);
         }
 
         $amount = round($amount, 2);
@@ -204,6 +258,7 @@ class PurchaseService
                 userId: $userId,
                 remarks: $remarks,
                 paymentDate: $paymentDate,
+                storeId: $purchase->store_id,
             );
 
             $purchase->update([

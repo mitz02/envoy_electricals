@@ -10,9 +10,11 @@ defineOptions({ layout: AdminLayout });
 const props = defineProps({
     categories: { type: Array, required: true },
     expense: { type: Object, default: null },
+    store: { type: Object, default: null },
 });
 
 const isEdit = computed(() => !!props.expense);
+const expenseStore = computed(() => props.expense?.store ?? props.store);
 
 const form = useForm({
     expense_date: props.expense?.expense_date ?? new Date().toISOString().split('T')[0],
@@ -26,6 +28,10 @@ const form = useForm({
 });
 
 function submit() {
+    if (!isEdit.value && !expenseStore.value) {
+        return;
+    }
+
     if (isEdit.value) {
         form.put(`/admin/expenses/${props.expense.id}`);
     } else {
@@ -37,6 +43,15 @@ function submit() {
 <template>
         <FlashMessages />
         <PageHeader :title="isEdit ? 'Edit Expense' : 'Add Expense'" />
+
+        <div
+            class="mb-4 flex items-center gap-3 rounded-xl border px-4 py-3 text-sm"
+            :class="expenseStore ? 'border-teal-200 bg-teal-50 text-teal-900' : 'border-amber-200 bg-amber-50 text-amber-900'"
+        >
+            <i class="bi bi-shop text-lg" />
+            <span v-if="expenseStore">This expense is assigned to <strong>{{ expenseStore.name }}</strong>.</span>
+            <span v-else>No store is available. Configure a store before recording this expense.</span>
+        </div>
 
         <form class="max-w-2xl space-y-5" @submit.prevent="submit">
             <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
@@ -88,7 +103,7 @@ function submit() {
             </div>
 
             <div class="flex justify-end">
-                <button type="submit" class="rounded-lg bg-[#0D1527] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#0D1527]/90 disabled:opacity-50" :disabled="form.processing">
+                <button type="submit" class="rounded-lg bg-[#0D1527] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#0D1527]/90 disabled:opacity-50" :disabled="form.processing || (!isEdit && !expenseStore)">
                     {{ isEdit ? 'Save Changes' : 'Record Expense' }}
                 </button>
             </div>

@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Customer;
 use App\Models\Enrollment;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Models\Sale;
 use App\Models\SolarPackage;
+use App\Models\Trainee;
 use App\Models\Training;
 use App\Services\AcademyService;
 use App\Services\AuditLogger;
@@ -184,8 +186,8 @@ class PaystackWebhookController extends Controller
     {
         $training = Training::find($payment->document_id);
         $trainee = $payment->trainee_id
-            ? \App\Models\Trainee::find($payment->trainee_id)
-            : ($payment->customer_id ? \App\Models\Trainee::find($payment->customer_id) : null);
+            ? Trainee::find($payment->trainee_id)
+            : ($payment->customer_id ? Trainee::find($payment->customer_id) : null);
 
         if (! $training || ! $trainee) {
             Log::warning('Paystack payment could not be applied to enrollment - missing training or trainee.', [
@@ -221,6 +223,7 @@ class PaystackWebhookController extends Controller
 
         if ($existing) {
             Log::info('Trainee already enrolled, payment marked success but no new enrollment.', ['payment' => $payment->ref_id]);
+
             return;
         }
 
@@ -236,7 +239,7 @@ class PaystackWebhookController extends Controller
     protected function applyToPackage(Payment $payment): void
     {
         $package = SolarPackage::find($payment->document_id);
-        $customer = $payment->customer_id ? \App\Models\Customer::find($payment->customer_id) : null;
+        $customer = $payment->customer_id ? Customer::find($payment->customer_id) : null;
 
         if (! $package || ! $customer) {
             Log::warning('Paystack payment could not be applied to package - missing package or customer.', [
@@ -258,7 +261,7 @@ class PaystackWebhookController extends Controller
 
         // Create an order for the package purchase
         try {
-            $orderService = app(\App\Services\OrderService::class);
+            $orderService = app(OrderService::class);
             $order = $orderService->createOrder(
                 data: [
                     'customer_name' => $customer->name,

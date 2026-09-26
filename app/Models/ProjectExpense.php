@@ -8,7 +8,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ProjectExpense extends Model
 {
     public const TYPE_LABOUR = 'labour';
+
     public const TYPE_TRANSPORT = 'transport';
+
     public const TYPE_OTHER = 'other';
 
     protected $fillable = [

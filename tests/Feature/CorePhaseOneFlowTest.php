@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Customer;
 use App\Models\Expense;
+use App\Models\ExpenseCategory;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\StockMovement;
@@ -24,9 +25,9 @@ class CorePhaseOneFlowTest extends TestCase
     private function isolatedProduct(string $name): Product
     {
         return Product::create([
-            'ref_id' => 'EV-PROD-' . str_pad((string) random_int(1000, PHP_INT_MAX), 6, '0', STR_PAD_LEFT),
+            'ref_id' => 'EV-PROD-'.str_pad((string) random_int(1000, PHP_INT_MAX), 6, '0', STR_PAD_LEFT),
             'name' => $name,
-            'sku' => 'FLOW-' . strtoupper(substr(md5((string) mt_rand()), 0, 8)),
+            'sku' => 'FLOW-'.strtoupper(substr(md5((string) mt_rand()), 0, 8)),
             'unit' => 'piece',
             'selling_price' => 0,
         ]);
@@ -35,7 +36,7 @@ class CorePhaseOneFlowTest extends TestCase
     public function test_full_purchase_and_sale_flow(): void
     {
         $user = User::factory()->create();
-        $category = ProductCategory::create(['name' => 'Test Cat', 'slug' => 'test-cat-' . mt_rand()]);
+        $category = ProductCategory::create(['name' => 'Test Cat', 'slug' => 'test-cat-'.mt_rand()]);
         $supplier = Supplier::create(['ref_id' => 'SUP-TEST0', 'name' => 'Test Supplier']);
 
         $inventory = app(InventoryService::class);
@@ -110,7 +111,7 @@ class CorePhaseOneFlowTest extends TestCase
     public function test_expense_recording_and_ledger(): void
     {
         $user = User::factory()->create();
-        $category = \App\Models\ExpenseCategory::create(['name' => 'Transport', 'slug' => 'transport-' . mt_rand()]);
+        $category = ExpenseCategory::create(['name' => 'Transport', 'slug' => 'transport-'.mt_rand()]);
 
         $expense = Expense::create([
             'ref_id' => 'EXP-TEST000001',

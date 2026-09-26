@@ -1,4 +1,4 @@
-﻿<script setup>
+<script setup>
 import { useForm, Link } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
@@ -41,9 +41,26 @@ const availabilityBadge = {
     <PageHeader
         title="Solar Packages"
         subtitle="Pre-configured solar solutions offered on the website and in POS."
-        :action-href="canManage ? '/admin/solar-packages/create' : ''"
-        action-label="Add Package"
+        :actionLabel="canManage ? 'Create Package' : ''"
+        :actionHref="canManage ? '/admin/solar-packages/create' : ''"
     />
+
+    <!-- Flow Explanation -->
+    <div class="mb-6 p-4 rounded-xl bg-blue-50 border border-blue-100">
+        <div class="flex items-start gap-3">
+            <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                <i class="bi bi-info-circle text-blue-600 text-sm" />
+            </div>
+            <div class="text-sm text-blue-800 space-y-1">
+                <p class="font-semibold">How Solar Packages Work:</p>
+                <p><strong>1. Create Package:</strong> Define name, price, installation cost, inverter capacity, load capacity, warranty.</p>
+                <p><strong>2. Add Components:</strong> Select products (inverters, batteries, panels, etc.) with quantities and unit costs. System auto-calculates margin.</p>
+                <p><strong>3. Visibility:</strong> "Visible online" → shows on website calculator & packages page. "Featured" → highlighted on homepage.</p>
+                <p><strong>4. Availability:</strong> "Available" → customers can buy/quote. "Unavailable" → hidden from purchase.</p>
+                <p><strong>Flow:</strong> Package created → Added to quotations/leads → Customer selects package → Order/Sale created.</p>
+            </div>
+        </div>
+    </div>
 
     <!-- Summary Cards -->
     <div class="mb-4 grid grid-cols-2 gap-4 lg:grid-cols-3">
@@ -63,7 +80,7 @@ const availabilityBadge = {
 
     <!-- Filters -->
     <div class="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs sm:flex-row">
-        <input v-model="form.search" type="search" placeholder="Search packagesâ€¦" class="flex-1 rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" @keyup.enter="applyFilters" />
+        <input v-model="form.search" type="search" placeholder="Search packages…" class="flex-1 rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" @keyup.enter="applyFilters" />
         <select v-model="form.availability" class="rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20">
             <option value="">All availability</option>
             <option value="available">Available</option>
@@ -92,10 +109,10 @@ const availabilityBadge = {
                     <tr v-for="p in packages.data" :key="p.id" class="hover:bg-slate-50">
                         <td class="px-4 py-3">
                             <Link :href="`/admin/solar-packages/${p.id}`" class="font-medium text-slate-900 hover:text-slate-600">{{ p.name }}</Link>
-                            <p class="text-xs text-slate-400">{{ p.ref_id }}<span v-if="p.is_featured"> Â· <span class="font-semibold text-amber-600">Featured</span></span></p>
+                            <p class="text-xs text-slate-400">{{ p.ref_id }}<span v-if="p.is_featured"> · <span class="font-semibold text-amber-600">Featured</span></span></p>
                         </td>
-                        <td class="px-4 py-3 text-slate-600">{{ p.inverter_capacity || 'â€”' }}</td>
-                        <td class="px-4 py-3 text-right text-slate-600">{{ p.estimated_load_capacity || 'â€”' }}</td>
+                        <td class="px-4 py-3 text-slate-600">{{ p.inverter_capacity || '—' }}</td>
+                        <td class="px-4 py-3 text-right text-slate-600">{{ p.estimated_load_capacity || '—' }}</td>
                         <td class="px-4 py-3 text-right font-bold text-slate-900">{{ naira(p.package_price) }}</td>
                         <td class="px-4 py-3 text-right text-slate-600">{{ naira(p.installation_cost) }}</td>
                         <td class="px-4 py-3 text-center text-slate-600">{{ p.items_count ?? 0 }}</td>

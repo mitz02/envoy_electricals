@@ -3,16 +3,20 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Media;
 use App\Models\Product;
 use App\Models\SolarPackage;
+use App\Models\SolarPackageImage;
 use App\Services\AuditLogger;
 use App\Services\ReferenceGenerator;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class SolarPackageController extends Controller
 {
-    public function index(Request $request): \Inertia\Response
+    public function index(Request $request): Response
     {
         $packages = SolarPackage::query()
             ->withCount('items')
@@ -39,7 +43,7 @@ class SolarPackageController extends Controller
         ]);
     }
 
-    public function create(): \Inertia\Response
+    public function create(): Response
     {
         return Inertia::render('Admin/SolarPackages/Form', [
             'package' => null,
@@ -56,6 +60,7 @@ class SolarPackageController extends Controller
             'installation_cost' => ['nullable', 'numeric', 'min:0'],
             'estimated_load_capacity' => ['nullable', 'string', 'max:255'],
             'inverter_capacity' => ['nullable', 'string', 'max:255'],
+            'custom_inverter_capacity' => ['nullable', 'string', 'max:255'],
             'warranty' => ['nullable', 'string', 'max:255'],
             'is_featured' => ['boolean'],
             'availability' => ['required', 'in:available,unavailable'],
@@ -66,6 +71,8 @@ class SolarPackageController extends Controller
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.specification' => ['nullable', 'string', 'max:255'],
             'items.*.unit_cost' => ['required', 'numeric', 'min:0'],
+            'images' => ['nullable', 'array', 'max:10'],
+            'images.*' => ['image', 'mimes:jpeg,jpg,png,webp', 'max:10240'],
         ]);
 
         $package = SolarPackage::create([
@@ -76,6 +83,7 @@ class SolarPackageController extends Controller
             'installation_cost' => $data['installation_cost'] ?? 0,
             'estimated_load_capacity' => $data['estimated_load_capacity'] ?? null,
             'inverter_capacity' => $data['inverter_capacity'] ?? null,
+            'custom_inverter_capacity' => $data['custom_inverter_capacity'] ?? null,
             'warranty' => $data['warranty'] ?? null,
             'is_featured' => (bool) ($data['is_featured'] ?? false),
             'availability' => $data['availability'],
@@ -85,22 +93,25 @@ class SolarPackageController extends Controller
 
         $this->syncItems($package, $data['items'] ?? []);
 
+        // Handle image uploads
+        $createdIds = $this->storeImages($package, $request->file('images') ?? []);
+
         AuditLogger::log('created', 'solar_package', $package->id, "Created solar package {$package->ref_id}: {$package->name}");
 
         return redirect()->route('admin.solar-packages.show', $package->id)->with('success', 'Solar package created.');
     }
 
-    public function show(SolarPackage $package): \Inertia\Response
+    public function show(SolarPackage $package): Response
     {
         return Inertia::render('Admin/SolarPackages/Show', [
-            'package' => $package->load('items.product'),
+            'package' => $package->load('items.product', 'images.media'),
         ]);
     }
 
-    public function edit(SolarPackage $package): \Inertia\Response
+    public function edit(SolarPackage $package): Response
     {
         return Inertia::render('Admin/SolarPackages/Form', [
-            'package' => $package->load('items'),
+            'package' => $package->load('items', 'images.media'),
             'products' => $this->productOptions(),
         ]);
     }
@@ -114,6 +125,7 @@ class SolarPackageController extends Controller
             'installation_cost' => ['nullable', 'numeric', 'min:0'],
             'estimated_load_capacity' => ['nullable', 'string', 'max:255'],
             'inverter_capacity' => ['nullable', 'string', 'max:255'],
+            'custom_inverter_capacity' => ['nullable', 'string', 'max:255'],
             'warranty' => ['nullable', 'string', 'max:255'],
             'is_featured' => ['boolean'],
             'availability' => ['required', 'in:available,unavailable'],
@@ -124,6 +136,10 @@ class SolarPackageController extends Controller
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.specification' => ['nullable', 'string', 'max:255'],
             'items.*.unit_cost' => ['required', 'numeric', 'min:0'],
+            'images' => ['nullable', 'array', 'max:10'],
+            'images.*' => ['image', 'mimes:jpeg,jpg,png,webp', 'max:10240'],
+            'remove_images' => ['nullable', 'array'],
+            'remove_images.*' => ['integer'],
         ]);
 
         $package->update([
@@ -133,6 +149,7 @@ class SolarPackageController extends Controller
             'installation_cost' => $data['installation_cost'] ?? 0,
             'estimated_load_capacity' => $data['estimated_load_capacity'] ?? null,
             'inverter_capacity' => $data['inverter_capacity'] ?? null,
+            'custom_inverter_capacity' => $data['custom_inverter_capacity'] ?? null,
             'warranty' => $data['warranty'] ?? null,
             'is_featured' => (bool) ($data['is_featured'] ?? false),
             'availability' => $data['availability'],
@@ -141,6 +158,27 @@ class SolarPackageController extends Controller
         ]);
 
         $this->syncItems($package, $data['items'] ?? []);
+
+        // Handle image removals
+        if (! empty($data['remove_images'])) {
+            $imagesToRemove = SolarPackageImage::whereIn('id', $data['remove_images'])
+                ->where('solar_package_id', $package->id)
+                ->get();
+
+            foreach ($imagesToRemove as $image) {
+                if ($image->media_id) {
+                    $media = Media::find($image->media_id);
+                    if ($media && Storage::disk('public')->exists($media->path)) {
+                        Storage::disk('public')->delete($media->path);
+                    }
+                    $media?->delete();
+                }
+                $image->delete();
+            }
+        }
+
+        // Handle new image uploads
+        $createdIds = $this->storeImages($package, $request->file('images') ?? []);
 
         AuditLogger::log('updated', 'solar_package', $package->id, "Updated solar package {$package->ref_id}: {$package->name}");
 
@@ -169,6 +207,39 @@ class SolarPackageController extends Controller
     protected function buildComponents(array $items): array
     {
         return array_values(array_filter($items, fn ($i) => $i['name'] ?? null));
+    }
+
+    /**
+     * Persist newly uploaded solar package images.
+     *
+     * @return array<int, int>
+     */
+    protected function storeImages(SolarPackage $package, array $files): array
+    {
+        $createdIds = [];
+        $baseOrder = (int) $package->images()->count();
+
+        foreach ($files as $i => $file) {
+            $media = Media::create([
+                'name' => $file->getClientOriginalName(),
+                'path' => $file->store('solar-packages', 'public'),
+                'type' => 'image',
+                'mime' => $file->getMimeType(),
+                'size' => $file->getSize(),
+                'category' => 'solar_package',
+                'uploaded_by' => auth()->id(),
+            ]);
+
+            $image = SolarPackageImage::create([
+                'solar_package_id' => $package->id,
+                'media_id' => $media->id,
+                'sort_order' => $baseOrder + $i,
+                'is_featured' => false,
+            ]);
+            $createdIds[] = $image->id;
+        }
+
+        return $createdIds;
     }
 
     protected function productOptions(): array

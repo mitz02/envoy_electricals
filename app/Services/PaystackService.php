@@ -2,7 +2,10 @@
 
 namespace App\Services;
 
+use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -31,7 +34,7 @@ class PaystackService
      *
      * @return array decoded JSON response from Paystack
      *
-     * @throws \Illuminate\Http\Client\RequestException
+     * @throws RequestException
      */
     public function initialize(
         string $reference,
@@ -46,7 +49,7 @@ class PaystackService
             'currency' => 'NGN',
             'email' => $email,
             'callback_url' => $callbackUrl,
-            'metadata' => $metadata ?: new \stdClass(),
+            'metadata' => $metadata ?: new \stdClass,
             'channels' => ['card', 'bank', 'ussd', 'bank_transfer'],
         ]);
 
@@ -58,7 +61,7 @@ class PaystackService
     /**
      * Verify a transaction server-side (never trust the customer's browser).
      *
-     * @throws \Illuminate\Http\Client\RequestException
+     * @throws RequestException
      */
     public function verify(string $reference): array
     {
@@ -99,9 +102,9 @@ class PaystackService
         return (int) round($amount * 100);
     }
 
-    protected function client(): \Illuminate\Http\Client\PendingRequest
+    protected function client(): PendingRequest
     {
-        return \Illuminate\Support\Facades\Http::baseUrl($this->baseUrl)
+        return Http::baseUrl($this->baseUrl)
             ->acceptJson()
             ->asJson()
             ->withToken($this->secretKey, 'Bearer')
