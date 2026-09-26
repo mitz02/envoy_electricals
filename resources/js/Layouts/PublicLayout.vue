@@ -79,7 +79,7 @@ function leaveImpersonation() {
                         </Link>
                     </nav>
 
-                    <!-- Desktop Actions -->
+<!-- Desktop Actions -->
                     <div class="hidden lg:flex items-center gap-3 shrink-0">
                         <!-- "Let's talk" CTA Button -->
                         <a
@@ -116,7 +116,7 @@ function leaveImpersonation() {
                             class="w-10 h-10 rounded-full border border-slate-200 flex items-center justify-center text-slate-600 hover:border-yellow-400 hover:bg-yellow-50 hover:text-slate-950 transition-all duration-200"
                         >
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                             </svg>
                         </Link>
                         <Link
@@ -126,22 +126,41 @@ function leaveImpersonation() {
                             class="w-10 h-10 rounded-full border border-slate-200 flex items-center justify-center text-slate-600 hover:border-yellow-400 hover:bg-yellow-50 hover:text-slate-950 transition-all duration-200"
                         >
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                             </svg>
                         </Link>
                     </div>
 
-                    <!-- Mobile Menu Button -->
-                    <button
-                        type="button"
-                        class="lg:hidden w-10 h-10 flex flex-col justify-center items-end gap-1.5 p-2 group focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400 focus-visible:ring-offset-2 rounded-lg"
-                        @click="isMobileMenuOpen = !isMobileMenuOpen"
-                        aria-label="Toggle menu"
-                        aria-expanded="false"
-                    >
-                        <span class="w-6 h-[2px] bg-slate-700 transition-all duration-300 group-hover:bg-yellow-400 origin-right"></span>
-                        <span class="w-5 h-[2px] bg-slate-700 transition-all duration-300 group-hover:bg-yellow-400 origin-right"></span>
-                    </button>
+                    <!-- Mobile Actions: Cart + Menu -->
+                    <div class="lg:hidden flex items-center gap-2 shrink-0">
+                        <!-- Cart -->
+                        <Link
+                            href="/cart"
+                            title="Cart"
+                            class="relative w-10 h-10 rounded-full border border-slate-200 flex items-center justify-center text-slate-600 hover:border-yellow-400 hover:bg-yellow-50 hover:text-slate-950 transition-all duration-200"
+                        >
+                            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="9" cy="21" r="1" />
+                                <circle cx="20" cy="21" r="1" />
+                                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+                            </svg>
+                            <span v-if="cartCount > 0" class="absolute -top-1 -right-1 min-w-5 h-5 rounded-full bg-[#E4312B] text-white text-[10px] font-black flex items-center justify-center px-1">
+                                {{ cartCount }}
+                            </span>
+                        </Link>
+
+                        <!-- Mobile Menu Button -->
+                        <button
+                            type="button"
+                            class="lg:hidden w-10 h-10 flex flex-col justify-center items-end gap-1.5 p-2 group focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400 focus-visible:ring-offset-2 rounded-lg"
+                            @click="isMobileMenuOpen = !isMobileMenuOpen"
+                            aria-label="Toggle menu"
+                            aria-expanded="false"
+                        >
+                            <span class="w-6 h-[2px] bg-slate-700 transition-all duration-300 group-hover:bg-yellow-400 origin-right"></span>
+                            <span class="w-5 h-[2px] bg-slate-700 transition-all duration-300 group-hover:bg-yellow-400 origin-right"></span>
+                        </button>
+                    </div>
                 </div>
             </div>
 

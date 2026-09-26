@@ -53,6 +53,7 @@ Route::get('/robots.txt', [SeoController::class, 'robots'])->name('robots');
 Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('sitemap');
 
 Route::get('/', function () {
+    // First try to get featured products with images
     $featuredProducts = Product::where('is_visible_online', true)
         ->where('is_featured', true)
         ->whereHas('images')
@@ -69,6 +70,25 @@ Route::get('/', function () {
         ])
         ->filter(fn ($p) => $p['image'] !== null)
         ->values();
+
+    // If no featured products with images, fall back to any visible online products with images
+    if ($featuredProducts->isEmpty()) {
+        $featuredProducts = Product::where('is_visible_online', true)
+            ->whereHas('images')
+            ->with('images')
+            ->orderBy('name')
+            ->limit(12)
+            ->get()
+            ->map(fn ($p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'price' => (int) $p->selling_price,
+                'image' => $p->images->first()?->path,
+                'category' => $p->category?->name ?? 'Solar',
+            ])
+            ->filter(fn ($p) => $p['image'] !== null)
+            ->values();
+    }
 
     $whatsappNumber = preg_replace('/\D/', '', (string) Setting::where('key', 'business.phone')->value('value'));
 

@@ -236,7 +236,7 @@ function applyPreset(p) {
                 </select>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-8 px-2 sm:px-6 lg:px-16">
+            <div class="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-8" style="width: 98vw; max-width: 100%; margin: 0 auto;">
 
                 <!-- ======================= SIDEBAR ======================= -->
                 <aside class="hidden lg:block">
@@ -404,7 +404,7 @@ function applyPreset(p) {
                     </div>
 
                     <!-- Product grid — matching landing page card style -->
-                    <div class="mt-6 grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-5 w-full">
+                    <div class="mt-6 grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3 w-full" style="padding: 0 0.5rem;">
                         <Link
                             v-for="product in products.data"
                             :key="product.id"

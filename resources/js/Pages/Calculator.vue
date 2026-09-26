@@ -642,6 +642,176 @@ onMounted(() => {
                         </div>
                     </div>
                 </section>
+
+                <!-- Mobile STEP 2 — SYSTEM PARAMETERS -->
+                <section class="reveal bg-white rounded-2xl rounded-tr-none shadow-[0_2px_14px_rgba(0,0,0,0.06)] overflow-hidden" style="transition-delay: 60ms">
+                    <div class="flex items-center gap-4 border-b border-slate-100 px-5 sm:px-7 py-5">
+                        <span class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl rounded-tr-none bg-yellow-400/10 text-yellow-500 text-lg font-black">2</span>
+                        <div>
+                            <h2 class="text-base sm:text-lg font-extrabold text-slate-950 leading-tight">System Parameters</h2>
+                            <p class="text-xs text-slate-400">Tune panel, inverter and battery assumptions to match your gear.</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 px-5 sm:px-7 py-6">
+                        <!-- Panel wattage -->
+                        <div class="rounded-2xl rounded-tr-none border border-slate-200 bg-white p-4 shadow-[0_2px_14px_rgba(0,0,0,0.04)]">
+                            <label class="block text-[11px] font-bold uppercase tracking-widest text-slate-500">Solar Panel Wattage</label>
+                            <div class="mt-2 flex items-center gap-2">
+                                <input
+                                    v-model.number="panelWattage"
+                                    type="number"
+                                    min="1"
+                                    :class="panelWattageValid ? 'border-[#d9d7d0]' : 'border-red-400 ring-4 ring-red-400/20'"
+                                    class="w-24 rounded-lg rounded-tr-none border-[1.5px] bg-[#fbfbf9] px-3 py-2 text-sm font-bold text-right text-slate-900 focus:outline-none focus:border-yellow-500 focus:ring-4 focus:ring-yellow-400/15 focus:bg-white transition-all"
+                                />
+                                <span class="text-sm font-semibold text-slate-400">W</span>
+                            </div>
+                            <p v-if="!panelWattageValid" class="mt-1 text-[10.5px] font-semibold text-red-500">Must be greater than 0</p>
+                        </div>
+
+                        <!-- Panel efficiency -->
+                        <div class="rounded-2xl rounded-tr-none border border-slate-200 bg-white p-4 shadow-[0_2px_14px_rgba(0,0,0,0.04)]">
+                            <label class="block text-[11px] font-bold uppercase tracking-widest text-slate-500">Panel Efficiency Factor</label>
+                            <div class="mt-2 flex items-center gap-2">
+                                <input
+                                    v-model.number="panelEfficiency"
+                                    type="number"
+                                    step="0.01"
+                                    min="0.01"
+                                    max="1"
+                                    :class="efficiencyValid ? 'border-[#d9d7d0]' : 'border-red-400 ring-4 ring-red-400/20'"
+                                    class="w-24 rounded-lg rounded-tr-none border-[1.5px] bg-[#fbfbf9] px-3 py-2 text-sm font-bold text-right text-slate-900 focus:outline-none focus:border-yellow-500 focus:ring-4 focus:ring-yellow-400/15 focus:bg-white transition-all"
+                                />
+                                <span class="text-sm font-semibold text-slate-400">×</span>
+                            </div>
+                            <p v-if="!efficiencyValid" class="mt-1 text-[10.5px] font-semibold text-red-500">Between 0 and 1</p>
+                        </div>
+
+                        <!-- Inverter safety factor -->
+                        <div class="rounded-2xl rounded-tr-none border border-slate-200 bg-white p-4 shadow-[0_2px_14px_rgba(0,0,0,0.04)]">
+                            <label class="block text-[11px] font-bold uppercase tracking-widest text-slate-500">Inverter Safety Factor</label>
+                            <div class="mt-2 flex items-center gap-2">
+                                <input
+                                    v-model.number="inverterSafetyFactor"
+                                    type="number"
+                                    step="0.05"
+                                    min="0.01"
+                                    :class="safetyValid ? 'border-[#d9d7d0]' : 'border-red-400 ring-4 ring-red-400/20'"
+                                    class="w-24 rounded-lg rounded-tr-none border-[1.5px] bg-[#fbfbf9] px-3 py-2 text-sm font-bold text-right text-slate-900 focus:outline-none focus:border-yellow-500 focus:ring-4 focus:ring-yellow-400/15 focus:bg-white transition-all"
+                                />
+                                <span class="text-sm font-semibold text-slate-400">×</span>
+                            </div>
+                            <p v-if="!safetyValid" class="mt-1 text-[10.5px] font-semibold text-red-500">Must be greater than 0</p>
+                        </div>
+
+                        <!-- Battery capacity -->
+                        <div class="rounded-2xl rounded-tr-none border border-slate-200 bg-white p-4 shadow-[0_2px_14px_rgba(0,0,0,0.04)]">
+                            <label class="block text-[11px] font-bold uppercase tracking-widest text-slate-500">Battery Capacity</label>
+                            <div class="mt-2 flex items-center gap-2">
+                                <input
+                                    v-model.number="batteryCapacity"
+                                    type="number"
+                                    step="0.5"
+                                    min="0.1"
+                                    :class="batteryValid ? 'border-[#d9d7d0]' : 'border-red-400 ring-4 ring-red-400/20'"
+                                    class="w-24 rounded-lg rounded-tr-none border-[1.5px] bg-[#fbfbf9] px-3 py-2 text-sm font-bold text-right text-slate-900 focus:outline-none focus:border-yellow-500 focus:ring-4 focus:ring-yellow-400/15 focus:bg-white transition-all"
+                                />
+                                <span class="text-sm font-semibold text-slate-400">kWh</span>
+                            </div>
+                            <p v-if="!batteryValid" class="mt-1 text-[10.5px] font-semibold text-red-500">Must be greater than 0</p>
+                        </div>
+
+                        <!-- Inverter sizes -->
+                        <div class="rounded-2xl rounded-tr-none border border-slate-200 bg-white p-4 shadow-[0_2px_14px_rgba(0,0,0,0.04)] sm:col-span-2">
+                            <label class="block text-[11px] font-bold uppercase tracking-widest text-slate-500">Available Inverter Sizes (kW)</label>
+                            <input
+                                v-model="inverterSizesText"
+                                type="text"
+                                placeholder="e.g. 1, 2.5, 3, 5, 7.5, 10, 15, 20"
+                                class="mt-2 w-full rounded-lg rounded-tr-none border-[1.5px] border-[#d9d7d0] bg-[#fbfbf9] px-3 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:border-yellow-500 focus:ring-4 focus:ring-yellow-400/15 focus:bg-white transition-all"
+                            />
+                            <p class="mt-1.5 text-[11px] text-slate-400">
+                                The nearest size <span class="font-bold text-slate-600">equal to or greater</span> than the requirement is recommended automatically.
+                            </p>
+                            <div class="mt-2 flex flex-wrap gap-1.5">
+                                <span
+                                    v-for="s in availableSizes"
+                                    :key="s"
+                                    class="rounded-full px-2.5 py-1 text-[10.5px] font-bold"
+                                    :class="s >= inverterRequiredKw && s === recommendedInverterKw ? 'bg-[#40e0d0] text-slate-950 shadow-sm' : 'bg-slate-200 text-slate-600'"
+                                >
+                                    {{ s.toLocaleString() }}kW
+                                </span>
+                                <span v-if="!availableSizes.length" class="text-[11px] font-semibold text-red-500">Enter at least one valid size.</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Mobile STEP 3 — SAVE YOUR DESIGN -->
+                <section id="save" class="reveal bg-white rounded-2xl rounded-tr-none shadow-[0_2px_14px_rgba(0,0,0,0.06)] overflow-hidden" style="transition-delay: 120ms">
+                    <div class="flex items-center gap-4 border-b border-slate-100 px-5 sm:px-7 py-5">
+                        <span class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl rounded-tr-none bg-yellow-400/10 text-yellow-500 text-lg font-black">3</span>
+                        <div>
+                            <h2 class="text-base sm:text-lg font-extrabold text-slate-950 leading-tight">Save Your Design</h2>
+                            <p class="text-xs text-slate-400">Leave your details and we'll send the full quotation within 24 hours.</p>
+                        </div>
+                    </div>
+
+                    <div class="px-5 sm:px-7 py-6">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <input
+                                    v-model="form.customer_name"
+                                    type="text"
+                                    placeholder="Full name *"
+                                    required
+                                    class="w-full border-[1.5px] border-[#d9d7d0] bg-[#fbfbf9] rounded-xl rounded-tr-none px-4 py-3 text-[15px] placeholder:text-slate-400 focus:outline-none focus:border-yellow-500 focus:ring-4 focus:ring-yellow-400/15 focus:bg-white transition-all"
+                                />
+                                <p v-if="form.errors.customer_name" class="mt-1 text-xs font-semibold text-red-600">{{ form.errors.customer_name }}</p>
+                            </div>
+                            <div>
+                                <input
+                                    v-model="form.customer_phone"
+                                    type="tel"
+                                    placeholder="Phone number *"
+                                    required
+                                    class="w-full border-[1.5px] border-[#d9d7d0] bg-[#fbfbf9] rounded-xl rounded-tr-none px-4 py-3 text-[15px] placeholder:text-slate-400 focus:outline-none focus:border-yellow-500 focus:ring-4 focus:ring-yellow-400/15 focus:bg-white transition-all"
+                                />
+                                <p v-if="form.errors.customer_phone" class="mt-1 text-xs font-semibold text-red-600">{{ form.errors.customer_phone }}</p>
+                            </div>
+                            <input
+                                v-model="form.customer_email"
+                                type="email"
+                                placeholder="Email"
+                                class="w-full border-[1.5px] border-[#d9d7d0] bg-[#fbfbf9] rounded-xl rounded-tr-none px-4 py-3 text-[15px] placeholder:text-slate-400 focus:outline-none focus:border-yellow-500 focus:ring-4 focus:ring-yellow-400/15 focus:bg-white transition-all"
+                            />
+                            <input
+                                v-model="form.location"
+                                type="text"
+                                placeholder="Location (e.g. Lekki Phase 1)"
+                                class="w-full border-[1.5px] border-[#d9d7d0] bg-[#fbfbf9] rounded-xl rounded-tr-none px-4 py-3 text-[15px] placeholder:text-slate-400 focus:outline-none focus:border-yellow-500 focus:ring-4 focus:ring-yellow-400/15 focus:bg-white transition-all"
+                            />
+                        </div>
+                        <textarea
+                            v-model="form.notes"
+                            rows="3"
+                            placeholder="Anything else we should know? (optional)"
+                            class="mt-4 w-full border-[1.5px] border-[#d9d7d0] bg-[#fbfbf9] rounded-xl rounded-tr-none px-4 py-3 text-[15px] placeholder:text-slate-400 focus:outline-none focus:border-yellow-500 focus:ring-4 focus:ring-yellow-400/15 focus:bg-white transition-all resize-y"
+                        ></textarea>
+                        <button
+                            type="button"
+                            :disabled="form.processing || hasInvalidRows"
+                            class="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#0D1527] px-6 py-3 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                            @click="submit"
+                        >
+                            <i v-if="form.processing" class="bi bi-arrow-clockwise animate-spin"></i>
+                            <span v-if="form.processing">Submitting…</span>
+                            <span v-else>Request Free Quotation</span>
+                        </button>
+                    </div>
+                </section>
             </div>
 
             <!-- ======================= MAIN GRID (DESKTOP) ======================= -->
