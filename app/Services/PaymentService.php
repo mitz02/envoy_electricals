@@ -41,7 +41,7 @@ class PaymentService
             ?? Store::value('id')
             ?? 1;
 
-        $refId = ReferenceGenerator::generate('payment');
+        $refId = ReferenceGenerator::generate('payment').'-'.bin2hex(random_bytes(4));
 
         return Payment::create([
             'ref_id' => $refId,
