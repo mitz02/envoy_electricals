@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\CustomQuotationMail;
 use App\Models\CustomQuotation;
 use App\Models\CustomQuotationItem;
 use App\Services\AuditLogger;
@@ -10,6 +11,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -231,8 +233,7 @@ class CustomQuotationController extends Controller
         }
 
         try {
-            // TODO: Implement email sending with CustomQuotationMail
-            // Mail::to($customQuotation->customer_email)->send(new CustomQuotationMail($customQuotation));
+            Mail::to($customQuotation->customer_email)->send(new CustomQuotationMail($customQuotation));
 
             if ($customQuotation->status === 'draft') {
                 $customQuotation->update(['status' => 'sent']);
