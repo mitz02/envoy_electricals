@@ -12,6 +12,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -48,33 +49,20 @@ class CustomQuotationController extends Controller
 
     public function create(): Response
     {
-        return Inertia::render('Admin/CustomQuotations/Create', [
-            'jobTypes' => CustomQuotation::distinct()->pluck('job_type')->filter()->values(),
-        ]);
+        return Inertia::render('Admin/CustomQuotations/Create');
     }
 
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
             'customer_name' => ['required', 'string', 'max:255'],
-            'customer_phone' => ['required', 'string', 'max:255'],
             'customer_email' => ['nullable', 'email', 'max:255'],
+            'customer_phone' => ['nullable', 'string', 'max:255'],
             'customer_address' => ['nullable', 'string'],
-            'customer_company' => ['nullable', 'string', 'max:255'],
-            'quotation_date' => ['required', 'date'],
-            'valid_until' => ['nullable', 'date'],
-            'job_type' => ['required', 'string', 'max:255'],
-            'title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'notes' => ['nullable', 'string'],
-            'discount' => ['nullable', 'numeric', 'min:0'],
-            'tax' => ['nullable', 'numeric', 'min:0'],
-            'other_charges' => ['nullable', 'numeric', 'min:0'],
+            'job_description' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.item' => ['required', 'string', 'max:255'],
-            'items.*.description' => ['nullable', 'string'],
-            'items.*.quantity' => ['required', 'numeric', 'min:0.01'],
-            'items.*.unit' => ['nullable', 'string', 'max:50'],
+            'items.*.quantity' => ['required', 'numeric', 'min:1'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
         ]);
 
@@ -87,16 +75,16 @@ class CustomQuotationController extends Controller
                 'customer_phone' => $data['customer_phone'],
                 'customer_email' => $data['customer_email'],
                 'customer_address' => $data['customer_address'],
-                'customer_company' => $data['customer_company'],
-                'quotation_date' => $data['quotation_date'],
-                'valid_until' => $data['valid_until'],
-                'job_type' => $data['job_type'],
-                'title' => $data['title'],
-                'description' => $data['description'],
-                'notes' => $data['notes'],
-                'discount' => $data['discount'] ?? 0,
-                'tax' => $data['tax'] ?? 0,
-                'other_charges' => $data['other_charges'] ?? 0,
+                'customer_company' => null,
+                'quotation_date' => now()->toDateString(),
+                'valid_until' => now()->addDays(30)->toDateString(),
+                'job_type' => 'Custom Service',
+                'title' => $data['job_description'] ? Str::limit($data['job_description'], 80) : 'Custom Quotation',
+                'description' => $data['job_description'],
+                'notes' => null,
+                'discount' => 0,
+                'tax' => 0,
+                'other_charges' => 0,
                 'status' => 'draft',
             ]);
 
@@ -141,7 +129,6 @@ class CustomQuotationController extends Controller
 
         return Inertia::render('Admin/CustomQuotations/Edit', [
             'quotation' => $customQuotation,
-            'jobTypes' => CustomQuotation::distinct()->pluck('job_type')->filter()->values(),
         ]);
     }
 
@@ -149,24 +136,13 @@ class CustomQuotationController extends Controller
     {
         $data = $request->validate([
             'customer_name' => ['required', 'string', 'max:255'],
-            'customer_phone' => ['required', 'string', 'max:255'],
             'customer_email' => ['nullable', 'email', 'max:255'],
+            'customer_phone' => ['nullable', 'string', 'max:255'],
             'customer_address' => ['nullable', 'string'],
-            'customer_company' => ['nullable', 'string', 'max:255'],
-            'quotation_date' => ['required', 'date'],
-            'valid_until' => ['nullable', 'date'],
-            'job_type' => ['required', 'string', 'max:255'],
-            'title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'notes' => ['nullable', 'string'],
-            'discount' => ['nullable', 'numeric', 'min:0'],
-            'tax' => ['nullable', 'numeric', 'min:0'],
-            'other_charges' => ['nullable', 'numeric', 'min:0'],
+            'job_description' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.item' => ['required', 'string', 'max:255'],
-            'items.*.description' => ['nullable', 'string'],
-            'items.*.quantity' => ['required', 'numeric', 'min:0.01'],
-            'items.*.unit' => ['nullable', 'string', 'max:50'],
+            'items.*.quantity' => ['required', 'numeric', 'min:1'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
         ]);
 
@@ -176,16 +152,8 @@ class CustomQuotationController extends Controller
                 'customer_phone' => $data['customer_phone'],
                 'customer_email' => $data['customer_email'],
                 'customer_address' => $data['customer_address'],
-                'customer_company' => $data['customer_company'],
-                'quotation_date' => $data['quotation_date'],
-                'valid_until' => $data['valid_until'],
-                'job_type' => $data['job_type'],
-                'title' => $data['title'],
-                'description' => $data['description'],
-                'notes' => $data['notes'],
-                'discount' => $data['discount'] ?? 0,
-                'tax' => $data['tax'] ?? 0,
-                'other_charges' => $data['other_charges'] ?? 0,
+                'description' => $data['job_description'],
+                'title' => $data['job_description'] ? Str::limit($data['job_description'], 80) : 'Custom Quotation',
             ]);
 
             $customQuotation->items()->delete();
@@ -195,9 +163,9 @@ class CustomQuotationController extends Controller
                 CustomQuotationItem::create([
                     'custom_quotation_id' => $customQuotation->id,
                     'item' => $item['item'],
-                    'description' => $item['description'],
+                    'description' => null,
                     'quantity' => $item['quantity'],
-                    'unit' => $item['unit'],
+                    'unit' => 'pcs',
                     'unit_price' => $item['unit_price'],
                     'total' => $total,
                     'sort_order' => $index,
