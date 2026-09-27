@@ -75,6 +75,7 @@ const sidebarMenu = [
     { type: 'link', label: 'Projects', href: '/admin/projects', icon: 'bi-lightning-charge-fill', perm: 'projects.view' },
     { type: 'link', label: 'Packages', href: '/admin/solar-packages', icon: 'bi-sun-fill', perm: 'solar.view' },
     { type: 'link', label: 'Leads', href: '/admin/solar-leads', icon: 'bi-person-lines-fill', perm: 'solar.leads' },
+    { type: 'link', label: 'Custom Quotations', href: '/admin/custom-quotations', icon: 'bi-file-earmark-text-fill', perm: 'custom-quotations.view' },
     {
         type: 'group',
         label: 'Marketing',

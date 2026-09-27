@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\BrandController;
 use App\Http\Controllers\Admin\BuyerController;
 use App\Http\Controllers\Admin\CertificateController;
 use App\Http\Controllers\Admin\CustomerController;
+use App\Http\Controllers\Admin\CustomQuotationController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\EnrollmentController;
 use App\Http\Controllers\Admin\ExpenseController;
@@ -339,6 +340,26 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::get('solar-leads/quotations/create', [SolarLeadController::class, 'createQuotationManual'])->middleware('permission:solar.leads')->name('solar-leads.quotations.create');
     Route::post('solar-leads/quotations', [SolarLeadController::class, 'storeQuotationManual'])->middleware('permission:solar.leads')->name('solar-leads.quotations.store');
     Route::post('solar-leads/quotations/{quotation}/send', [SolarLeadController::class, 'sendQuotation'])->middleware('permission:solar.leads')->name('solar-leads.quotations.send');
+
+    // Custom Quotations (general purpose - CCTV, Electrical, Fence, etc.)
+    Route::resource('custom-quotations', CustomQuotationController::class)
+        ->parameters(['custom-quotations' => 'customQuotation'])
+        ->middleware('permission:custom-quotations.view');
+    Route::post('custom-quotations/{customQuotation}/status', [CustomQuotationController::class, 'updateStatus'])
+        ->middleware('permission:custom-quotations.edit')
+        ->name('custom-quotations.status');
+    Route::post('custom-quotations/{customQuotation}/send', [CustomQuotationController::class, 'send'])
+        ->middleware('permission:custom-quotations.edit')
+        ->name('custom-quotations.send');
+    Route::get('custom-quotations/{customQuotation}/pdf', [CustomQuotationController::class, 'downloadPdf'])
+        ->middleware('permission:custom-quotations.view')
+        ->name('custom-quotations.pdf');
+    Route::get('custom-quotations/{customQuotation}/preview', [CustomQuotationController::class, 'previewPdf'])
+        ->middleware('permission:custom-quotations.view')
+        ->name('custom-quotations.preview');
+    Route::post('custom-quotations/{customQuotation}/convert', [CustomQuotationController::class, 'convertToProject'])
+        ->middleware('permission:custom-quotations.edit')
+        ->name('custom-quotations.convert');
 
     Route::prefix('marketing')->name('marketing.')->group(function () {
         Route::get('/', [MarketingController::class, 'index'])->middleware('permission:marketing.newsletter')->name('index');
