@@ -117,6 +117,20 @@ const availabilityBadge = {
                 <div class="flex justify-between"><dt class="text-slate-500">Warranty</dt><dd class="font-medium text-slate-900">{{ package.warranty || '—' }}</dd></div>
             </dl>
 
+            <div v-if="package.images && package.images.length" class="mt-4">
+                <h3 class="text-sm font-semibold text-slate-700 mb-2">Package Images</h3>
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                    <div v-for="img in package.images" :key="img.id" class="group relative overflow-hidden rounded-xl border border-slate-200">
+                        <img :src="img.media ? ('/storage/' + img.media.path) : ''" :alt="img.media?.alt || 'Package image'" class="h-24 w-full object-cover" />
+                        <div class="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent px-2 pb-1.5 pt-4 text-white">
+                            <span v-if="img.is_featured" class="flex items-center gap-1 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-bold text-amber-950">
+                                <i class="bi bi-star-fill"></i> Cover
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="mt-4 flex gap-2">
                 <Link v-if="canManage" :href="`/admin/solar-packages/${package.id}/edit`" class="rounded-lg bg-[#0D1527] px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800">Edit Package</Link>
                 <button v-if="canManage" class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50" @click="remove">Remove</button>

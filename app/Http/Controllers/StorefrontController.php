@@ -890,7 +890,7 @@ class StorefrontController extends Controller
 
         NotificationService::notifyAdmins(
             'New newsletter subscriber',
-            "{$validated['email']} joined the newsletter".($validated['name'] ? " ({$validated['name']})" : '').'.',
+            "{$validated['email']} joined the newsletter".($validated['name'] ?? null ? " ({$validated['name']})" : '').'.',
             'newsletter',
             route('admin.marketing.subscribers.index'),
             ['marketing.newsletter'],

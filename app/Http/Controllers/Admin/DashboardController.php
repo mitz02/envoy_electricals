@@ -97,28 +97,39 @@ class DashboardController extends Controller
 
         // ---- Inventory & stock health ----
         if ($isAllStores) {
-            $inventoryValue = round((float) Product::sum(DB::raw('current_quantity * average_cost')), 2);
-            $totalProducts = Product::count();
-            $lowStock = Product::where('current_quantity', '>', 0)
-                ->whereRaw('current_quantity <= reorder_level')
-                ->count();
-            $outOfStock = Product::where('current_quantity', '<=', 0)->count();
-        } else {
-            $inventoryValue = round((float) DB::table('product_store')
-                ->where('store_id', $storeId)
-                ->sum(DB::raw('current_quantity * average_cost')), 2);
-            $totalProducts = DB::table('product_store')
-                ->where('store_id', $storeId)
-                ->distinct('product_id')
-                ->count('product_id');
-            $lowStock = DB::table('product_store')
-                ->where('store_id', $storeId)
+            $inventoryValue = round((float) Product::whereNull('deleted_at')->sum(DB::raw('current_quantity * selling_price')), 2);
+            $totalProducts = Product::whereNull('deleted_at')->count();
+            $lowStock = Product::whereNull('deleted_at')
                 ->where('current_quantity', '>', 0)
                 ->whereRaw('current_quantity <= reorder_level')
                 ->count();
-            $outOfStock = DB::table('product_store')
-                ->where('store_id', $storeId)
+            $outOfStock = Product::whereNull('deleted_at')
                 ->where('current_quantity', '<=', 0)
+                ->count();
+        } else {
+            $inventoryValue = round((float) DB::table('product_store')
+                ->join('products', 'products.id', '=', 'product_store.product_id')
+                ->where('product_store.store_id', $storeId)
+                ->whereNull('products.deleted_at')
+                ->sum(DB::raw('product_store.current_quantity * product_store.selling_price')), 2);
+            $totalProducts = DB::table('product_store')
+                ->join('products', 'products.id', '=', 'product_store.product_id')
+                ->where('product_store.store_id', $storeId)
+                ->whereNull('products.deleted_at')
+                ->distinct('product_store.product_id')
+                ->count('product_store.product_id');
+            $lowStock = DB::table('product_store')
+                ->join('products', 'products.id', '=', 'product_store.product_id')
+                ->where('product_store.store_id', $storeId)
+                ->whereNull('products.deleted_at')
+                ->where('product_store.current_quantity', '>', 0)
+                ->whereRaw('product_store.current_quantity <= product_store.reorder_level')
+                ->count();
+            $outOfStock = DB::table('product_store')
+                ->join('products', 'products.id', '=', 'product_store.product_id')
+                ->where('product_store.store_id', $storeId)
+                ->whereNull('products.deleted_at')
+                ->where('product_store.current_quantity', '<=', 0)
                 ->count();
         }
 

@@ -79,7 +79,7 @@ class StoreController extends Controller
         $inventoryStats = [
             'total_products' => $store->products()->count(),
             'total_stock' => (int) $store->products()->sum('product_store.current_quantity'),
-            'total_value' => round((float) $store->products()->sum(DB::raw('product_store.current_quantity * product_store.average_cost')), 2),
+            'total_value' => round((float) $store->products()->sum(DB::raw('product_store.current_quantity * product_store.selling_price')), 2),
             'low_stock' => $store->products()->where('product_store.current_quantity', '>', 0)
                 ->whereRaw('product_store.current_quantity <= product_store.reorder_level')->count(),
         ];

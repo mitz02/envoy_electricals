@@ -335,6 +335,11 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::delete('solar-leads/{calculation}', [SolarLeadController::class, 'destroy'])->middleware('permission:solar.leads')->name('solar-leads.destroy');
     Route::delete('solar-leads/quotations/{quotation}', [SolarLeadController::class, 'destroyQuotation'])->middleware('permission:solar.leads')->name('solar-leads.quotations.destroy');
 
+    // Manual quotation creation (without lead)
+    Route::get('solar-leads/quotations/create', [SolarLeadController::class, 'createQuotationManual'])->middleware('permission:solar.leads')->name('solar-leads.quotations.create');
+    Route::post('solar-leads/quotations', [SolarLeadController::class, 'storeQuotationManual'])->middleware('permission:solar.leads')->name('solar-leads.quotations.store');
+    Route::post('solar-leads/quotations/{quotation}/send', [SolarLeadController::class, 'sendQuotation'])->middleware('permission:solar.leads')->name('solar-leads.quotations.send');
+
     Route::prefix('marketing')->name('marketing.')->group(function () {
         Route::get('/', [MarketingController::class, 'index'])->middleware('permission:marketing.newsletter')->name('index');
 
@@ -350,6 +355,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('newsletters/{newsletter}/edit', [MarketingController::class, 'newsletterEdit'])->middleware('permission:marketing.newsletter')->name('newsletters.edit');
         Route::put('newsletters/{newsletter}', [MarketingController::class, 'newsletterUpdate'])->middleware('permission:marketing.newsletter')->name('newsletters.update');
         Route::post('newsletters/{newsletter}/send', [MarketingController::class, 'newsletterSend'])->middleware('permission:marketing.newsletter')->name('newsletters.send');
+        Route::post('newsletters/{newsletter}/resend', [MarketingController::class, 'newsletterResend'])->middleware('permission:marketing.newsletter')->name('newsletters.resend');
         Route::delete('newsletters/{newsletter}', [MarketingController::class, 'newsletterDestroy'])->middleware('permission:marketing.newsletter')->name('newsletters.destroy');
 
         Route::get('testimonials', [MarketingController::class, 'testimonials'])->middleware('permission:marketing.testimonials')->name('testimonials.index');

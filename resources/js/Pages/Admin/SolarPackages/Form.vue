@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useForm, Link } from '@inertiajs/vue3';
 import axios from 'axios';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
@@ -40,6 +40,50 @@ const form = useForm({
     remove_images: [],
 });
 
+const imageFiles = ref([]);
+
+/* ---------- Product images ---------- */
+const existingImages = ref([]);
+const newImages = ref([]);
+const isDragOver = ref(false);
+const fileInput = ref(null);
+
+function initForm() {
+    form.name = props.package?.name ?? '';
+    form.description = props.package?.description ?? '';
+    form.package_price = props.package?.package_price ?? '';
+    form.installation_cost = props.package?.installation_cost ?? 0;
+    form.estimated_load_capacity = props.package?.estimated_load_capacity ?? '';
+    form.inverter_capacity = props.package?.inverter_capacity ?? '';
+    form.custom_inverter_capacity = props.package?.custom_inverter_capacity ?? '';
+    form.warranty = props.package?.warranty ?? '';
+    form.is_featured = props.package ? Boolean(props.package.is_featured) : false;
+    form.availability = props.package?.availability ?? 'available';
+    form.is_visible_online = props.package ? Boolean(props.package.is_visible_online) : true;
+    form.items = props.package?.items?.length
+        ? props.package.items.map((i) => ({
+              product_id: i.product_id ?? '',
+              name: i.name,
+              quantity: i.quantity,
+              specification: i.specification ?? '',
+              unit_cost: i.unit_cost,
+          }))
+        : [];
+    form.remove_images = [];
+    form.errors = {};
+    
+    existingImages.value = (props.package?.images ?? []).map((img) => ({ ...img }));
+    newImages.value.forEach(img => URL.revokeObjectURL(img.url));
+    newImages.value = [];
+    imageFiles.value = [];
+}
+
+watch(() => props.package?.id, (newId, oldId) => {
+    if (newId && newId !== oldId) {
+        initForm();
+    }
+}, { immediate: true });
+
 const totalCost = computed(() =>
     form.items.reduce((sum, i) => sum + Number(i.quantity || 0) * Number(i.unit_cost || 0), 0)
 );
@@ -51,12 +95,6 @@ const margin = computed(() => {
     return ((price - cost) / price) * 100;
 });
 
-/* ---------- Product images ---------- */
-const existingImages = ref((props.package?.images ?? []).map((img) => ({ ...img })));
-const newImages = ref([]);
-const isDragOver = ref(false);
-const imageInput = ref(null);
-
 function imageSrc(path) {
     return path?.startsWith('/images/') ? path : `/storage/${path}`;
 }
@@ -64,12 +102,15 @@ function imageSrc(path) {
 function addFiles(files) {
     [...files]
         .filter((f) => f.type?.startsWith('image/'))
-        .forEach((file) => newImages.value.push({ file, url: URL.createObjectURL(file) }));
+        .forEach((file) => {
+            newImages.value.push({ file, url: URL.createObjectURL(file) });
+            imageFiles.value.push(file);
+        });
 }
 
 function onFilesPicked(e) {
     addFiles(e.target.files);
-    if (imageInput.value) imageInput.value.value = '';
+    if (fileInput.value) fileInput.value.value = '';
 }
 
 function onDrop(e) {
@@ -80,6 +121,7 @@ function onDrop(e) {
 function removeNew(index) {
     URL.revokeObjectURL(newImages.value[index].url);
     newImages.value.splice(index, 1);
+    imageFiles.value.splice(index, 1);
 }
 
 function removeExisting(id) {
@@ -94,10 +136,7 @@ function submit() {
         is_visible_online: data.is_visible_online ? 1 : 0,
     }));
 
-    // Append new image files to form
-    newImages.value.forEach((img, index) => {
-        form.images.push(img.file);
-    });
+    form.images = imageFiles.value;
 
     if (editing.value) {
         form.put(`/admin/solar-packages/${props.package.id}`);
@@ -211,10 +250,9 @@ function onProductSelect(item) {
                 </div>
 
                 <div
-                    ref="imageInput"
                     class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-8 text-center transition"
                     :class="isDragOver ? 'border-[#0D1527] bg-[#0D1527]/5' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'"
-                    @click="imageInput?.click()"
+                    @click="fileInput?.click()"
                     @dragover.prevent="isDragOver = true"
                     @dragleave.prevent="isDragOver = false"
                     @drop.prevent="onDrop"
@@ -225,7 +263,7 @@ function onProductSelect(item) {
                     <p class="text-sm font-medium text-slate-700">Click to upload or drag & drop</p>
                     <p class="text-xs text-slate-400">PNG, JPG or WEBP · up to 10MB each</p>
                     <input
-                        ref="imageInput"
+                        ref="fileInput"
                         type="file"
                         accept="image/png,image/jpeg,image/webp"
                         multiple

@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
-import { Link, router } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import { naira, formatDate, maskNaira, maskPercent, MASK_GLYPH } from '@/lib/format';
 import { useCan } from '@/composables/permissions';
 
@@ -45,6 +45,11 @@ function changePeriod(key) {
 
 // Interactive Spline Chart Hover State
 const hoveredPointIndex = ref(18);
+
+// Store selector state (from Inertia shared props)
+const page = usePage();
+const selectedStore = computed(() => page.props.selectedStore ?? null);
+const isAllStores = computed(() => !selectedStore.value);
 
 const trendPoints = computed(() => (Array.isArray(props.trend_curve) ? props.trend_curve : []));
 
@@ -363,7 +368,16 @@ function getStatusBadge(status) {
                     <span class="text-2xl font-bold tracking-tight text-[#0D1527]">{{ maskNaira('inventory_value', stats.inventory_value) }}</span>
                 </div>
                 <div class="mt-1.5 flex items-center justify-between text-[11px]">
-                    <span class="text-slate-400">{{ stats.total_products || 0 }} Products</span>
+                    <span class="flex items-center gap-1.5">
+                        <span class="text-slate-400">{{ stats.total_products || 0 }} Products</span>
+                        <span
+                            class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium border"
+                            :class="isAllStores ? 'bg-[#40e0d0]/10 text-[#40e0d0] border-[#40e0d0]/30' : 'bg-yellow-400/10 text-yellow-700 border-yellow-400/30'"
+                        >
+                            <i :class="isAllStores ? 'bi bi-grid-1x2-fill text-xs' : 'bi bi-shop-fill text-xs'" />
+                            {{ isAllStores ? 'All Stores' : selectedStore.name }}
+                        </span>
+                    </span>
                     <span v-if="stats.low_stock > 0 || stats.out_of_stock > 0" class="inline-flex items-center gap-1 font-semibold text-amber-600">
                         <span class="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
                         {{ stats.low_stock }} Low, {{ stats.out_of_stock }} Out

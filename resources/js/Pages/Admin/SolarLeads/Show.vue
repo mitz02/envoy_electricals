@@ -28,7 +28,10 @@ const showQuotationModal = ref(false);
 const quotationForm = useForm({
     solar_package_id: '',
     notes: '',
+    additional_logistics: 0,
 });
+
+const sendLoading = ref(false);
 
 function saveStatus() {
     statusForm
@@ -60,6 +63,23 @@ function createQuotation() {
             closeQuotationModal();
         },
         preserveScroll: true,
+    });
+}
+
+function sendQuotation() {
+    if (!props.record.customer_email) return;
+    if (!confirm(`Send quotation ${props.record.ref_id} to ${props.record.customer_email}?`)) return;
+
+    sendLoading.value = true;
+    const form = useForm({});
+    form.post(`/admin/solar-leads/quotations/${props.record.id}/send`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            sendLoading.value = false;
+        },
+        onError: () => {
+            sendLoading.value = false;
+        },
     });
 }
 
@@ -182,6 +202,8 @@ const appliances = computed(() => {
 
             <div class="my-5 space-y-2 text-sm">
                 <div class="flex justify-between rounded-lg bg-emerald-50 p-3"><span class="text-emerald-600">Estimated price</span><span class="font-bold text-emerald-700">{{ record.estimated_price ? naira(record.estimated_price) : '—' }}</span></div>
+                <div class="flex justify-between rounded-lg bg-slate-50 p-3"><span class="text-slate-500">Additional logistics</span><span class="font-bold text-slate-900">{{ record.additional_logistics ? naira(record.additional_logistics) : '₦0' }}</span></div>
+                <div class="flex justify-between rounded-lg bg-emerald-50 p-3"><span class="text-emerald-600">Total with logistics</span><span class="font-bold text-emerald-700">{{ record.estimated_price && record.additional_logistics ? naira(Number(record.estimated_price) + Number(record.additional_logistics)) : naira(record.estimated_price || 0) }}</span></div>
                 <div class="flex justify-between rounded-lg bg-slate-50 p-3"><span class="text-slate-500">Linked package</span><span class="font-bold text-slate-900">{{ record.solar_package?.name || '—' }}</span></div>
             </div>
 
@@ -194,6 +216,7 @@ const appliances = computed(() => {
 
             <div class="mt-4 flex gap-2">
                 <button :disabled="statusForm.processing" class="rounded-lg bg-[#0D1527] px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50" @click="saveStatus">Update Status</button>
+                <button v-if="record.customer_email" @click="sendQuotation" class="rounded-lg bg-[#40e0d0] px-3 py-1.5 text-xs font-semibold text-[#0D1527] hover:bg-[#40e0d0]/90" :disabled="sendLoading">Send via Email</button>
                 <button class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50" @click="remove">Remove</button>
             </div>
         </div>
@@ -218,7 +241,7 @@ const appliances = computed(() => {
                             <template v-if="app.hours"> · {{ app.hours }} hrs/day</template>
                         </p>
                     </div>
-                    <span class="text-sm font-bold text-slate-900">{{ naira(app.cost || app.estimated_cost || 0) }}</span>
+                    <span class="text-sm font-medium text-slate-500">{{ (app.quantity ?? app.qty) * (app.watts || app.wattage || 0) }} W total</span>
                 </div>
                 <p v-if="!appliances.length" class="py-8 text-center text-sm text-slate-400">No appliance data recorded.</p>
             </div>
@@ -244,13 +267,12 @@ const appliances = computed(() => {
 
         <form @submit.prevent="createQuotation" class="p-6 space-y-4">
             <div>
-                <label class="block text-sm font-medium text-slate-700">Solar Package *</label>
+                <label class="block text-sm font-medium text-slate-700">Solar Package (Optional)</label>
                 <select
                     v-model="quotationForm.solar_package_id"
-                    required
                     class="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20"
                 >
-                    <option value="">Select a solar package</option>
+                    <option value="">— Use calculator's custom recommendation —</option>
                     <option
                         v-for="pkg in props.packages"
                         :key="pkg.id"
@@ -260,6 +282,19 @@ const appliances = computed(() => {
                     </option>
                 </select>
                 <p v-if="quotationForm.errors.solar_package_id" class="mt-1 text-xs text-red-600">{{ quotationForm.errors.solar_package_id }}</p>
+                <p class="mt-1.5 text-[11px] text-slate-400">Leave empty to quote based on the calculator's custom sizing. Select a package to use a pre-defined bundle.</p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-slate-700">Additional Logistics (₦)</label>
+                <input
+                    v-model.number="quotationForm.additional_logistics"
+                    type="number"
+                    min="0"
+                    step="1000"
+                    class="mt-1 w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20"
+                />
+                <p class="mt-1.5 text-[11px] text-slate-400">For locations outside standard service area.</p>
             </div>
 
             <div>

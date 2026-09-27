@@ -101,14 +101,14 @@ class ReportController extends Controller
                     'out' => $q->where('product_store.current_quantity', '<=', 0),
                     default => $q,
                 })
-                ->orderByDesc(DB::raw('product_store.current_quantity * product_store.average_cost'))
+                ->orderByDesc(DB::raw('product_store.current_quantity * product_store.selling_price'))
                 ->paginate(20)
                 ->withQueryString();
 
             $summary = [
                 'total_value' => round((float) DB::table('product_store')
                     ->where('store_id', $storeId)
-                    ->sum(DB::raw('current_quantity * average_cost')), 2),
+                    ->sum(DB::raw('current_quantity * selling_price')), 2),
                 'low' => DB::table('product_store')
                     ->where('store_id', $storeId)
                     ->where('current_quantity', '>', 0)
@@ -132,12 +132,12 @@ class ReportController extends Controller
                     'out' => $q->where('current_quantity', '<=', 0),
                     default => $q,
                 })
-                ->orderByDesc(DB::raw('current_quantity * average_cost'))
+                ->orderByDesc(DB::raw('current_quantity * selling_price'))
                 ->paginate(20)
                 ->withQueryString();
 
             $summary = [
-                'total_value' => round((float) Product::sum(DB::raw('current_quantity * average_cost')), 2),
+                'total_value' => round((float) Product::sum(DB::raw('current_quantity * selling_price')), 2),
                 'low' => Product::whereRaw('current_quantity <= reorder_level')->where('current_quantity', '>', 0)->count(),
                 'out' => Product::where('current_quantity', '<=', 0)->count(),
                 'unit_cost' => Product::where('current_quantity', '>', 0)->count(),

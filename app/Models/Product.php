@@ -91,6 +91,6 @@ class Product extends Model
 
     public function stockValue(): Attribute
     {
-        return Attribute::get(fn () => round($this->current_quantity * $this->average_cost, 2));
+        return Attribute::get(fn () => round($this->current_quantity * $this->selling_price, 2));
     }
 }

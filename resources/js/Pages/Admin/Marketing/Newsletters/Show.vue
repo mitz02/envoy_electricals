@@ -25,6 +25,13 @@ function send() {
     form.post(`/admin/marketing/newsletters/${props.newsletter.id}/send`);
 }
 
+function resend() {
+    if (!confirm(`Resend "${props.newsletter.subject}" to ${props.subscriber_count} subscribers?`)) {
+        return;
+    }
+    form.post(`/admin/marketing/newsletters/${props.newsletter.id}/resend`);
+}
+
 function remove() {
     if (!confirm(`Remove "${props.newsletter.subject}"?`)) {
         return;
@@ -67,6 +74,14 @@ const statusBadge = {
                     @click="send"
                 >
                     {{ form.processing ? 'Sending…' : `Send to ${subscriber_count} Subscribers` }}
+                </button>
+                <button
+                    v-if="canManage && newsletter.status === 'sent'"
+                    :disabled="form.processing || subscriber_count === 0"
+                    class="rounded-lg bg-[#40e0d0] px-3 py-2 text-xs font-semibold text-[#0D1527] hover:bg-[#40e0d0]/90 disabled:opacity-50"
+                    @click="resend"
+                >
+                    {{ form.processing ? 'Resending…' : `Resend to ${subscriber_count} Subscribers` }}
                 </button>
                 <p v-if="subscriber_count === 0 && newsletter.status !== 'sent'" class="text-[11px] text-amber-700">
                     No active subscribers yet — add some before sending.

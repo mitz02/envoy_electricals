@@ -214,7 +214,7 @@ class MarketingController extends Controller
 
     public function newsletterSend(Newsletter $newsletter)
     {
-        abort_if($newsletter->status === 'sent', 409, 'This newsletter was already sent.');
+        abort_if($newsletter->status === 'sent', 409, 'This newsletter was already sent. Use "Resend" to send again.');
 
         $subscriberCount = NewsletterSubscriber::where('status', 'subscribed')->count();
 
@@ -241,6 +241,40 @@ class MarketingController extends Controller
         }
 
         AuditLogger::log('sent', 'newsletter', $newsletter->id, $message);
+
+        return redirect()->route('admin.marketing.newsletters.show', $newsletter->id)
+            ->with('success', $message);
+    }
+
+    public function newsletterResend(Newsletter $newsletter)
+    {
+        abort_unless($newsletter->status === 'sent', 409, 'Only sent newsletters can be resent.');
+
+        $subscriberCount = NewsletterSubscriber::where('status', 'subscribed')->count();
+
+        if ($subscriberCount === 0) {
+            return redirect()->route('admin.marketing.newsletters.show', $newsletter->id)
+                ->with('error', 'Cannot resend — there are no active subscribers yet. Add subscribers first.');
+        }
+
+        $result = app(NewsletterService::class)->send($newsletter);
+
+        if ($result['delivered'] === 0) {
+            $message = 'Delivery failed for all '.($result['failed']).' subscriber(s). Check the mail configuration and try again.';
+
+            AuditLogger::log('resend_failed', 'newsletter', $newsletter->id, $message);
+
+            return redirect()->route('admin.marketing.newsletters.show', $newsletter->id)
+                ->with('error', $message);
+        }
+
+        $message = "Newsletter resent to {$result['delivered']} of {$result['total']} subscriber(s).";
+
+        if ($result['failed'] > 0) {
+            $message .= " {$result['failed']} failed (".implode(', ', array_slice($result['failures'], 0, 5)).').';
+        }
+
+        AuditLogger::log('resent', 'newsletter', $newsletter->id, $message);
 
         return redirect()->route('admin.marketing.newsletters.show', $newsletter->id)
             ->with('success', $message);

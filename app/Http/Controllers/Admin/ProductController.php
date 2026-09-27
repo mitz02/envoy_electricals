@@ -220,7 +220,7 @@ class ProductController extends Controller
                 'is_default' => (bool) $row->is_default,
                 'current_quantity' => (int) $row->current_quantity,
                 'average_cost' => (float) $row->average_cost,
-                'stock_value' => round((int) $row->current_quantity * (float) $row->average_cost, 2),
+                'stock_value' => round((int) $row->current_quantity * (float) $row->selling_price, 2),
                 'reorder_level' => (int) $row->reorder_level,
             ]);
 
@@ -233,7 +233,7 @@ class ProductController extends Controller
             // Restricted user with no branch picked: roll the totals up across
             // their own branches only, never the whole product's global stock.
             $onHand = (int) $storeRows->sum('current_quantity');
-            $weighted = (float) $storeRows->sum(fn ($row) => $row['current_quantity'] * $row['average_cost']);
+            $weighted = (float) $storeRows->sum(fn ($row) => $row['current_quantity'] * $row['selling_price']);
             $averageCost = $onHand > 0 ? round($weighted / $onHand, 2) : (float) $product->average_cost;
         } else {
             $onHand = (int) $product->current_quantity;
@@ -265,7 +265,7 @@ class ProductController extends Controller
             'summary' => [
                 'on_hand' => $onHand,
                 'average_cost' => round($averageCost, 2),
-                'stock_value' => round($onHand * $averageCost, 2),
+                'stock_value' => round($onHand * (float) $product->selling_price, 2),
                 'reorder_level' => (int) $product->reorder_level,
                 'selling_price' => (float) $product->selling_price,
                 'total_purchased' => (int) PurchaseItem::where('product_id', $product->id)

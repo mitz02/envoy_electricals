@@ -80,20 +80,31 @@ class SettingsController extends Controller
             'panel_wattage' => ['required', 'integer', 'min:1'],
             'panel_efficiency' => ['required', 'numeric', 'min:0.01', 'max:1'],
             'inverter_safety_factor' => ['required', 'numeric', 'min:0.01'],
-            'battery_capacity' => ['required', 'numeric', 'min:0.1'],
-            'inverter_sizes' => ['required', 'string', 'max:255'],
+            'battery_capacities' => ['required', 'string', 'max:500'],
+            'inverter_sizes' => ['required', 'string', 'max:500'],
             'price_per_panel' => ['required', 'numeric', 'min:0'],
             'price_per_kwh_daily' => ['required', 'numeric', 'min:0'],
-            'panel_product_ids' => ['nullable', 'string', 'max:500'],
-            'inverter_product_ids' => ['nullable', 'string', 'max:500'],
-            'battery_product_ids' => ['nullable', 'string', 'max:500'],
+            // Detailed pricing settings
+            'inverter_prices' => ['nullable', 'array'],
+            'inverter_prices.*' => ['nullable', 'numeric', 'min:0'],
+            'battery_prices' => ['nullable', 'array'],
+            'battery_prices.*' => ['nullable', 'numeric', 'min:0'],
+            'installation_costs' => ['nullable', 'array'],
+            'installation_costs.*' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         foreach ($data as $key => $value) {
-            Setting::updateOrCreate(
-                ['key' => 'calculator.'.$key, 'group' => 'calculator'],
-                ['value' => (string) $value]
-            );
+            if (is_array($value)) {
+                Setting::updateOrCreate(
+                    ['key' => 'calculator.'.$key, 'group' => 'calculator'],
+                    ['value' => json_encode($value)]
+                );
+            } else {
+                Setting::updateOrCreate(
+                    ['key' => 'calculator.'.$key, 'group' => 'calculator'],
+                    ['value' => (string) $value]
+                );
+            }
         }
 
         // Clear cache so changes take effect immediately

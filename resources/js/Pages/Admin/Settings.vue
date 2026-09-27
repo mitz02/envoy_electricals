@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
@@ -16,17 +16,47 @@ const form = useForm({
     name: '',
 });
 
+function parseJsonSetting(key, fallback = []) {
+    const val = props.calculatorSettings[`calculator.${key}`];
+    if (!val) return fallback;
+    try {
+        return JSON.parse(val);
+    } catch {
+        return fallback;
+    }
+}
+
+function getPrice(key, size, fallback = 0) {
+    const prices = parseJsonSetting(key, {});
+    return prices[size] ?? fallback;
+}
+
 const calcForm = useForm({
-    panel_wattage: props.calculatorSettings['calculator.panel_wattage'] || 550,
+    panel_wattage: props.calculatorSettings['calculator.panel_wattage'] || 620,
     panel_efficiency: props.calculatorSettings['calculator.panel_efficiency'] || 0.8,
     inverter_safety_factor: props.calculatorSettings['calculator.inverter_safety_factor'] || 1.4,
-    battery_capacity: props.calculatorSettings['calculator.battery_capacity'] || 5,
-    inverter_sizes: props.calculatorSettings['calculator.inverter_sizes'] || '1, 2.5, 3, 5, 7.5, 10, 15, 20',
+    battery_capacities: props.calculatorSettings['calculator.battery_capacities'] || '1.2, 2.56, 5.12, 10.24, 16, 20, 25.6, 32',
+    inverter_sizes: props.calculatorSettings['calculator.inverter_sizes'] || '1.5, 3, 5, 8, 10, 12',
     price_per_panel: props.calculatorSettings['calculator.price_per_panel'] || 185000,
     price_per_kwh_daily: props.calculatorSettings['calculator.price_per_kwh_daily'] || 220000,
-    panel_product_ids: props.calculatorSettings['calculator.panel_product_ids'] || '',
-    inverter_product_ids: props.calculatorSettings['calculator.inverter_product_ids'] || '',
-    battery_product_ids: props.calculatorSettings['calculator.battery_product_ids'] || '',
+    inverter_prices: parseJsonSetting('inverter_prices', {}),
+    battery_prices: parseJsonSetting('battery_prices', {}),
+    installation_costs: parseJsonSetting('installation_costs', {}),
+});
+
+const inverterSizesArray = computed(() => 
+    calcForm.inverter_sizes
+        .split(',')
+        .map(s => parseFloat(s.trim()))
+        .filter(n => Number.isFinite(n) && n > 0)
+);
+
+const batteryCapacitiesArray = computed(() => {
+    const caps = calcForm.battery_capacities || '1.2, 2.56, 5.12, 10.24, 16, 20, 25.6, 32';
+    return caps
+        .split(',')
+        .map(s => parseFloat(s.trim()))
+        .filter(n => Number.isFinite(n) && n > 0);
 });
 
 function addCategory() {
@@ -49,12 +79,21 @@ function confirmDelete(category) {
 }
 
 function saveCalculatorSettings() {
-    calcForm.post('/admin/settings/calculator', {
+    calcForm.transform((data) => ({
+        ...data,
+        inverter_prices: JSON.parse(JSON.stringify(calcForm.inverter_prices)),
+        battery_prices: JSON.parse(JSON.stringify(calcForm.battery_prices)),
+        installation_costs: JSON.parse(JSON.stringify(calcForm.installation_costs)),
+    })).post('/admin/settings/calculator', {
         preserveScroll: true,
         onSuccess: () => {
             // Settings will be refreshed via cache
         },
     });
+}
+
+function naira(v) {
+    return '₦' + Number(v || 0).toLocaleString('en-NG');
 }
 </script>
 
@@ -73,120 +112,158 @@ function saveCalculatorSettings() {
             </div>
             <p class="mb-4 text-sm text-slate-500">These values are used as defaults in the public load calculator. Only administrators can modify them.</p>
 
-            <form @submit.prevent="saveCalculatorSettings" class="space-y-4">
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div>
-                        <label class="mb-1.5 block text-xs font-medium text-slate-600">Solar Panel Wattage (W)</label>
-                        <input
-                            v-model.number="calcForm.panel_wattage"
-                            type="number"
-                            min="1"
-                            step="1"
-                            class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
-                        />
-                        <p v-if="calcForm.errors.panel_wattage" class="mt-1 text-xs text-red-600">{{ calcForm.errors.panel_wattage }}</p>
-                    </div>
-                    <div>
-                        <label class="mb-1.5 block text-xs font-medium text-slate-600">Panel Efficiency Factor</label>
-                        <input
-                            v-model.number="calcForm.panel_efficiency"
-                            type="number"
-                            min="0.01"
-                            max="1"
-                            step="0.01"
-                            class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
-                        />
-                        <p v-if="calcForm.errors.panel_efficiency" class="mt-1 text-xs text-red-600">{{ calcForm.errors.panel_efficiency }}</p>
-                    </div>
-                    <div>
-                        <label class="mb-1.5 block text-xs font-medium text-slate-600">Inverter Safety Factor</label>
-                        <input
-                            v-model.number="calcForm.inverter_safety_factor"
-                            type="number"
-                            min="0.01"
-                            step="0.05"
-                            class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
-                        />
-                        <p v-if="calcForm.errors.inverter_safety_factor" class="mt-1 text-xs text-red-600">{{ calcForm.errors.inverter_safety_factor }}</p>
-                    </div>
-                    <div>
-                        <label class="mb-1.5 block text-xs font-medium text-slate-600">Battery Capacity (kWh)</label>
-                        <input
-                            v-model.number="calcForm.battery_capacity"
-                            type="number"
-                            min="0.1"
-                            step="0.5"
-                            class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
-                        />
-                        <p v-if="calcForm.errors.battery_capacity" class="mt-1 text-xs text-red-600">{{ calcForm.errors.battery_capacity }}</p>
-                    </div>
-                    <div class="sm:col-span-2 lg:col-span-3">
-                        <label class="mb-1.5 block text-xs font-medium text-slate-600">Available Inverter Sizes (kW)</label>
-                        <input
-                            v-model="calcForm.inverter_sizes"
-                            type="text"
-                            placeholder="e.g. 1, 2.5, 3, 5, 7.5, 10, 15, 20"
-                            class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
-                        />
-                        <p v-if="calcForm.errors.inverter_sizes" class="mt-1 text-xs text-red-600">{{ calcForm.errors.inverter_sizes }}</p>
-                        <p class="mt-1.5 text-[11px] text-slate-400">Comma-separated list. The nearest size ≥ required is recommended automatically.</p>
-                    </div>
-                    <div>
-                        <label class="mb-1.5 block text-xs font-medium text-slate-600">Price Per Panel (₦)</label>
-                        <input
-                            v-model.number="calcForm.price_per_panel"
-                            type="number"
-                            min="0"
-                            step="1000"
-                            class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
-                        />
-                        <p v-if="calcForm.errors.price_per_panel" class="mt-1 text-xs text-red-600">{{ calcForm.errors.price_per_panel }}</p>
-                    </div>
-                    <div>
-                        <label class="mb-1.5 block text-xs font-medium text-slate-600">Price Per kWh Daily (₦)</label>
-                        <input
-                            v-model.number="calcForm.price_per_kwh_daily"
-                            type="number"
-                            min="0"
-                            step="1000"
-                            class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
-                        />
-                        <p v-if="calcForm.errors.price_per_kwh_daily" class="mt-1 text-xs text-red-600">{{ calcForm.errors.price_per_kwh_daily }}</p>
-                    </div>
-                    <div class="sm:col-span-2 lg:col-span-3">
-                        <label class="mb-1.5 block text-xs font-medium text-slate-600">Solar Panel Product IDs</label>
-                        <input
-                            v-model="calcForm.panel_product_ids"
-                            type="text"
-                            placeholder="e.g. 1, 5, 12 (comma-separated product IDs for panels)"
-                            class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
-                        />
-                        <p v-if="calcForm.errors.panel_product_ids" class="mt-1 text-xs text-red-600">{{ calcForm.errors.panel_product_ids }}</p>
-                        <p class="mt-1.5 text-[11px] text-slate-400">Comma-separated product IDs. Calculator will recommend panels from these.</p>
-                    </div>
-                    <div class="sm:col-span-2 lg:col-span-3">
-                        <label class="mb-1.5 block text-xs font-medium text-slate-600">Inverter Product IDs</label>
-                        <input
-                            v-model="calcForm.inverter_product_ids"
-                            type="text"
-                            placeholder="e.g. 3, 8, 15 (comma-separated product IDs for inverters)"
-                            class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
-                        />
-                        <p v-if="calcForm.errors.inverter_product_ids" class="mt-1 text-xs text-red-600">{{ calcForm.errors.inverter_product_ids }}</p>
-                        <p class="mt-1.5 text-[11px] text-slate-400">Comma-separated product IDs. Calculator will recommend inverters from these.</p>
-                    </div>
-                    <div class="sm:col-span-2 lg:col-span-3">
-                        <label class="mb-1.5 block text-xs font-medium text-slate-600">Battery Product IDs</label>
-                        <input
-                            v-model="calcForm.battery_product_ids"
-                            type="text"
-                            placeholder="e.g. 2, 7, 20 (comma-separated product IDs for batteries)"
-                            class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
-                        />
-                        <p v-if="calcForm.errors.battery_product_ids" class="mt-1 text-xs text-red-600">{{ calcForm.errors.battery_product_ids }}</p>
-                        <p class="mt-1.5 text-[11px] text-slate-400">Comma-separated product IDs. Calculator will recommend batteries from these.</p>
+            <form @submit.prevent="saveCalculatorSettings" class="space-y-6">
+                <!-- Basic Parameters -->
+                <div class="rounded-xl border border-slate-200 p-4 bg-slate-50/50">
+                    <h3 class="mb-3 text-sm font-semibold text-slate-700">Basic Parameters</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-600">Solar Panel Wattage (W)</label>
+                            <input
+                                v-model.number="calcForm.panel_wattage"
+                                type="number"
+                                min="1"
+                                step="1"
+                                class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
+                            />
+                            <p v-if="calcForm.errors.panel_wattage" class="mt-1 text-xs text-red-600">{{ calcForm.errors.panel_wattage }}</p>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-600">Panel Efficiency Factor</label>
+                            <input
+                                v-model.number="calcForm.panel_efficiency"
+                                type="number"
+                                min="0.01"
+                                max="1"
+                                step="0.01"
+                                class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
+                            />
+                            <p v-if="calcForm.errors.panel_efficiency" class="mt-1 text-xs text-red-600">{{ calcForm.errors.panel_efficiency }}</p>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-600">Inverter Safety Factor</label>
+                            <input
+                                v-model.number="calcForm.inverter_safety_factor"
+                                type="number"
+                                min="0.01"
+                                step="0.05"
+                                class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
+                            />
+                            <p v-if="calcForm.errors.inverter_safety_factor" class="mt-1 text-xs text-red-600">{{ calcForm.errors.inverter_safety_factor }}</p>
+                        </div>
+                        <div class="sm:col-span-2 lg:col-span-3">
+                            <label class="mb-1.5 block text-xs font-medium text-slate-600">Available Battery Capacities (kWh)</label>
+                            <input
+                                v-model="calcForm.battery_capacities"
+                                type="text"
+                                placeholder="e.g. 1.2, 2.56, 5.12, 10.24, 16, 20, 25.6, 32"
+                                class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
+                            />
+                            <p v-if="calcForm.errors.battery_capacities" class="mt-1 text-xs text-red-600">{{ calcForm.errors.battery_capacities }}</p>
+                            <p class="mt-1.5 text-[11px] text-slate-400">Comma-separated list. Calculator uses these for battery quantity calculations.</p>
+                        </div>
+                        <div class="sm:col-span-2 lg:col-span-3">
+                            <label class="mb-1.5 block text-xs font-medium text-slate-600">Available Inverter Sizes (kW)</label>
+                            <input
+                                v-model="calcForm.inverter_sizes"
+                                type="text"
+                                placeholder="e.g. 1.5, 3, 5, 8, 10, 12"
+                                class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
+                            />
+                            <p v-if="calcForm.errors.inverter_sizes" class="mt-1 text-xs text-red-600">{{ calcForm.errors.inverter_sizes }}</p>
+                            <p class="mt-1.5 text-[11px] text-slate-400">Comma-separated list. The nearest size ≥ required is recommended automatically.</p>
+                        </div>
                     </div>
                 </div>
+
+                <!-- Panel Pricing -->
+                <div class="rounded-xl border border-slate-200 p-4 bg-slate-50/50">
+                    <h3 class="mb-3 text-sm font-semibold text-slate-700">Solar Panel Pricing</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-600">Price Per Panel (₦)</label>
+                            <input
+                                v-model.number="calcForm.price_per_panel"
+                                type="number"
+                                min="0"
+                                step="1000"
+                                class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
+                            />
+                            <p v-if="calcForm.errors.price_per_panel" class="mt-1 text-xs text-red-600">{{ calcForm.errors.price_per_panel }}</p>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-600">Price Per kWh Daily (₦)</label>
+                            <input
+                                v-model.number="calcForm.price_per_kwh_daily"
+                                type="number"
+                                min="0"
+                                step="1000"
+                                class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
+                            />
+                            <p v-if="calcForm.errors.price_per_kwh_daily" class="mt-1 text-xs text-red-600">{{ calcForm.errors.price_per_kwh_daily }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Inverter Pricing (per size) -->
+                <div class="rounded-xl border border-slate-200 p-4 bg-slate-50/50">
+                    <h3 class="mb-3 text-sm font-semibold text-slate-700">Inverter Pricing (per size)</h3>
+                    <p class="mb-3 text-sm text-slate-500">Enter price for each inverter size. These will be multiplied by quantity if multiple inverters are needed.</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div v-for="size in inverterSizesArray" :key="size" class="flex items-center gap-3 p-3 rounded-lg border border-slate-200 bg-white">
+                            <span class="shrink-0 w-20 font-medium text-slate-700">{{ size }}kW</span>
+                            <input
+                                v-model.number="calcForm.inverter_prices[String(size)]"
+                                type="number"
+                                min="0"
+                                step="1000"
+                                placeholder="₦"
+                                class="flex-1 rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
+                            />
+                        </div>
+                    </div>
+                    <p class="mt-2 text-[11px] text-slate-400">Prices are stored per inverter size (kW). Add new sizes to the list above to configure their prices.</p>
+                </div>
+
+                <!-- Battery Pricing (per capacity) -->
+                <div class="rounded-xl border border-slate-200 p-4 bg-slate-50/50">
+                    <h3 class="mb-3 text-sm font-semibold text-slate-700">Battery Pricing (per capacity)</h3>
+                    <p class="mb-3 text-sm text-slate-500">Enter price for each battery capacity. These will be multiplied by quantity if multiple batteries are needed.</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div v-for="cap in batteryCapacitiesArray" :key="cap" class="flex items-center gap-3 p-3 rounded-lg border border-slate-200 bg-white">
+                            <span class="shrink-0 w-24 font-medium text-slate-700">{{ cap }}kWh</span>
+                            <input
+                                v-model.number="calcForm.battery_prices[String(cap)]"
+                                type="number"
+                                min="0"
+                                step="1000"
+                                placeholder="₦"
+                                class="flex-1 rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
+                            />
+                        </div>
+                    </div>
+                    <p class="mt-2 text-[11px] text-slate-400">Configure available battery capacities in the Basic Parameters section above to add/remove options here.</p>
+                </div>
+
+                <!-- Installation/Materials/Logistics Costs (per inverter size) -->
+                <div class="rounded-xl border border-slate-200 p-4 bg-slate-50/50">
+                    <h3 class="mb-3 text-sm font-semibold text-slate-700">Installation + Materials + Standard Logistics (per inverter size)</h3>
+                    <p class="mb-3 text-sm text-slate-500">Enter cost for each inverter size. This will be multiplied by the number of inverters required.</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div v-for="size in inverterSizesArray" :key="'install-' + size" class="flex items-center gap-3 p-3 rounded-lg border border-slate-200 bg-white">
+                            <span class="shrink-0 w-20 font-medium text-slate-700">{{ size }}kW</span>
+                            <input
+                                v-model.number="calcForm.installation_costs[String(size)]"
+                                type="number"
+                                min="0"
+                                step="1000"
+                                placeholder="₦"
+                                class="flex-1 rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
+                            />
+                        </div>
+                    </div>
+                </div>
+
                 <button
                     type="submit"
                     class="inline-flex items-center gap-2 rounded-lg bg-[#0D1527] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0D1527]/90 disabled:opacity-50"

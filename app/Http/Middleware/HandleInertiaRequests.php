@@ -103,9 +103,8 @@ class HandleInertiaRequests extends Middleware
             }),
             'currency' => Setting::where('key', 'currency.symbol')->value('value') ?? '₦',
             'tax_rate' => (float) (Setting::where('key', 'tax.rate')->value('value') ?? 0),
-            'calculator' => cache()->remember('settings.calculator', 3600, function () {
-                return Setting::where('group', 'calculator')->pluck('value', 'key');
-            }),
+            // Calculator settings: NO CACHE - must reflect admin changes immediately
+            'calculator' => Setting::where('group', 'calculator')->pluck('value', 'key'),
         ];
     }
 }

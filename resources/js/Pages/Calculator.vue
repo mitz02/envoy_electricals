@@ -11,16 +11,23 @@ const props = defineProps({});
 
 const page = usePage();
 
-// Toast state
-const toast = ref(null);
-
-function showToast(message, type = 'success') {
-    toast.value = { message, type };
-    setTimeout(() => { toast.value = null; }, 5000);
-}
-
 // Get calculator settings from shared props (set by admin)
 const calculatorSettings = computed(() => page.props.settings?.calculator || {});
+
+// Helper to parse JSON settings
+function parseJsonSetting(key, fallback = {}) {
+    const val = calculatorSettings.value[`calculator.${key}`];
+    if (!val) return fallback;
+    try {
+        return JSON.parse(val);
+    } catch {
+        return fallback;
+    }
+}
+
+function getPrice(prices, size, fallback = 0) {
+    return prices[String(size)] ?? fallback;
+}
 
 // Check if user is admin (has admin permissions)
 const isAdmin = computed(() => {
@@ -29,20 +36,45 @@ const isAdmin = computed(() => {
 });
 
 // System parameters - use admin settings as defaults, fallback to hardcoded values
-const panelWattage = ref(Number(calculatorSettings.value['calculator.panel_wattage']) || 550);
+const panelWattage = ref(Number(calculatorSettings.value['calculator.panel_wattage']) || 620);
 const panelEfficiency = ref(Number(calculatorSettings.value['calculator.panel_efficiency']) || 0.8);
 const inverterSafetyFactor = ref(Number(calculatorSettings.value['calculator.inverter_safety_factor']) || 1.4);
-const batteryCapacity = ref(Number(calculatorSettings.value['calculator.battery_capacity']) || 5);
-const inverterSizesText = ref(calculatorSettings.value['calculator.inverter_sizes'] || '1, 2.5, 3, 5, 7.5, 10, 15, 20');
+const inverterSizesText = ref(calculatorSettings.value['calculator.inverter_sizes'] || '1.5, 3, 5, 8, 10, 12');
+const batteryCapacitiesText = ref(calculatorSettings.value['calculator.battery_capacities'] || '1.2, 2.56, 5.12, 10.24, 16, 20, 25.6, 32');
 
-// Pricing parameters - use admin settings as defaults, fallback to hardcoded values
+// Available inverter sizes (parsed from settings)
+const availableInverterSizes = computed(() =>
+    inverterSizesText.value
+        .split(',')
+        .map((s) => parseFloat(s.trim()))
+        .filter((n) => Number.isFinite(n) && n > 0),
+);
+
+// Available battery capacities (parsed from settings)
+const availableBatteryCapacities = computed(() =>
+    batteryCapacitiesText.value
+        .split(',')
+        .map((s) => parseFloat(s.trim()))
+        .filter((n) => Number.isFinite(n) && n > 0),
+);
+
+// Recommended battery capacity: smallest capacity that meets or exceeds required storage per battery
+// For now, use the first capacity as default, or select based on total storage needed
+const batteryCapacity = computed(() => {
+    const caps = availableBatteryCapacities.value;
+    if (!caps.length) return 5.12;
+    // Default to the smallest capacity (most granular)
+    return caps[0];
+});
+
+// Detailed pricing settings (JSON)
+const inverterPrices = computed(() => parseJsonSetting('inverter_prices', {}));
+const batteryPrices = computed(() => parseJsonSetting('battery_prices', {}));
+const installationCosts = computed(() => parseJsonSetting('installation_costs', {}));
+
+// Legacy pricing parameters (fallback)
 const pricePerPanel = ref(Number(calculatorSettings.value['calculator.price_per_panel']) || 185000);
 const pricePerKwhDaily = ref(Number(calculatorSettings.value['calculator.price_per_kwh_daily']) || 220000);
-
-// Product IDs for recommendations - use admin settings
-const panelProductIds = computed(() => (calculatorSettings.value['calculator.panel_product_ids'] || '').split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id) && id > 0));
-const inverterProductIds = computed(() => (calculatorSettings.value['calculator.inverter_product_ids'] || '').split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id) && id > 0));
-const batteryProductIds = computed(() => (calculatorSettings.value['calculator.battery_product_ids'] || '').split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id) && id > 0));
 
 const applianceDefs = [
     { name: 'LED Bulbs', watts: 9 },
@@ -142,34 +174,75 @@ const safetyValid = computed(() => num(inverterSafetyFactor.value) > 0);
 const inverterRequiredW = computed(() => totalLoadW.value * num(inverterSafetyFactor.value));
 const inverterRequiredKw = computed(() => inverterRequiredW.value / 1000);
 
-const availableSizes = computed(() =>
-    inverterSizesText.value
-        .split(',')
-        .map((s) => parseFloat(s.trim()))
-        .filter((n) => Number.isFinite(n) && n > 0),
-);
-
 const recommendedInverterKw = computed(() => {
     const need = inverterRequiredKw.value;
     if (!need) return 0;
-    const found = availableSizes.value.filter((s) => s >= need).sort((a, b) => a - b)[0];
+    const found = availableInverterSizes.value.filter((s) => s >= need).sort((a, b) => a - b)[0];
     if (found) return found;
     return Math.ceil(need / 5) * 5;
 });
 
 // ---- Battery sizing ----
-const batteryValid = computed(() => num(batteryCapacity.value) > 0);
+// Select battery capacity: find the smallest capacity that can cover daily consumption with a single battery,
+// otherwise use the largest capacity to minimize battery count
+const recommendedBatteryCapacity = computed(() => {
+    const caps = availableBatteryCapacities.value;
+    if (!caps.length) return 5.12;
+    const need = totalDailyKwh.value;
+    if (!need) return caps[0];
+    // Find smallest capacity >= daily consumption (single battery covers it)
+    const singleBatteryFit = caps.filter((c) => c >= need).sort((a, b) => a - b)[0];
+    if (singleBatteryFit) return singleBatteryFit;
+    // Otherwise use largest capacity to minimize count
+    return caps.reduce((max, c) => (c > max ? c : max), caps[0]);
+});
+
+const batteryValid = computed(() => num(recommendedBatteryCapacity.value) > 0);
 
 const batteriesRequired = computed(() =>
     batteryValid.value && totalDailyKwh.value > 0
-        ? Math.ceil(totalDailyKwh.value / num(batteryCapacity.value))
+        ? Math.ceil(totalDailyKwh.value / num(recommendedBatteryCapacity.value))
         : 0,
 );
-const totalStorageKwh = computed(() => batteriesRequired.value * num(batteryCapacity.value));
+const totalStorageKwh = computed(() => batteriesRequired.value * num(recommendedBatteryCapacity.value));
 
-// ---- Pricing ----
+// ---- Inverter Quantity Calculation ----
+// Calculate how many inverters of the recommended size are needed
+const inverterQuantity = computed(() => {
+    const recommendedSize = recommendedInverterKw.value;
+    const requiredKw = inverterRequiredKw.value;
+    if (!recommendedSize || !requiredKw) return 1;
+    return Math.ceil(requiredKw / recommendedSize);
+});
+
+// ---- Pricing (New Detailed Calculation) ----
+// Panel Cost: Number of panels × Price per panel
+const panelCost = computed(() => Math.round(panelsRequired.value * num(pricePerPanel.value)));
+
+// Inverter Cost: Number of inverters × Price of selected inverter size
+const inverterCost = computed(() => {
+    const qty = inverterQuantity.value;
+    const price = getPrice(inverterPrices.value, recommendedInverterKw.value, 0);
+    return Math.round(qty * num(price));
+});
+
+// Battery Cost: Number of batteries × Price of selected battery capacity
+const batteryCost = computed(() => {
+    const qty = batteriesRequired.value;
+    const price = getPrice(batteryPrices.value, recommendedBatteryCapacity.value, 0);
+    return Math.round(qty * num(price));
+});
+
+// Installation Cost: Number of inverters × Installation cost for the selected inverter size
+const installationCost = computed(() => {
+    const qty = inverterQuantity.value;
+    const cost = getPrice(installationCosts.value, recommendedInverterKw.value, 0);
+    return Math.round(qty * num(cost));
+});
+
+// Final Estimate: Panel + Inverter + Battery + Installation
 const estimatedPrice = computed(() => {
-    return Math.round(panelsRequired.value * num(pricePerPanel.value) + totalDailyKwh.value * num(pricePerKwhDaily.value));
+    return panelCost.value + inverterCost.value + batteryCost.value + installationCost.value;
 });
 
 // ---- Formatting ----
@@ -187,25 +260,6 @@ function fmtNum(v) {
 }
 
 const maxRowWh = computed(() => Math.max(1, ...appliances.map(rowDailyWh)));
-
-// ---- Recommended Products (from admin-configured product IDs) ----
-// These will be populated from the shared props (products fetched by admin)
-const allProducts = computed(() => page.props.products || []);
-
-const recommendedPanels = computed(() => {
-    if (!panelProductIds.value.length) return [];
-    return allProducts.value.filter(p => panelProductIds.value.includes(p.id) && p.current_quantity > 0);
-});
-
-const recommendedInverters = computed(() => {
-    if (!inverterProductIds.value.length) return [];
-    return allProducts.value.filter(p => inverterProductIds.value.includes(p.id) && p.current_quantity > 0);
-});
-
-const recommendedBatteries = computed(() => {
-    if (!batteryProductIds.value.length) return [];
-    return allProducts.value.filter(p => batteryProductIds.value.includes(p.id) && p.current_quantity > 0);
-});
 
 // ---- Package Matching ----
 const allSolarPackages = computed(() => page.props.solarPackages || []);
@@ -306,7 +360,7 @@ function submit() {
             peak_load_kw: totalLoadKw.value,
             recommended_inverter: fmtKw(recommendedInverterKw.value),
             recommended_panels: panelsRequired.value,
-            recommended_battery: `${batteriesRequired.value} × ${batteryCapacity.value}kWh battery`,
+            recommended_battery: `${batteriesRequired.value} × ${recommendedBatteryCapacity.value}kWh battery`,
             estimated_price: estimatedPrice.value,
             recommended_products: {
                 panels: recommendedPanels.value.map(p => ({ id: p.id, name: p.name, sku: p.sku, price: p.selling_price })),
@@ -325,11 +379,6 @@ function submit() {
         }))
         .post('/calculator', {
             preserveScroll: true,
-            onSuccess: (page) => {
-                if (page.props.flash?.success) {
-                    showToast(page.props.flash.success);
-                }
-            },
         });
 }
 
@@ -361,19 +410,7 @@ onMounted(() => {
         <link rel="canonical" :href="origin + '/calculator'" />
     </Head>
 
-    <!-- Toast Notification -->
-    <div v-if="toast" class="fixed inset-x-0 top-20 z-50 flex justify-center px-4 pointer-events-none">
-        <div class="pointer-events-auto flex max-w-md items-center gap-3 rounded-xl px-5 py-3 text-sm font-medium text-white shadow-xl transition-all"
-            :class="toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'">
-            <svg v-if="toast.type === 'success'" class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-            </svg>
-            <svg v-else class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-            <span>{{ toast.message }}</span>
-        </div>
-    </div>
+    <FlashMessages />
 
     <!-- ============================ HERO ============================ -->
     <section class="relative overflow-hidden">
@@ -600,18 +637,22 @@ onMounted(() => {
                             <div class="rounded-2xl rounded-tr-none border border-white/10 bg-white/5 p-3.5">
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Batteries Required</p>
                                 <p class="mt-1 text-lg font-black text-white">{{ batteriesRequired }} <span class="text-xs font-bold text-slate-300">pcs</span></p>
-                                <p class="text-[10.5px] font-semibold text-slate-400">× {{ batteryCapacity }}kWh</p>
+                                <p class="text-[10.5px] font-semibold text-slate-400">× {{ recommendedBatteryCapacity }}kWh</p>
                             </div>
                             <div class="rounded-2xl rounded-tr-none border border-white/10 bg-white/5 p-3.5">
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Battery Storage</p>
                                 <p class="mt-1 text-lg font-black text-white">{{ totalStorageKwh.toFixed(2) }} <span class="text-xs font-bold text-slate-300">kWh</span></p>
-                                <p class="text-[10.5px] font-semibold text-slate-400">{{ batteriesRequired }} × {{ batteryCapacity }}kWh</p>
+                                <p class="text-[10.5px] font-semibold text-slate-400">{{ batteriesRequired }} × {{ recommendedBatteryCapacity }}kWh</p>
                             </div>
                         </div>
 
-                        <div class="mt-5 border-t border-white/10 pt-4 flex items-end justify-between">
-                            <span class="text-xs font-bold uppercase tracking-wide text-slate-300">Est. price</span>
-                            <span class="text-2xl font-black text-yellow-400">{{ naira(estimatedPrice) }}</span>
+                        <!-- Total Estimated Price -->
+                        <div class="mt-4 border-t border-white/10 pt-4">
+                            <div class="flex items-baseline justify-between">
+                                <span class="text-xs font-bold uppercase tracking-wide text-slate-300">Estimated Price</span>
+                                <span class="text-3xl font-black text-yellow-400">{{ naira(estimatedPrice) }}</span>
+                            </div>
+                            <p class="mt-1 text-xs text-slate-400">Includes panels, inverter, batteries, installation & logistics</p>
                         </div>
                     </div>
                 </section>
@@ -951,52 +992,22 @@ onMounted(() => {
                             <div class="rounded-2xl rounded-tr-none border border-white/10 bg-white/5 p-3.5">
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Batteries Required</p>
                                 <p class="mt-1 text-lg font-black text-white">{{ batteriesRequired }} <span class="text-xs font-bold text-slate-300">pcs</span></p>
-                                <p class="text-[10.5px] font-semibold text-slate-400">× {{ batteryCapacity }}kWh</p>
+                                <p class="text-[10.5px] font-semibold text-slate-400">× {{ recommendedBatteryCapacity }}kWh</p>
                             </div>
                             <div class="rounded-2xl rounded-tr-none border border-white/10 bg-white/5 p-3.5">
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Battery Storage</p>
                                 <p class="mt-1 text-lg font-black text-white">{{ totalStorageKwh.toFixed(2) }} <span class="text-xs font-bold text-slate-300">kWh</span></p>
-                                <p class="text-[10.5px] font-semibold text-slate-400">{{ batteriesRequired }} × {{ batteryCapacity }}kWh</p>
+                                <p class="text-[10.5px] font-semibold text-slate-400">{{ batteriesRequired }} × {{ recommendedBatteryCapacity }}kWh</p>
                             </div>
                         </div>
 
-                        <div class="mt-5 border-t border-white/10 pt-4 flex items-end justify-between">
-                            <span class="text-xs font-bold uppercase tracking-wide text-slate-300">Est. price</span>
-                            <span class="text-2xl font-black text-yellow-400">{{ naira(estimatedPrice) }}</span>
-                        </div>
-
-                        <!-- Recommended Products -->
-                        <div v-if="recommendedPanels.length || recommendedInverters.length || recommendedBatteries.length" class="mt-6 space-y-4">
-                            <h3 class="text-xs font-bold uppercase tracking-widest text-slate-300">Recommended Products</h3>
-                            <div class="grid gap-3 sm:grid-cols-3">
-                                <div v-if="recommendedPanels.length" class="rounded-2xl rounded-tr-none border border-white/10 bg-white/5 p-3.5">
-                                    <p class="text-[10px] font-bold uppercase tracking-widest text-yellow-400">Solar Panels</p>
-                                    <div class="mt-2 space-y-1.5 max-h-40 overflow-y-auto">
-                                        <div v-for="p in recommendedPanels" :key="p.id" class="flex items-center justify-between text-xs">
-                                            <span class="text-white/90 truncate">{{ p.name }}</span>
-                                            <span class="text-yellow-400 font-bold">{{ naira(p.selling_price) }}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div v-if="recommendedInverters.length" class="rounded-2xl rounded-tr-none border border-white/10 bg-white/5 p-3.5">
-                                    <p class="text-[10px] font-bold uppercase tracking-widest text-[#40e0d0]">Inverters</p>
-                                    <div class="mt-2 space-y-1.5 max-h-40 overflow-y-auto">
-                                        <div v-for="p in recommendedInverters" :key="p.id" class="flex items-center justify-between text-xs">
-                                            <span class="text-white/90 truncate">{{ p.name }}</span>
-                                            <span class="text-[#40e0d0] font-bold">{{ naira(p.selling_price) }}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div v-if="recommendedBatteries.length" class="rounded-2xl rounded-tr-none border border-white/10 bg-white/5 p-3.5">
-                                    <p class="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Batteries</p>
-                                    <div class="mt-2 space-y-1.5 max-h-40 overflow-y-auto">
-                                        <div v-for="p in recommendedBatteries" :key="p.id" class="flex items-center justify-between text-xs">
-                                            <span class="text-white/90 truncate">{{ p.name }}</span>
-                                            <span class="text-emerald-400 font-bold">{{ naira(p.selling_price) }}</span>
-                                        </div>
-                                    </div>
-                                </div>
+                        <!-- Total Estimated Price -->
+                        <div class="mt-4 border-t border-white/10 pt-4">
+                            <div class="flex items-baseline justify-between">
+                                <span class="text-xs font-bold uppercase tracking-wide text-slate-300">Estimated Price</span>
+                                <span class="text-3xl font-black text-yellow-400">{{ naira(estimatedPrice) }}</span>
                             </div>
+                            <p class="mt-1 text-xs text-slate-400">Includes panels, inverter, batteries, installation & logistics</p>
                         </div>
 
                         <!-- Matched Solar Packages -->

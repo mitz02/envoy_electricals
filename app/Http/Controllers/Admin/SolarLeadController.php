@@ -3,12 +3,15 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\QuotationMail;
 use App\Models\Quotation;
 use App\Models\SolarCalculation;
 use App\Models\SolarPackage;
 use App\Services\AuditLogger;
+use App\Services\ReferenceGenerator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -80,8 +83,9 @@ class SolarLeadController extends Controller
     public function createQuotation(Request $request, SolarCalculation $calculation): RedirectResponse
     {
         $data = $request->validate([
-            'solar_package_id' => ['required', 'exists:solar_packages,id'],
+            'solar_package_id' => ['nullable', 'exists:solar_packages,id'],
             'notes' => ['nullable', 'string', 'max:1000'],
+            'additional_logistics' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $quotation = Quotation::create([
@@ -93,8 +97,9 @@ class SolarLeadController extends Controller
             'location' => $calculation->location,
             'appliances_json' => $calculation->appliances_json,
             'recommended_system' => $calculation->recommended_inverter,
-            'solar_package_id' => $data['solar_package_id'],
+            'solar_package_id' => $data['solar_package_id'] ?? null,
             'estimated_price' => $calculation->estimated_price,
+            'additional_logistics' => $data['additional_logistics'] ?? 0,
             'status' => 'quoted',
             'notes' => $data['notes'],
         ]);
@@ -148,5 +153,79 @@ class SolarLeadController extends Controller
         AuditLogger::log('deleted', 'quotation', $quotation->id, "Removed quotation {$ref}");
 
         return redirect()->route('admin.solar-leads.index')->with('success', 'Quotation removed.');
+    }
+
+    public function createQuotationManual(): Response
+    {
+        $packages = SolarPackage::where('is_visible_online', true)
+            ->where('availability', 'available')
+            ->get(['id', 'name', 'package_price', 'installation_cost', 'inverter_capacity', 'estimated_load_capacity']);
+
+        return Inertia::render('Admin/SolarLeads/CreateQuotation', [
+            'packages' => $packages,
+        ]);
+    }
+
+    public function storeQuotationManual(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'customer_name' => ['required', 'string', 'max:255'],
+            'customer_phone' => ['required', 'string', 'max:255'],
+            'customer_email' => ['nullable', 'email', 'max:255'],
+            'location' => ['nullable', 'string', 'max:255'],
+            'solar_package_id' => ['required', 'exists:solar_packages,id'],
+            'estimated_price' => ['nullable', 'numeric', 'min:0'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+            'additional_logistics' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $package = SolarPackage::find($data['solar_package_id']);
+
+        $quotation = Quotation::create([
+            'ref_id' => ReferenceGenerator::generate('quotation'),
+            'customer_id' => null,
+            'customer_name' => $data['customer_name'],
+            'customer_phone' => $data['customer_phone'],
+            'customer_email' => $data['customer_email'],
+            'location' => $data['location'],
+            'appliances_json' => null,
+            'recommended_system' => $package->inverter_capacity ?? 'Custom System',
+            'solar_package_id' => $data['solar_package_id'],
+            'estimated_price' => $data['estimated_price'] ?? ($package->package_price + $package->installation_cost),
+            'status' => 'quoted',
+            'notes' => $data['notes'],
+        ]);
+
+        AuditLogger::log('created', 'quotation', $quotation->id, "Created manual quotation {$quotation->ref_id} for {$data['customer_name']}");
+
+        return redirect()->route('admin.solar-leads.quotations.show', $quotation)
+            ->with('success', "Quotation {$quotation->ref_id} created successfully.");
+    }
+
+    public function sendQuotation(Request $request, Quotation $quotation): RedirectResponse
+    {
+        $quotation->load('solarPackage');
+
+        // Update status to quoted if not already
+        if ($quotation->status !== 'quoted') {
+            $quotation->update(['status' => 'quoted']);
+        }
+
+        // Send email with quotation
+        try {
+            Mail::to($quotation->customer_email)->send(new QuotationMail($quotation));
+            $quotation->update(['notes' => ($quotation->notes ?? '')."\n\n[Quotation sent via email on ".now()->format('Y-m-d H:i').']']);
+
+            AuditLogger::log('updated', 'quotation', $quotation->id, "Quotation {$quotation->ref_id} sent to {$quotation->customer_email}");
+
+            return redirect()->back()->with('success', "Quotation sent to {$quotation->customer_email}.");
+        } catch (\Exception $e) {
+            \Log::error('Failed to send quotation email', [
+                'quotation_id' => $quotation->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()->back()->with('error', 'Failed to send email: '.$e->getMessage());
+        }
     }
 }

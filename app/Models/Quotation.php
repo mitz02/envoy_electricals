@@ -13,11 +13,12 @@ class Quotation extends Model
     protected $fillable = [
         'ref_id', 'customer_id', 'customer_name', 'customer_phone', 'customer_email',
         'location', 'appliances_json', 'recommended_system', 'solar_package_id',
-        'estimated_price', 'status', 'notes',
+        'estimated_price', 'additional_logistics', 'status', 'notes',
     ];
 
     protected $casts = [
         'estimated_price' => 'float',
+        'additional_logistics' => 'float',
         'appliances_json' => 'array',
     ];
 
