@@ -607,27 +607,22 @@ onMounted(() => {
                             <div class="rounded-2xl rounded-tr-none border border-white/10 bg-white/5 p-3.5">
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Connected Load</p>
                                 <p class="mt-1 text-lg font-black text-yellow-400">{{ totalLoadKw.toFixed(2) }} <span class="text-xs font-bold text-slate-300">kW</span></p>
-                                <p class="text-[10.5px] font-semibold text-slate-400">{{ fmtNum(totalLoadW) }} W</p>
                             </div>
                             <div class="rounded-2xl rounded-tr-none border border-white/10 bg-white/5 p-3.5">
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Daily Energy</p>
                                 <p class="mt-1 text-lg font-black text-[#40e0d0]">{{ totalDailyKwh.toFixed(2) }} <span class="text-xs font-bold text-slate-300">kWh</span></p>
-                                <p class="text-[10.5px] font-semibold text-slate-400">{{ fmtNum(totalDailyWh) }} Wh / day</p>
                             </div>
                             <div class="rounded-2xl rounded-tr-none border border-white/10 bg-white/5 p-3.5">
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Solar Panels</p>
                                 <p class="mt-1 text-lg font-black text-white">{{ panelsRequired }} <span class="text-xs font-bold text-slate-300">pcs</span></p>
-                                <p class="text-[10.5px] font-semibold text-slate-400">× {{ panelWattage }}W @ {{ panelEfficiency }} eff.</p>
                             </div>
                             <div class="rounded-2xl rounded-tr-none border border-white/10 bg-white/5 p-3.5">
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Array Capacity</p>
                                 <p class="mt-1 text-lg font-black text-white">{{ arrayCapacityKw.toFixed(2) }} <span class="text-xs font-bold text-slate-300">kW</span></p>
-                                <p class="text-[10.5px] font-semibold text-slate-400">{{ panelsRequired }} × {{ panelWattage }}W</p>
                             </div>
                             <div class="rounded-2xl rounded-tr-none border border-white/10 bg-white/5 p-3.5">
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Inverter Required</p>
                                 <p class="mt-1 text-lg font-black text-yellow-400">{{ inverterRequiredKw.toFixed(2) }} <span class="text-xs font-bold text-slate-300">kW</span></p>
-                                <p class="text-[10.5px] font-semibold text-slate-400">{{ fmtNum(inverterRequiredW) }} W × {{ inverterSafetyFactor }}</p>
                             </div>
                             <div class="rounded-2xl rounded-tr-none border border-[#40e0d0]/30 bg-[#40e0d0]/10 p-3.5">
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-[#40e0d0]">Recommended Inverter</p>
@@ -637,12 +632,10 @@ onMounted(() => {
                             <div class="rounded-2xl rounded-tr-none border border-white/10 bg-white/5 p-3.5">
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Batteries Required</p>
                                 <p class="mt-1 text-lg font-black text-white">{{ batteriesRequired }} <span class="text-xs font-bold text-slate-300">pcs</span></p>
-                                <p class="text-[10.5px] font-semibold text-slate-400">× {{ recommendedBatteryCapacity }}kWh</p>
                             </div>
                             <div class="rounded-2xl rounded-tr-none border border-white/10 bg-white/5 p-3.5">
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Battery Storage</p>
                                 <p class="mt-1 text-lg font-black text-white">{{ totalStorageKwh.toFixed(2) }} <span class="text-xs font-bold text-slate-300">kWh</span></p>
-                                <p class="text-[10.5px] font-semibold text-slate-400">{{ batteriesRequired }} × {{ recommendedBatteryCapacity }}kWh</p>
                             </div>
                         </div>
 
@@ -962,27 +955,22 @@ onMounted(() => {
                             <div class="rounded-2xl rounded-tr-none border border-white/10 bg-white/5 p-3.5">
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Connected Load</p>
                                 <p class="mt-1 text-lg font-black text-yellow-400">{{ totalLoadKw.toFixed(2) }} <span class="text-xs font-bold text-slate-300">kW</span></p>
-                                <p class="text-[10.5px] font-semibold text-slate-400">{{ fmtNum(totalLoadW) }} W</p>
                             </div>
                             <div class="rounded-2xl rounded-tr-none border border-white/10 bg-white/5 p-3.5">
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Daily Energy</p>
                                 <p class="mt-1 text-lg font-black text-[#40e0d0]">{{ totalDailyKwh.toFixed(2) }} <span class="text-xs font-bold text-slate-300">kWh</span></p>
-                                <p class="text-[10.5px] font-semibold text-slate-400">{{ fmtNum(totalDailyWh) }} Wh / day</p>
                             </div>
                             <div class="rounded-2xl rounded-tr-none border border-white/10 bg-white/5 p-3.5">
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Solar Panels</p>
                                 <p class="mt-1 text-lg font-black text-white">{{ panelsRequired }} <span class="text-xs font-bold text-slate-300">pcs</span></p>
-                                <p class="text-[10.5px] font-semibold text-slate-400">× {{ panelWattage }}W @ {{ panelEfficiency }} eff.</p>
                             </div>
                             <div class="rounded-2xl rounded-tr-none border border-white/10 bg-white/5 p-3.5">
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Array Capacity</p>
                                 <p class="mt-1 text-lg font-black text-white">{{ arrayCapacityKw.toFixed(2) }} <span class="text-xs font-bold text-slate-300">kW</span></p>
-                                <p class="text-[10.5px] font-semibold text-slate-400">{{ panelsRequired }} × {{ panelWattage }}W</p>
                             </div>
                             <div class="rounded-2xl rounded-tr-none border border-white/10 bg-white/5 p-3.5">
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Inverter Required</p>
                                 <p class="mt-1 text-lg font-black text-yellow-400">{{ inverterRequiredKw.toFixed(2) }} <span class="text-xs font-bold text-slate-300">kW</span></p>
-                                <p class="text-[10.5px] font-semibold text-slate-400">{{ fmtNum(inverterRequiredW) }} W × {{ inverterSafetyFactor }}</p>
                             </div>
                             <div class="rounded-2xl rounded-tr-none border border-[#40e0d0]/30 bg-[#40e0d0]/10 p-3.5">
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-[#40e0d0]">Recommended Inverter</p>
@@ -992,12 +980,10 @@ onMounted(() => {
                             <div class="rounded-2xl rounded-tr-none border border-white/10 bg-white/5 p-3.5">
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Batteries Required</p>
                                 <p class="mt-1 text-lg font-black text-white">{{ batteriesRequired }} <span class="text-xs font-bold text-slate-300">pcs</span></p>
-                                <p class="text-[10.5px] font-semibold text-slate-400">× {{ recommendedBatteryCapacity }}kWh</p>
                             </div>
                             <div class="rounded-2xl rounded-tr-none border border-white/10 bg-white/5 p-3.5">
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Battery Storage</p>
                                 <p class="mt-1 text-lg font-black text-white">{{ totalStorageKwh.toFixed(2) }} <span class="text-xs font-bold text-slate-300">kWh</span></p>
-                                <p class="text-[10.5px] font-semibold text-slate-400">{{ batteriesRequired }} × {{ recommendedBatteryCapacity }}kWh</p>
                             </div>
                         </div>
 
