@@ -83,7 +83,11 @@ class CustomerController extends Controller
             'customer_type' => ['nullable', 'in:walk_in,regular,corporate'],
         ]);
 
-        $customer = Customer::create([...$data, 'ref_id' => ReferenceGenerator::generate('customer')]);
+        // Create customer without auto-assigning store (for quick inline creation)
+        $customer = new Customer($data);
+        $customer->skipStoreAutoAssign = true;
+        $customer->ref_id = ReferenceGenerator::generate('customer');
+        $customer->save();
 
         AuditLogger::log('created', 'customer', $customer->id, "Created customer {$customer->name}");
 

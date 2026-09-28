@@ -315,7 +315,7 @@ function openCustomerModal(tab = 'existing') {
     customerValidationErrors.value = {};
     customerQuery.value = '';
     if (tab === 'new') {
-        customerForm.value = { name: '', phone: '', email: '', address: '', location: '', customer_type: 'walk_in' };
+        customerForm.value = { name: '', phone: '', email: '', address: '', location: '', customer_type: 'regular' };
     }
     customerTab.value = tab;
     showCustomerModal.value = true;
@@ -412,6 +412,7 @@ function submit() {
                         <select
                             v-model="form.customer_id"
                             class="w-full rounded-xl border-slate-300 py-2.5 pl-4 pr-12 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 bg-white appearance-none"
+                            style="appearance: none; -webkit-appearance: none; -moz-appearance: none; background-image: none;"
                             @change="onCustomerChange"
                         >
                             <option value="">
@@ -428,11 +429,11 @@ function submit() {
                         </select>
                         <button
                             type="button"
-                            class="absolute right-0 top-0 h-full w-10 flex items-center justify-center rounded-r-xl border-l border-slate-200 text-slate-400 hover:bg-[#0D1527] hover:text-white hover:border-[#0D1527] transition-colors"
+                            class="absolute right-0 top-0 h-full w-10 flex items-center justify-center rounded-r-xl border-l border-slate-200 text-[#0D1527] hover:bg-[#0D1527] hover:text-white hover:border-[#0D1527] transition-colors"
                             @click="openCustomerModal('new')"
                             title="Create new customer"
                         >
-                            <i class="bi bi-plus-circle text-lg" />
+                            <i class="bi bi-plus-lg text-xl" />
                         </button>
                     </div>
                     <div v-if="form.errors.customer_id" class="mt-1 text-xs text-red-600">{{ form.errors.customer_id }}</div>
