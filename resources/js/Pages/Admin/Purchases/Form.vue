@@ -80,7 +80,15 @@ const filteredProducts = computed(() => {
             p.name.toLowerCase().includes(q) ||
             p.sku.toLowerCase().includes(q) ||
             p.id.toString() === q,
-    ).slice(0, 8);
+    ).slice(0, 10);
+});
+
+// Suggested products shown on focus (before typing) - top products by stock
+const suggestedProducts = computed(() => {
+    return props.products
+        .filter(p => p.current_quantity > 0)
+        .sort((a, b) => b.current_quantity - a.current_quantity)
+        .slice(0, 10);
 });
 
 const cartCount = computed(() => items.value.reduce((n, i) => n + i.quantity, 0));
@@ -162,7 +170,7 @@ function clearCart() {
 }
 
 function handleSearchKeydown(e) {
-    const results = filteredProducts.value;
+    const results = search.value.trim() ? filteredProducts.value : suggestedProducts.value;
     if (!results.length) return;
 
     if (e.key === 'ArrowDown') {
@@ -183,7 +191,8 @@ function handleSearchKeydown(e) {
 }
 
 watch(search, (val) => {
-    showResults.value = val.trim().length > 0;
+    // Show results when typing OR when empty (to show suggestions on focus)
+    showResults.value = val.trim().length > 0 || val === '';
     selectedResultIndex.value = -1;
 });
 
@@ -398,42 +407,82 @@ function submit() {
                     <!-- Dropdown Results -->
                     <transition enter-active-class="transition duration-100" leave-active-class="transition duration-75">
                         <div
-                            v-if="showResults && filteredProducts.length"
+                            v-if="showResults && (filteredProducts.length || (!search && suggestedProducts.length))"
                             class="absolute z-20 top-full left-0 right-0 mt-1.5 rounded-xl border border-slate-200 bg-white shadow-lg max-h-80 overflow-y-auto"
                         >
-                            <button
-                                v-for="(p, idx) in filteredProducts"
-                                :key="p.id"
-                                type="button"
-                                class="w-full flex items-center gap-3 px-3 py-2.5 text-left transition hover:bg-slate-50"
-                                :class="{
-                                    'bg-[#0D1527]/5': idx === selectedResultIndex,
-                                    'opacity-50 cursor-not-allowed': p.current_quantity <= 0,
-                                }"
-                                :disabled="p.current_quantity <= 0"
-                                @click="addItem(p)"
-                                @mouseenter="selectedResultIndex = idx"
-                            >
-                                <div class="min-w-0 flex-1">
-                                    <p class="truncate font-medium text-slate-900">{{ p.name }}</p>
-                                    <p class="text-xs text-slate-400">{{ p.sku }} · {{ naira(p.cost_price) }} · {{ p.current_quantity }} in stock</p>
+                            <!-- Suggested products when no search -->
+                            <template v-if="!search && suggestedProducts.length">
+                                <div class="px-3 py-2 border-b border-slate-100 flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                    <i class="bi bi-star-fill text-amber-500" />
+                                    Suggested (top stock)
                                 </div>
-                                <div class="flex items-center gap-2 shrink-0">
-                                    <span :class="stockPill(p.current_quantity)" class="text-[10px]">
-                                        {{ p.current_quantity > 0 ? p.current_quantity + ' in stock' : 'Out of stock' }}
-                                    </span>
-                                    <span v-if="items.some(i => i.product_id === p.id)"
-                                        class="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#0D1527] px-1.5 text-[10px] font-bold text-white"
-                                    >
-                                        {{ items.find(i => i.product_id === p.id).quantity }}
-                                    </span>
-                                    <i v-else class="bi bi-plus-circle text-[#40e0d0] text-lg" />
-                                </div>
-                            </button>
+                                <button
+                                    v-for="(p, idx) in suggestedProducts"
+                                    :key="p.id"
+                                    type="button"
+                                    class="w-full flex items-center gap-3 px-3 py-2.5 text-left transition hover:bg-slate-50"
+                                    :class="{
+                                        'bg-[#0D1527]/5': idx === selectedResultIndex,
+                                        'opacity-50 cursor-not-allowed': p.current_quantity <= 0,
+                                    }"
+                                    :disabled="p.current_quantity <= 0"
+                                    @click="addItem(p)"
+                                    @mouseenter="selectedResultIndex = idx"
+                                >
+                                    <div class="min-w-0 flex-1">
+                                        <p class="truncate font-medium text-slate-900">{{ p.name }}</p>
+                                        <p class="text-xs text-slate-400">{{ p.sku }} · {{ naira(p.cost_price) }} · {{ p.current_quantity }} in stock</p>
+                                    </div>
+                                    <div class="flex items-center gap-2 shrink-0">
+                                        <span :class="stockPill(p.current_quantity)" class="text-[10px]">
+                                            {{ p.current_quantity > 0 ? p.current_quantity + ' in stock' : 'Out of stock' }}
+                                        </span>
+                                        <span v-if="items.some(i => i.product_id === p.id)"
+                                            class="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#0D1527] px-1.5 text-[10px] font-bold text-white"
+                                        >
+                                            {{ items.find(i => i.product_id === p.id).quantity }}
+                                        </span>
+                                        <i v-else class="bi bi-plus-circle text-[#40e0d0] text-lg" />
+                                    </div>
+                                </button>
+                            </template>
 
-                            <div v-if="search && !filteredProducts.length" class="px-3 py-4 text-center text-sm text-slate-400">
-                                No products match "<span class="font-medium">{{ search }}</span>"
-                            </div>
+                            <!-- Filtered products when searching -->
+                            <template v-else>
+                                <button
+                                    v-for="(p, idx) in filteredProducts"
+                                    :key="p.id"
+                                    type="button"
+                                    class="w-full flex items-center gap-3 px-3 py-2.5 text-left transition hover:bg-slate-50"
+                                    :class="{
+                                        'bg-[#0D1527]/5': idx === selectedResultIndex,
+                                        'opacity-50 cursor-not-allowed': p.current_quantity <= 0,
+                                    }"
+                                    :disabled="p.current_quantity <= 0"
+                                    @click="addItem(p)"
+                                    @mouseenter="selectedResultIndex = idx"
+                                >
+                                    <div class="min-w-0 flex-1">
+                                        <p class="truncate font-medium text-slate-900">{{ p.name }}</p>
+                                        <p class="text-xs text-slate-400">{{ p.sku }} · {{ naira(p.cost_price) }} · {{ p.current_quantity }} in stock</p>
+                                    </div>
+                                    <div class="flex items-center gap-2 shrink-0">
+                                        <span :class="stockPill(p.current_quantity)" class="text-[10px]">
+                                            {{ p.current_quantity > 0 ? p.current_quantity + ' in stock' : 'Out of stock' }}
+                                        </span>
+                                        <span v-if="items.some(i => i.product_id === p.id)"
+                                            class="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#0D1527] px-1.5 text-[10px] font-bold text-white"
+                                        >
+                                            {{ items.find(i => i.product_id === p.id).quantity }}
+                                        </span>
+                                        <i v-else class="bi bi-plus-circle text-[#40e0d0] text-lg" />
+                                    </div>
+                                </button>
+
+                                <div v-if="search && !filteredProducts.length" class="px-3 py-4 text-center text-sm text-slate-400">
+                                    No products match "<span class="font-medium">{{ search }}</span>"
+                                </div>
+                            </template>
                         </div>
                     </transition>
                 </div>

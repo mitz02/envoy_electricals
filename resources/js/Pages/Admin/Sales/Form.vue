@@ -119,7 +119,7 @@ const filteredProducts = computed(() => {
             p.name.toLowerCase().includes(q) ||
             p.sku.toLowerCase().includes(q) ||
             p.id.toString() === q,
-    ).slice(0, 8);
+    ).slice(0, 10);
 });
 
 // Suggested products shown on focus (before typing) - top products by stock
@@ -127,7 +127,7 @@ const suggestedProducts = computed(() => {
     return props.products
         .filter(p => p.current_quantity > 0)
         .sort((a, b) => b.current_quantity - a.current_quantity)
-        .slice(0, 8);
+        .slice(0, 10);
 });
 
 const cartCount = computed(() => items.value.reduce((n, i) => n + i.quantity, 0));
