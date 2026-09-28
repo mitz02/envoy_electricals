@@ -337,7 +337,7 @@ async function createCustomer() {
     customerValidationErrors.value = {};
 
     try {
-        const { data } = await axios.post('/admin/customers/quick', {
+        const response = await axios.post('/admin/customers/quick', {
             name: customerForm.value.name,
             phone: customerForm.value.phone,
             email: customerForm.value.email,
@@ -346,16 +346,20 @@ async function createCustomer() {
             customer_type: customerForm.value.customer_type,
         });
 
-        const customer = data.customer;
+        const customer = response.data.customer;
+        if (!customer) {
+            throw new Error('No customer returned from server');
+        }
         customersList.value.push(customer);
         selectCustomer(customer);
         modalSuccess.value = `"${customer.name}" created & selected for this sale.`;
         showCustomerModal.value = false;
     } catch (e) {
+        console.error('Create customer error:', e);
         if (e.response?.data?.errors) {
             customerValidationErrors.value = e.response.data.errors;
         } else {
-            customerModalError.value = e.response?.data?.message || 'Could not save customer. Please try again.';
+            customerModalError.value = e.response?.data?.message || e.message || 'Could not save customer. Please try again.';
         }
     } finally {
         customerSaving.value = false;

@@ -92,6 +92,7 @@ class CustomerController extends Controller
         AuditLogger::log('created', 'customer', $customer->id, "Created customer {$customer->name}");
 
         return response()->json([
+            'success' => true,
             'customer' => $customer->only([
                 'id', 'name', 'phone', 'email', 'address', 'location', 'customer_type',
             ]),
