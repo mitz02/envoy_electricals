@@ -44,8 +44,8 @@
         }
 
         .logo {
-            width: 80px;
-            height: 80px;
+            width: 140px;
+            height: 140px;
             object-fit: contain;
         }
 
@@ -399,15 +399,6 @@
                 <div class="company-details">
                     <h1>{{ $company['name'] }}</h1>
                     <div class="tagline">Electrical & Solar Solutions</div>
-                    @if($company['address'])
-                    <p>{{ $company['address'] }}</p>
-                    @endif
-                    @if($company['phone'])
-                    <p>Tel: {{ $company['phone'] }}</p>
-                    @endif
-                    @if($company['email'])
-                    <p>Email: {{ $company['email'] }}</p>
-                    @endif
                 </div>
             </div>
 
@@ -566,9 +557,6 @@
         <!-- Footer -->
         <div class="footer">
             <p><strong>{{ $company['name'] }}</strong></p>
-            @if($company['address'])
-            <p>{{ $company['address'] }}</p>
-            @endif
             @if($company['phone'] || $company['email'])
             <p>
                 @if($company['phone'])
