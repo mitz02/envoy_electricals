@@ -94,11 +94,10 @@ class SupplierController extends Controller
             'contact_person' => ['nullable', 'string', 'max:255'],
         ]);
 
-        // Create supplier without auto-assigning store (for quick inline creation)
-        $supplier = new Supplier($data);
-        $supplier->skipStoreAutoAssign = true;
-        $supplier->ref_id = ReferenceGenerator::generate('supplier');
-        $supplier->save();
+        $supplier = Supplier::create([
+            ...$data,
+            'ref_id' => ReferenceGenerator::generate('supplier'),
+        ]);
 
         return response()->json([
             'success' => true,
