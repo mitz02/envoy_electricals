@@ -437,24 +437,6 @@ function submit() {
                     </div>
                     <div v-if="form.errors.customer_id" class="mt-1 text-xs text-red-600">{{ form.errors.customer_id }}</div>
                 </div>
-
-                <!-- Cart Summary Badge -->
-                <div v-if="items.length" class="flex items-center gap-3 shrink-0 sm:ml-4">
-                    <div class="hidden sm:flex items-center gap-2 rounded-xl bg-[#0D1527]/5 px-3 py-1.5">
-                        <span class="text-xs font-medium text-[#0D1527]">{{ items.length }} line{{ items.length === 1 ? '' : 's' }}</span>
-                        <span class="text-xs font-bold text-[#0D1527]">{{ cartCount }} item{{ cartCount === 1 ? '' : 's' }}</span>
-                        <span class="text-xs text-slate-400">·</span>
-                        <span class="text-sm font-bold text-[#0D1527]">{{ naira(total) }}</span>
-                    </div>
-                    <button
-                        type="button"
-                        class="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 transition"
-                        @click="clearCart"
-                        title="Clear cart"
-                    >
-                        <i class="bi bi-trash3 text-lg" />
-                    </button>
-                </div>
             </div>
         </div>
 
