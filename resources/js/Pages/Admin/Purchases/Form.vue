@@ -222,7 +222,6 @@ const showSupplierModal = ref(false);
 const supplierSaving = ref(false);
 const supplierModalError = ref('');
 const supplierValidationErrors = ref({});
-const modalSuccess = ref('');
 const supplierForm = ref({
     name: '',
     phone: '',
@@ -357,11 +356,6 @@ function submit() {
                     <i class="bi bi-building-check" />
                     <span class="truncate">Supplier: {{ selectedSupplier?.name ?? `#${form.supplier_id}` }}</span>
                     <span v-if="selectedSupplier?.phone" class="shrink-0 text-[#0D1527]/60">· {{ selectedSupplier.phone }}</span>
-                </div>
-
-                <div v-if="modalSuccess" class="mt-2 flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] font-medium text-amber-800">
-                    <i class="bi bi-check-circle-fill" />
-                    <span>{{ modalSuccess }}</span>
                 </div>
             </div>
         </div>
