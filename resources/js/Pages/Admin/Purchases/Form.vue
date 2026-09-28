@@ -222,6 +222,7 @@ const showSupplierModal = ref(false);
 const supplierSaving = ref(false);
 const supplierModalError = ref('');
 const supplierValidationErrors = ref({});
+const modalSuccess = ref('');
 const supplierForm = ref({
     name: '',
     phone: '',
