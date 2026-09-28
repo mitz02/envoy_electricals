@@ -1,38 +1,3 @@
-<script setup>
-import { ref, computed } from 'vue';
-import { Link, router, usePage } from '@inertiajs/vue3';
-import AdminLayout from '@/Layouts/AdminLayout.vue';
-import FlashMessages from '@/Components/FlashMessages.vue';
-import { naira, formatDate, formatDateTime, badgeClass } from '@/lib/format';
-import { useCan } from '@/composables/permissions';
-
-defineOptions({ layout: AdminLayout });
-
-const props = defineProps({
-    quotation: { type: Object, required: true },
-});
-
-const page = usePage();
-
-const { has } = useCan();
-
-const canEdit = has('custom-quotations.edit');
-
-const subtotal = computed(() => props.quotation.items.reduce((sum, item) => sum + Number(item.total), 0));
-
-function printInvoice() {
-    window.print();
-}
-
-function downloadPdf() {
-    window.open(`/admin/custom-quotations/${props.quotation.id}/pdf`, '_blank');
-}
-
-function goBack() {
-    router.get(`/admin/custom-quotations/${props.quotation.id}`, { preserveScroll: true });
-}
-</script>
-
 <template>
     <div class="print-full grid gap-6 lg:grid-cols-3">
         <div class="print:hidden lg:col-span-3">
@@ -228,48 +193,48 @@ function goBack() {
     </div>
 </template>
 
-<script>
-    import { computed } from 'vue';
-    import { Link, router, usePage } from '@inertiajs/vue3';
-    import AdminLayout from '@/Layouts/AdminLayout.vue';
-    import FlashMessages from '@/Components/FlashMessages.vue';
-    import { naira, formatDate, badgeClass } from '@/lib/format';
-    import { useCan } from '@/composables/permissions';
+<script setup>
+import { ref, computed } from 'vue';
+import { Link, router, usePage } from '@inertiajs/vue3';
+import AdminLayout from '@/Layouts/AdminLayout.vue';
+import FlashMessages from '@/Components/FlashMessages.vue';
+import { naira, formatDate, badgeClass } from '@/lib/format';
+import { useCan } from '@/composables/permissions';
 
-    defineOptions({ layout: AdminLayout });
+defineOptions({ layout: AdminLayout });
 
-    const props = defineProps({
-        quotation: { type: Object, required: true },
-    });
+const props = defineProps({
+    quotation: { type: Object, required: true },
+});
 
-    const page = usePage();
+const page = usePage();
 
-    const { has } = useCan();
+const { has } = useCan();
 
-    const canEdit = has('custom-quotations.edit');
+const canEdit = has('custom-quotations.edit');
 
-    const subtotal = computed(() => props.quotation.items.reduce((sum, item) => sum + Number(item.total), 0));
+const subtotal = computed(() => props.quotation.items.reduce((sum, item) => sum + Number(item.total), 0));
 
-    const pageProps = usePage().props;
+const pageProps = usePage().props;
 
-    const businessName = computed(() => pageProps.settings?.business?.name ?? 'Envoy Electricals');
-    const businessEmail = computed(() => pageProps.settings?.business?.email ?? 'envoyelectricals@gmail.com');
-    const businessPhone = computed(() => pageProps.settings?.business?.phone ?? '+234 809 708 9259');
-    const businessAddress = computed(() => pageProps.settings?.business?.address ?? 'Shop 1, Peace Avenue Junction, Futa Southgate Rd, Akure');
+const businessName = computed(() => pageProps.settings?.business?.name ?? 'Envoy Electricals');
+const businessEmail = computed(() => pageProps.settings?.business?.email ?? 'envoyelectricals@gmail.com');
+const businessPhone = computed(() => pageProps.settings?.business?.phone ?? '+234 809 708 9259');
+const businessAddress = computed(() => pageProps.settings?.business?.address ?? 'Shop 1, Peace Avenue Junction, Futa Southgate Rd, Akure');
 
-    const bankName = 'Wema Bank';
-    const bankAccountName = 'Envoy Electricals';
-    const bankAccountNumber = '0126278482';
+const bankName = 'Wema Bank';
+const bankAccountName = 'Envoy Electricals';
+const bankAccountNumber = '0126278482';
 
-    function printInvoice() {
-        window.print();
-    }
+function printInvoice() {
+    window.print();
+}
 
-    function downloadPdf() {
-        window.open(`/admin/custom-quotations/${props.quotation.id}/pdf`, '_blank');
-    }
+function downloadPdf() {
+    window.open(`/admin/custom-quotations/${props.quotation.id}/pdf`, '_blank');
+}
 
-    function goBack() {
-        router.get(`/admin/custom-quotations/${props.quotation.id}`, { preserveScroll: true });
-    }
+function goBack() {
+    router.get(`/admin/custom-quotations/${props.quotation.id}`, { preserveScroll: true });
+}
 </script>
