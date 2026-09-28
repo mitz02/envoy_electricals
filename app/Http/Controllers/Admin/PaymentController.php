@@ -16,6 +16,8 @@ use App\Services\PaymentService;
 use App\Services\PaystackService;
 use App\Services\PurchaseService;
 use App\Services\SaleService;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -185,6 +187,14 @@ class PaymentController extends Controller
                     'customer_name' => $sale->customer?->name,
                 ],
             );
+        } catch (ConnectionException $e) {
+            Log::error('Paystack connection failed: '.$e->getMessage(), ['payment' => $payment->ref_id]);
+
+            return response()->json(['message' => 'Network error: Could not connect to Paystack. Check internet connection.'], 502);
+        } catch (RequestException $e) {
+            Log::error('Paystack request failed: '.$e->getMessage(), ['payment' => $payment->ref_id, 'response' => $e->response?->json()]);
+
+            return response()->json(['message' => 'Paystack API error: '.($e->response?->json()['message'] ?? $e->getMessage())], 502);
         } catch (\Throwable $e) {
             Log::error('Paystack initialize failed: '.$e->getMessage(), ['payment' => $payment->ref_id]);
 
@@ -270,6 +280,14 @@ class PaymentController extends Controller
                     'customer_name' => $sale->customer?->name,
                 ],
             );
+        } catch (ConnectionException $e) {
+            Log::error('Paystack connection failed: '.$e->getMessage(), ['payment' => $payment->ref_id]);
+
+            return response()->json(['message' => 'Network error: Could not connect to Paystack. Check internet connection.'], 502);
+        } catch (RequestException $e) {
+            Log::error('Paystack request failed: '.$e->getMessage(), ['payment' => $payment->ref_id, 'response' => $e->response?->json()]);
+
+            return response()->json(['message' => 'Paystack API error: '.($e->response?->json()['message'] ?? $e->getMessage())], 502);
         } catch (\Throwable $e) {
             Log::error('Paystack initialize failed: '.$e->getMessage(), ['payment' => $payment->ref_id]);
 

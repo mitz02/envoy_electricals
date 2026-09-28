@@ -11,6 +11,6 @@ class Currency
             return '₦0';
         }
 
-        return '₦' . number_format($n, $decimals, '.', ',');
+        return '₦'.number_format($n, $decimals, '.', ',');
     }
 }

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quotation {{ $quotation->ref_id }}</title>
+    <title>Invoice {{ $quotation->ref_id }}</title>
     <style>
         @page {
             margin: 20mm 15mm;
@@ -44,34 +44,13 @@
         }
 
         .logo {
-            width: 140px;
-            height: 140px;
+            width: 280px;
+            height: 280px;
             object-fit: contain;
         }
 
-        .company-details h1 {
-            font-size: 22px;
-            font-weight: 900;
-            color: #0d1527;
-            letter-spacing: 0.05em;
-            text-transform: uppercase;
-            margin-bottom: 4px;
-        }
-
-        .company-details .tagline {
-            font-size: 10px;
-            color: #facc15;
-            font-weight: 700;
-            letter-spacing: 0.15em;
-            text-transform: uppercase;
-            margin-bottom: 8px;
-        }
-
-        .company-details p {
-            font-size: 10px;
-            color: #64748b;
-            line-height: 1.6;
-            margin: 2px 0;
+        .company-details {
+            display: none;
         }
 
         .quotation-title {
@@ -154,7 +133,7 @@
             color: #065f46;
         }
 
-        /* Billed To / Details Grid */
+        /* Details Grid */
         .details-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
@@ -219,16 +198,6 @@
             font-size: 12px;
             color: #0d1527;
             margin-bottom: 4px;
-        }
-
-        .billed-content .outstanding {
-            font-size: 9px;
-            color: #b45309;
-            background: #fef3c7;
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-            margin-top: 8px;
         }
 
         /* Items Table */
@@ -409,9 +378,6 @@
         .text-right { text-align: right; }
         .text-center { text-align: center; }
         .font-mono { font-family: monospace; }
-
-        /* Currency prefix */
-        .currency { font-family: monospace; }
     </style>
 </head>
 <body>
@@ -428,182 +394,182 @@
         $currencySymbol = \App\Models\Setting::where('key', 'currency.symbol')->value('value') ?? '₦';
     ?>
 
-    <!-- HEADER -->
-    <div class="header">
-        <div class="company-info">
-            <div class="company-logo">
+    <div class="invoice-container">
+        <!-- Header -->
+        <div class="header">
+            <div class="company-info">
                 <img src="/envoy_images/logo.png" alt="{{ $businessName }}" class="logo">
                 <div class="company-details">
                     <h1>{{ $businessName }}</h1>
-                    <div class="tagline">Powering your world with innovative solutions</div>
                 </div>
             </div>
-        </div>
-        <div class="invoice-header">
-            <h2 class="invoice-title">QUOTATION</h2>
-            <div class="invoice-meta">
-                <div><strong>Quotation No:</strong> {{ $quotation->ref_id }}</div>
-                <div><strong>Status:</strong> 
-                    <span class="status-badge status-{{ $quotation->status }}">{{ ucfirst($quotation->status) }}</span>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- BILL TO & DETAILS -->
-    <div class="details-section">
-        <div class="detail-block">
-            <div class="detail-label">Bill To</div>
-            <div class="detail-content">
-                <div class="detail-row">
-                    <span class="detail-row-label">Customer:</span>
-                    <span class="detail-row-value">{{ $quotation->customer_name }}</span>
-                </div>
-                @if($quotation->customer_company)
-                <div class="detail-row">
-                    <span class="detail-row-label">Company:</span>
-                    <span class="detail-row-value">{{ $quotation->customer_company }}</span>
-                </div>
-                @endif
-                <div class="detail-row">
-                    <span class="detail-row-label">Location:</span>
-                    <span class="detail-row-value">{{ $quotation->customer_address ?: 'Not specified' }}</span>
+            <div class="invoice-header">
+                <h2 class="invoice-title">QUOTATION</h2>
+                <div class="invoice-meta">
+                    <div><strong>Quotation No:</strong> {{ $quotation->ref_id }}</div>
+                    <div><strong>Status:</strong> 
+                        <span class="status-badge status-{{ $quotation->status }}">{{ ucfirst($quotation->status) }}</span>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="detail-block">
-            <div class="detail-label">Details</div>
-            <div class="detail-content">
-                <div class="detail-row">
-                    <span class="detail-row-label">Issue Date:</span>
-                    <span class="detail-row-value">{{ \Carbon\Carbon::parse($quotation->quotation_date)->format('m/d/Y') }}</span>
+        <!-- Details Grid -->
+        <div class="details-grid">
+            <div class="detail-box">
+                <div class="detail-label">Quotation Date</div>
+                <div class="detail-value">{{ \Carbon\Carbon::parse($quotation->quotation_date)->format('d M Y') }}</div>
+            </div>
+            <div class="detail-box">
+                <div class="detail-label">Valid Until</div>
+                <div class="detail-value">{{ $quotation->valid_until ? \Carbon\Carbon::parse($quotation->valid_until)->format('d M Y') : 'Not specified' }}</div>
+            </div>
+            <div class="detail-box">
+                <div class="detail-label">Job Type</div>
+                <div class="detail-value">{{ $quotation->job_type }}</div>
+            </div>
+            <div class="detail-box">
+                <div class="detail-label">Reference</div>
+                <div class="detail-value">{{ $quotation->title }}</div>
+            </div>
+        </div>
+
+        <!-- Billed To -->
+        <div class="billed-section">
+            <div class="billed-row">
+                <div class="billed-col">
+                    <div class="billed-label">Bill To</div>
+                    <div class="billed-content">
+                        <div class="name">{{ $quotation->customer_name }}</div>
+                        @if($quotation->customer_company)
+                        <div>{{ $quotation->customer_company }}</div>
+                        @endif
+                        <div>{{ $quotation->customer_address ?: 'Not specified' }}</div>
+                    </div>
                 </div>
-                <div class="detail-row">
-                    <span class="detail-row-label">Valid Until:</span>
-                    <span class="detail-row-value">{{ $quotation->valid_until ? \Carbon\Carbon::parse($quotation->valid_until)->format('m/d/Y') : 'Not specified' }}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-row-label">Job Type:</span>
-                    <span class="detail-row-value">{{ $quotation->job_type }}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-row-label">Reference:</span>
-                    <span class="detail-row-value">{{ $quotation->title }}</span>
+
+                <div class="billed-col">
+                    <div class="billed-label">Details</div>
+                    <div class="billed-content">
+                        <div><strong>Issue Date:</strong> {{ \Carbon\Carbon::parse($quotation->quotation_date)->format('m/d/Y') }}</div>
+                        <div><strong>Valid Until:</strong> {{ $quotation->valid_until ? \Carbon\Carbon::parse($quotation->valid_until)->format('m/d/Y') : 'Not specified' }}</div>
+                        <div><strong>Job Type:</strong> {{ $quotation->job_type }}</div>
+                        <div><strong>Reference:</strong> {{ $quotation->title }}</div>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- ITEMS TABLE -->
-    <table class="items-table">
-        <thead>
-            <tr>
-                <th style="width: 5%;">#</th>
-                <th style="width: 40%;">Item</th>
-                <th style="width: 10%;" class="text-center">Qty</th>
-                <th style="width: 15%;" class="text-right">Unit Price</th>
-                <th style="width: 15%;" class="text-right">Total</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach($quotation->items as $index => $item)
-            <tr>
-                <td>{{ $index + 1 }}</td>
-                <td>
-                    <div class="item-name">{{ $item->item }}</div>
-                    @if($item->description)
-                    <div class="item-sku">{{ $item->description }}</div>
-                    @endif
-                </td>
-                <td class="text-center">{{ $item->quantity }} {{ $item->unit ?: 'pcs' }}</td>
-                <td class="text-right">{{ $currencySymbol }}{{ number_format($item->unit_price, 0) }}</td>
-                <td class="text-right"><strong>{{ $currencySymbol }}{{ number_format($item->total, 0) }}</strong></td>
-            </tr>
-            @endforeach
-        </tbody>
-    </table>
-
-    <!-- FINANCIAL SUMMARY -->
-    <?php
-        $subtotal = $quotation->items->sum('total');
-        $discount = $quotation->discount ?? 0;
-        $tax = $quotation->tax ?? 0;
-        $otherCharges = $quotation->other_charges ?? 0;
-        $grandTotal = $subtotal - $discount + $tax + $otherCharges;
-        $amountPaid = 0;
-        $amountDue = $grandTotal - $amountPaid;
-    ?>
-    <div class="totals-section">
-        <table class="totals-table">
-            <tr>
-                <td class="label">Subtotal</td>
-                <td class="value">{{ $currencySymbol }}{{ number_format($subtotal, 0) }}</td>
-            </tr>
-            @if($discount > 0)
-            <tr class="discount">
-                <td class="label">Discount</td>
-                <td class="value">-{{ $currencySymbol }}{{ number_format($discount, 0) }}</td>
-            </tr>
-            @endif
-            @if($quotation->tax > 0)
-            <tr>
-                <td class="label">Tax / VAT</td>
-                <td class="value">+{{ $currencySymbol }}{{ number_format($quotation->tax, 0) }}</td>
-            </tr>
-            @endif
-            @if($quotation->other_charges > 0)
-            <tr>
-                <td class="label">Other Charges</td>
-                <td class="value">+{{ $currencySymbol }}{{ number_format($quotation->other_charges, 0) }}</td>
-            </tr>
-            @endif
-            <tr class="total-row">
-                <td class="label">Total</td>
-                <td class="value">{{ $currencySymbol }}{{ number_format($grandTotal, 0) }}</td>
-            </tr>
-            <tr class="paid-row">
-                <td class="label">Amount Paid</td>
-                <td class="value">{{ $currencySymbol }}{{ number_format(0, 0) }}</td>
-            </tr>
-            <tr class="balance-row {{ $amountDue <= 0 ? 'balance-zero' : '' }}">
-                <td class="label">Balance Due</td>
-                <td class="value">{{ $currencySymbol }}{{ number_format($grandTotal, 0) }}</td>
-            </tr>
+        <!-- ITEMS TABLE -->
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th style="width: 5%;">#</th>
+                    <th style="width: 40%;">Item</th>
+                    <th style="width: 10%;" class="text-center">Qty</th>
+                    <th style="width: 15%;" class="text-right">Unit Price</th>
+                    <th style="width: 15%;" class="text-right">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($quotation->items as $index => $item)
+                <tr>
+                    <td>{{ $index + 1 }}</td>
+                    <td>
+                        <div class="item-name">{{ $item->item }}</div>
+                        @if($item->description)
+                        <div class="item-sku">{{ $item->description }}</div>
+                        @endif
+                    </td>
+                    <td class="text-center">{{ $item->quantity }} {{ $item->unit ?: 'pcs' }}</td>
+                    <td class="text-right">{{ $currencySymbol }}{{ number_format($item->unit_price, 0) }}</td>
+                    <td class="text-right"><strong>{{ $currencySymbol }}{{ number_format($item->total, 0) }}</strong></td>
+                </tr>
+                @endforeach
+            </tbody>
         </table>
-    </div>
 
-    <!-- PAYMENT DETAILS -->
-    <div class="payment-section">
-        <div class="payment-title">Payment Details</div>
-        <div class="payment-grid">
-            <div class="payment-item">
-                <div class="payment-item-label">Bank</div>
-                <div class="payment-item-value">{{ $bankName }}</div>
-            </div>
-            <div class="payment-item">
-                <div class="payment-item-label">Account Name</div>
-                <div class="payment-item-value">{{ $bankAccountName }}</div>
-            </div>
-            <div class="payment-item">
-                <div class="payment-item-label">Account Number</div>
-                <div class="payment-item-value">{{ $bankAccountNumber }}</div>
+        <!-- Totals -->
+        <?php
+            $subtotal = $quotation->items->sum('total');
+            $discount = $quotation->discount ?? 0;
+            $tax = $quotation->tax ?? 0;
+            $otherCharges = $quotation->other_charges ?? 0;
+            $grandTotal = $subtotal - $discount + $tax + $otherCharges;
+            $amountPaid = 0;
+            $amountDue = $grandTotal - $amountPaid;
+        ?>
+        <div class="totals-section">
+            <table class="totals-table">
+                <tr>
+                    <td class="label">Subtotal</td>
+                    <td class="value">{{ $currencySymbol }}{{ number_format($subtotal, 0) }}</td>
+                </tr>
+                @if($discount > 0)
+                <tr class="discount">
+                    <td class="label">Discount</td>
+                    <td class="value">-{{ $currencySymbol }}{{ number_format($discount, 0) }}</td>
+                </tr>
+                @endif
+                @if($quotation->tax > 0)
+                <tr>
+                    <td class="label">Tax / VAT</td>
+                    <td class="value">+{{ $currencySymbol }}{{ number_format($quotation->tax, 0) }}</td>
+                </tr>
+                @endif
+                @if($quotation->other_charges > 0)
+                <tr>
+                    <td class="label">Other Charges</td>
+                    <td class="value">+{{ $currencySymbol }}{{ number_format($quotation->other_charges, 0) }}</td>
+                </tr>
+                @endif
+                <tr class="total-row">
+                    <td class="label">Total</td>
+                    <td class="value">{{ $currencySymbol }}{{ number_format($grandTotal, 0) }}</td>
+                </tr>
+                <tr class="paid-row">
+                    <td class="label">Paid</td>
+                    <td class="value">{{ $currencySymbol }}{{ number_format(0, 0) }}</td>
+                </tr>
+                <tr class="balance-row {{ $amountDue <= 0 ? 'balance-zero' : '' }}">
+                    <td class="label">Balance Due</td>
+                    <td class="value">{{ $currencySymbol }}{{ number_format($grandTotal, 0) }}</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Payment Details -->
+        <div class="payment-section">
+            <div class="payment-title">Payment Details</div>
+            <div class="payment-grid">
+                <div class="payment-item">
+                    <div class="payment-item-label">Bank</div>
+                    <div class="payment-item-value">{{ $bankName }}</div>
+                </div>
+                <div class="payment-item">
+                    <div class="payment-item-label">Account Name</div>
+                    <div class="payment-item-value">{{ $bankAccountName }}</div>
+                </div>
+                <div class="payment-item">
+                    <div class="payment-item-label">Account Number</div>
+                    <div class="payment-item-value">{{ $bankAccountNumber }}</div>
+                </div>
             </div>
         </div>
-    </div>
 
-    @if($quotation->notes)
-    <div class="notes-section">
-        <div class="box-title">Notes</div>
-        <p>{{ $quotation->notes }}</p>
-    </div>
-    @endif
+        @if($quotation->notes)
+        <div class="notes-section">
+            <div class="box-title">Notes</div>
+            <p>{{ $quotation->notes }}</p>
+        </div>
+        @endif
 
-    <!-- FOOTER -->
-    <div class="footer">
-        <div class="footer-tagline">Powering your world with innovative solutions</div>
-        <div class="footer-contact">
-            {{ $businessName }} | {{ $businessEmail }} | {{ $businessPhone }}
+        <!-- Footer -->
+        <div class="footer">
+            <div class="footer-tagline">Powering your world with innovative solutions</div>
+            <div class="footer-contact">
+                {{ $businessName }} | {{ $businessEmail }} | {{ $businessPhone }}
+            </div>
         </div>
     </div>
 </body>
