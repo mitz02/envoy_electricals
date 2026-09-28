@@ -391,7 +391,7 @@ function submit() {
                             placeholder="Type product name, SKU, or scan barcode…"
                             class="w-full rounded-xl border-slate-300 py-3 pl-10 pr-10 text-base focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20"
                             @keydown="handleSearchKeydown"
-                            @focus="showResults = search.trim().length > 0"
+                            @focus="showResults = true"
                             autocomplete="off"
                         />
                         <button
