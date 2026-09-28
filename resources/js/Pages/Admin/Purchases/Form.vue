@@ -392,6 +392,7 @@ function submit() {
                             class="w-full rounded-xl border-slate-300 py-3 pl-10 pr-10 text-base focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20"
                             @keydown="handleSearchKeydown"
                             @focus="showResults = true"
+                            @click.stop
                             autocomplete="off"
                         />
                         <button
