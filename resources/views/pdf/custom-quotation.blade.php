@@ -9,8 +9,8 @@
             font-family: DejaVu Sans, sans-serif; 
             font-size: 10px; 
             line-height: 1.5; 
-            color: #1f2937; 
-            background: white;
+            color: #0D1527; 
+            background: #FAF8F2;
         }
         /* Header - Logo left, Invoice title right */
         .header {
@@ -19,10 +19,15 @@
             align-items: flex-start;
             margin-bottom: 30px;
             padding-bottom: 20px;
-            border-bottom: 2px solid #1e3a5f;
+            border-bottom: 3px solid #0D1527;
         }
-        .company-info { flex: 1; }
-        .company-logo {
+        .company-info { flex: 1; display: flex; align-items: center; gap: 15px; }
+        .company-logo-img {
+            max-height: 70px;
+            max-width: 180px;
+            object-fit: contain;
+        }
+        .company-logo-text {
             font-size: 26px;
             font-weight: 800;
             color: #0D1527;
@@ -30,9 +35,9 @@
             margin-bottom: 4px;
         }
         .company-tagline {
-            color: #1e3a5f;
+            color: #40e0d0;
             font-size: 11px;
-            font-weight: 500;
+            font-weight: 600;
             margin-bottom: 12px;
         }
         .company-details {
@@ -45,7 +50,7 @@
         .invoice-title {
             font-size: 28px;
             font-weight: 800;
-            color: #1e3a5f;
+            color: #0D1527;
             letter-spacing: -0.5px;
             margin-bottom: 4px;
         }
@@ -55,22 +60,7 @@
             text-align: right;
         }
         .invoice-meta div { margin: 3px 0; }
-        .status-badge {
-            display: inline-block;
-            padding: 3px 10px;
-            border-radius: 4px;
-            font-size: 9px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .status-draft { background: #fef3c7; color: #92400e; }
-        .status-sent { background: #dbeafe; color: #1e40af; }
-        .status-viewed { background: #dbeafe; color: #1e40af; }
-        .status-accepted { background: #d1fae5; color: #065f46; }
-        .status-rejected { background: #fee2e2; color: #991b1b; }
-        .status-expired { background: #fef3c7; color: #92400e; }
-        .status-converted { background: #d1fae5; color: #065f46; }
+        .invoice-meta strong { color: #0D1527; }
 
         /* Bill To & Details */
         .details-section {
@@ -83,22 +73,22 @@
         .detail-label {
             font-size: 8px;
             font-weight: 700;
-            color: #1e3a5f;
+            color: #0D1527;
             text-transform: uppercase;
             letter-spacing: 0.8px;
             margin-bottom: 10px;
             padding-bottom: 4px;
-            border-bottom: 1px solid #1e3a5f;
+            border-bottom: 2px solid #0D1527;
         }
         .detail-content {
             font-size: 10px;
             color: #374151;
             line-height: 1.8;
         }
-        .detail-content strong { color: #1f2937; }
+        .detail-content strong { color: #0D1527; }
         .detail-row { margin: 4px 0; }
         .detail-row-label { color: #6b7280; font-size: 9px; font-weight: 500; }
-        .detail-row-value { color: #1f2937; font-weight: 500; }
+        .detail-row-value { color: #0D1527; font-weight: 500; }
 
         /* Items Table */
         .items-table {
@@ -114,7 +104,7 @@
             text-align: left;
         }
         .items-table th {
-            background: #1e3a5f;
+            background: #0D1527;
             color: white;
             font-weight: 600;
             font-size: 9px;
@@ -125,7 +115,7 @@
         .items-table td.number { text-align: right; font-variant-numeric: tabular-nums; }
         .items-table td.center { text-align: center; }
         .items-table tr:nth-child(even) td { background: #f9fafb; }
-        .items-table tr:last-child td { border-bottom: 2px solid #1e3a5f; }
+        .items-table tr:last-child td { border-bottom: 2px solid #0D1527; }
 
         /* Financial Summary - Right aligned */
         .financial-summary {
@@ -143,23 +133,25 @@
         }
         .summary-row:last-child { border-bottom: none; }
         .summary-label { color: #6b7280; font-weight: 500; }
-        .summary-value { color: #1f2937; font-weight: 600; font-variant-numeric: tabular-nums; }
+        .summary-value { color: #0D1527; font-weight: 600; font-variant-numeric: tabular-nums; }
         .summary-row.total {
-            border-top: 2px solid #1e3a5f;
+            border-top: 2px solid #0D1527;
             border-bottom: none;
             margin-top: 8px;
             padding-top: 14px;
             font-size: 12px;
             font-weight: 800;
         }
-        .summary-row.total .summary-label { color: #1e3a5f; }
-        .summary-row.total .summary-value { color: #1e3a5f; }
-        .summary-row.due .summary-value { color: #dc2626; font-weight: 700; }
+        .summary-row.total .summary-label { color: #0D1527; }
+        .summary-row.total .summary-value { color: #0D1527; }
+        .summary-row.discount .summary-value { color: #dc2626; font-weight: 700; }
+        .summary-row.tax .summary-value { color: #40e0d0; font-weight: 700; }
+        .summary-row.other .summary-value { color: #FACC15; font-weight: 700; }
 
         /* Payment Details */
         .payment-section {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
+            background: #FAF8F2;
+            border: 2px solid #40e0d0;
             border-radius: 8px;
             padding: 20px;
             margin-bottom: 25px;
@@ -167,18 +159,19 @@
         .payment-title {
             font-size: 10px;
             font-weight: 700;
-            color: #1e3a5f;
+            color: #0D1527;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             margin-bottom: 14px;
             padding-bottom: 8px;
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 2px solid #40e0d0;
         }
         .payment-grid {
             display: flex;
+            flex-wrap: wrap;
             gap: 20px;
         }
-        .payment-item { flex: 1; }
+        .payment-item { flex: 1; min-width: 200px; }
         .payment-item-label {
             font-size: 8px;
             font-weight: 600;
@@ -189,14 +182,23 @@
         }
         .payment-item-value {
             font-size: 10px;
-            color: #1f2937;
+            color: #0D1527;
             font-weight: 500;
         }
+        .payment-instructions {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 9px;
+            color: #6b7280;
+            line-height: 1.6;
+        }
+        .payment-instructions strong { color: #0D1527; font-size: 9px; }
 
         /* Notes */
         .notes-section {
-            background: #fffbeb;
-            border: 1px solid #fde68a;
+            background: #FAF8F2;
+            border: 1px solid #FACC15;
             border-radius: 8px;
             padding: 16px;
             margin-bottom: 25px;
@@ -204,14 +206,14 @@
         .notes-title {
             font-size: 8px;
             font-weight: 700;
-            color: #92400e;
+            color: #FACC15;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             margin-bottom: 8px;
         }
         .notes-content {
             font-size: 9.5px;
-            color: #78350f;
+            color: #374151;
             line-height: 1.6;
             white-space: pre-line;
         }
@@ -226,7 +228,7 @@
             line-height: 1.8;
         }
         .footer-tagline {
-            color: #1e3a5f;
+            color: #40e0d0;
             font-size: 10px;
             font-weight: 600;
             margin-bottom: 10px;
@@ -237,34 +239,40 @@
 <body>
     <?php
         // Fetch settings dynamically
-        $businessName = \App\Models\Setting::where('key', 'business.name')->value('value') ?? 'Envoy Electricals';
-        $businessEmail = \App\Models\Setting::where('key', 'business.email')->value('value') ?? 'envoyelectricals@gmail.com';
+        $businessName = \App\Models\Setting::where('key', 'business.name')->value('value') ?? 'Envoy Electric';
+        $businessEmail = \App\Models\Setting::where('key', 'business.email')->value('value') ?? 'hello@envoyelectric.com';
         $businessPhone = \App\Models\Setting::where('key', 'business.phone')->value('value') ?? '+234 809 708 9259';
-        $businessAddress = \App\Models\Setting::where('key', 'business.address')->value('value') ?? 'Shop 1, Peace Avenue Junction, Futa Southgate Rd, Akure';
+        $businessAddress = \App\Models\Setting::where('key', 'business.address')->value('value') ?? 'Shop 1, Peace Avenue Junction, opp Goddy Royal Hotel, Futa Southgate Road, Akure';
+        $businessLogo = \App\Models\Setting::where('key', 'business.logo')->value('value');
+        $currencySymbol = \App\Models\Setting::where('key', 'currency.symbol')->value('value') ?? '₦';
         
-        $bankName = \App\Models\Setting::where('key', 'bank.bank_name')->value('value') ?? 'Wema Bank';
+        $bankName = \App\Models\Setting::where('key', 'bank.bank_name')->value('value') ?? 'Moniepoint MFB';
         $bankAccountName = \App\Models\Setting::where('key', 'bank.account_name')->value('value') ?? 'Envoy Electricals';
-        $bankAccountNumber = \App\Models\Setting::where('key', 'bank.account_number')->value('value') ?? '0126278482';
+        $bankAccountNumber = \App\Models\Setting::where('key', 'bank.account_number')->value('value') ?? '5168265608';
+        $bankInstructions = \App\Models\Setting::where('key', 'bank.instructions')->value('value');
     ?>
 
     <!-- HEADER -->
     <div class="header">
         <div class="company-info">
-            <div class="company-logo">{{ $businessName }}</div>
-            <div class="company-tagline">Powering your world with innovative solutions</div>
-            <div class="company-details">
-                <div>{{ $businessEmail }}</div>
-                <div>{{ $businessAddress }}</div>
-                <div>Tel: {{ $businessPhone }}</div>
+            @if($businessLogo)
+                <img src="{{ $businessLogo }}" alt="{{ $businessName }}" class="company-logo-img">
+            @else
+                <div class="company-logo-text">{{ $businessName }}</div>
+            @endif
+            <div>
+                <div class="company-tagline">Powering your world with innovative solutions</div>
+                <div class="company-details">
+                    <div>{{ $businessEmail }}</div>
+                    <div>{{ $businessAddress }}</div>
+                    <div>Tel: {{ $businessPhone }}</div>
+                </div>
             </div>
         </div>
         <div class="invoice-header">
             <div class="invoice-title">QUOTATION</div>
             <div class="invoice-meta">
                 <div><strong>Quotation No:</strong> {{ $quotation->ref_id }}</div>
-                <div><strong>Status:</strong> 
-                    <span class="status-badge status-{{ $quotation->status }}">{{ ucfirst($quotation->status) }}</span>
-                </div>
             </div>
         </div>
     </div>
@@ -340,9 +348,9 @@
                     @endif
                 </td>
                 <td class="center">{{ $item->quantity }} {{ $item->unit ?: 'pcs' }}</td>
-                <td class="number">₦{{ number_format($item->unit_price, 0) }}</td>
+                <td class="number">{{ $currencySymbol }}{{ number_format($item->unit_price, 0) }}</td>
                 <td class="center">{{ $discountDisplay }}</td>
-                <td class="number"><strong>₦{{ number_format($item->total, 0) }}</strong></td>
+                <td class="number"><strong>{{ $currencySymbol }}{{ number_format($item->total, 0) }}</strong></td>
             </tr>
             @endforeach
         </tbody>
@@ -361,37 +369,37 @@
     <div class="financial-summary">
         <div class="summary-row">
             <span class="summary-label">Subtotal</span>
-            <span class="summary-value">₦{{ number_format($subtotal, 0) }}</span>
+            <span class="summary-value">{{ $currencySymbol }}{{ number_format($subtotal, 0) }}</span>
         </div>
         @if($discount > 0)
-        <div class="summary-row">
+        <div class="summary-row discount">
             <span class="summary-label">Discount</span>
-            <span class="summary-value" style="color: #dc2626;">- ₦{{ number_format($discount, 0) }}</span>
+            <span class="summary-value">- {{ $currencySymbol }}{{ number_format($discount, 0) }}</span>
         </div>
         @endif
         @if($tax > 0)
-        <div class="summary-row">
+        <div class="summary-row tax">
             <span class="summary-label">Tax / VAT</span>
-            <span class="summary-value">+ ₦{{ number_format($tax, 0) }}</span>
+            <span class="summary-value">+ {{ $currencySymbol }}{{ number_format($tax, 0) }}</span>
         </div>
         @endif
         @if($otherCharges > 0)
-        <div class="summary-row">
+        <div class="summary-row other">
             <span class="summary-label">Other Charges</span>
-            <span class="summary-value">+ ₦{{ number_format($otherCharges, 0) }}</span>
+            <span class="summary-value">+ {{ $currencySymbol }}{{ number_format($otherCharges, 0) }}</span>
         </div>
         @endif
         <div class="summary-row total">
             <span class="summary-label">Total</span>
-            <span class="summary-value">₦{{ number_format($grandTotal, 0) }}</span>
+            <span class="summary-value">{{ $currencySymbol }}{{ number_format($grandTotal, 0) }}</span>
         </div>
         <div class="summary-row">
             <span class="summary-label">Amount Paid</span>
-            <span class="summary-value">₦{{ number_format($amountPaid, 0) }}</span>
+            <span class="summary-value">{{ $currencySymbol }}{{ number_format($amountPaid, 0) }}</span>
         </div>
         <div class="summary-row due">
             <span class="summary-label">Amount Due</span>
-            <span class="summary-value">₦{{ number_format($amountDue, 0) }}</span>
+            <span class="summary-value">{{ $currencySymbol }}{{ number_format($amountDue, 0) }}</span>
         </div>
     </div>
 
@@ -412,6 +420,11 @@
                 <div class="payment-item-value">{{ $bankAccountNumber }}</div>
             </div>
         </div>
+        @if($bankInstructions)
+        <div class="payment-instructions">
+            <strong>Instructions:</strong> {{ $bankInstructions }}
+        </div>
+        @endif
     </div>
 
     <!-- NOTES -->

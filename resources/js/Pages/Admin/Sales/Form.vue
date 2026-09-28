@@ -18,11 +18,6 @@ const props = defineProps({
 
 const customersList = ref(props.customers.map((c) => ({ ...c })));
 
-const customerSearch = ref('');
-const showCustomerResults = ref(false);
-const selectedCustomerResultIndex = ref(-1);
-const customerSearchInputRef = ref(null);
-
 const search = ref('');
 const items = ref([]);
 const discount = ref(0);
@@ -66,17 +61,6 @@ onBeforeUnmount(() => {
 
 /* ---------- Customer Autocomplete ---------- */
 
-const filteredCustomers = computed(() => {
-    const q = customerSearch.value.trim().toLowerCase();
-    if (!q) return [];
-    return customersList.value.filter(
-        (c) =>
-            c.name.toLowerCase().includes(q) ||
-            (c.phone ?? '').toLowerCase().includes(q) ||
-            (c.email ?? '').toLowerCase().includes(q),
-    ).slice(0, 8);
-});
-
 const selectedCustomer = computed(() => {
     if (!form.customer_id) return null;
     return customersList.value.find((c) => c.id === Number(form.customer_id)) ?? null;
@@ -103,8 +87,6 @@ function clearCustomer() {
     form.customer_id = '';
     form.customer_name = 'Walk-in Customer';
     form.customer_phone = '';
-    customerSearch.value = '';
-    showCustomerResults.value = false;
     // Force full payment for walk-in
     form.payment_method = 'cash';
     form.amount_paid = '';
@@ -118,59 +100,15 @@ watch(() => isWalkIn.value, (val) => {
     }
 }, { immediate: true });
 
-function handleCustomerSearchKeydown(e) {
-    const results = filteredCustomers.value;
-    if (!results.length && e.key !== 'Enter') return;
-
-    if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        selectedCustomerResultIndex.value = Math.min(selectedCustomerResultIndex.value + 1, results.length - 1);
-    } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        selectedCustomerResultIndex.value = Math.max(selectedCustomerResultIndex.value - 1, 0);
-    } else if (e.key === 'Enter') {
-        e.preventDefault();
-        if (selectedCustomerResultIndex.value >= 0 && results[selectedCustomerResultIndex.value]) {
-            selectCustomer(results[selectedCustomerResultIndex.value]);
-        } else if (customerSearch.value.trim()) {
-            // Create new customer inline
-            createCustomerInline();
+function onCustomerChange() {
+    if (form.customer_id) {
+        const customer = customersList.value.find(c => c.id == form.customer_id);
+        if (customer) {
+            form.customer_name = customer.name;
+            form.customer_phone = customer.phone || '';
         }
-    } else if (e.key === 'Escape') {
-        showCustomerResults.value = false;
-        selectedCustomerResultIndex.value = -1;
-    }
-}
-
-watch(customerSearch, (val) => {
-    showCustomerResults.value = val.trim().length > 0;
-    selectedCustomerResultIndex.value = -1;
-});
-
-async function createCustomerInline() {
-    const name = customerSearch.value.trim();
-    if (!name) return;
-
-    try {
-        const { data } = await axios.post('/admin/customers/quick', {
-            name,
-            phone: '',
-            email: '',
-            address: '',
-            location: '',
-            customer_type: 'walk_in',
-        });
-
-        const customer = data.customer;
-        customersList.value.push(customer);
-        selectCustomer(customer);
-        createInlineCustomer.value = false;
-        showAllCustomers.value = false;
-        showCustomerResults.value = false;
-        customerSearch.value = '';
-        nextTick(() => searchInputRef.value?.focus());
-    } catch (e) {
-        console.error('Failed to create customer:', e);
+    } else {
+        clearCustomer();
     }
 }
 
@@ -361,9 +299,6 @@ const customerForm = ref({
     customer_type: 'walk_in',
 });
 
-const createInlineCustomer = ref(false);
-const showAllCustomers = ref(false);
-
 const modalFilteredCustomers = computed(() => {
     const q = customerQuery.value.trim().toLowerCase();
     if (!q) return customersList.value;
@@ -470,170 +405,37 @@ function submit() {
         <!-- ============ TOP BAR: Customer ============ -->
         <div class="rounded-2xl border border-slate-200/80 bg-white shadow-xs p-4">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <!-- Customer Autocomplete -->
+<!-- Customer Select -->
                 <div class="flex-1 min-w-0">
                     <label class="mb-1.5 block text-xs font-medium text-slate-600">Customer</label>
-                    <div class="relative" @click.outside="showCustomerResults = false; showAllCustomers = false">
-                        <div class="relative">
-                            <i class="bi bi-person absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400" />
-                            <input
-                                ref="customerSearchInputRef"
-                                v-model="customerSearch"
-                                type="search"
-                                placeholder="Type customer name, phone… or select Walk-in Customer"
-                                class="w-full rounded-xl border-slate-300 py-2.5 pl-10 pr-10 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20"
-                                @keydown="handleCustomerSearchKeydown"
-                                @focus="showCustomerResults = true; showAllCustomers = true"
-                                autocomplete="off"
-                            />
-                            <button
-                                v-if="customerSearch"
-                                type="button"
-                                class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
-                                @click="customerSearch = ''; showCustomerResults = false; showAllCustomers = false"
-                            >
-                                <i class="bi bi-x-lg text-xs" />
-                            </button>
-                            <button
-                                v-if="!customerSearch && !form.customer_id"
-                                type="button"
-                                class="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500 hover:text-emerald-700"
-                                title="Walk-in selected"
-                            >
-                                <i class="bi bi-check-circle-fill text-base" />
-                            </button>
-                            <button
-                                v-if="form.customer_id"
-                                type="button"
-                                class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-600"
-                                @click="clearCustomer"
-                                title="Clear to walk-in"
-                            >
-                                <i class="bi bi-x-circle text-base" />
-                            </button>
-                            <button
-                                type="button"
-                                class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
-                                @click="showAllCustomers = !showAllCustomers; showCustomerResults = showAllCustomers"
-                                title="Show all customers"
-                            >
-                                <i class="bi bi-chevron-down text-sm" :class="showAllCustomers ? 'rotate-180' : ''" />
-                            </button>
-                            <button
-                                type="button"
-                                class="absolute right-10 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#0D1527] hover:bg-[#0D1527]/10"
-                                @click="createInlineCustomer = true; customerSearch = ''; showCustomerResults = false; showAllCustomers = false"
-                                title="Create new customer"
-                            >
-                                <i class="bi bi-plus-circle text-lg" />
-                            </button>
-                        <!-- Dropdown Results -->
-                        <transition enter-active-class="transition duration-100" leave-active-class="transition duration-75">
-                            <div
-                                v-if="showCustomerResults || showAllCustomers"
-                                class="absolute z-20 top-full left-0 right-0 mt-1.5 rounded-xl border border-slate-200 bg-white shadow-lg max-h-80 overflow-y-auto"
-                            >
-                                <!-- Walk-in Customer Option -->
-                                <button
-                                    type="button"
-                                    class="w-full flex items-center gap-3 px-3 py-2.5 text-left transition hover:bg-slate-50"
-                                    @click="clearCustomer"
-                                >
-                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-xs font-bold text-emerald-600">
+                    <div class="relative">
+                        <select
+                            v-model="form.customer_id"
+                            class="w-full rounded-xl border-slate-300 py-2.5 pl-4 pr-12 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 bg-white appearance-none"
+                            @change="onCustomerChange"
+                        >
+                            <option value="">
+                                <span class="flex items-center gap-2">
+                                    <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-xs font-bold text-emerald-600">
                                         <i class="bi bi-person-fill" />
                                     </span>
-                                    <div class="min-w-0 flex-1">
-                                        <p class="truncate font-medium text-slate-900">Walk-in Customer</p>
-                                        <p class="text-xs text-slate-400">No customer account needed</p>
-                                    </div>
-                                    <span v-if="!form.customer_id" class="text-emerald-600 font-medium">Selected</span>
-                                </button>
-
-                                <div v-if="customerSearch.trim() && !filteredCustomers.length" class="px-3 py-2.5 border-t border-slate-100">
-                                    <button
-                                        type="button"
-                                        class="w-full flex items-center justify-center gap-2 rounded-lg bg-[#0D1527] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#0D1527]/90"
-                                        @click="createCustomerInline"
-                                    >
-                                        <i class="bi bi-plus-circle" />
-                                        Create "<span class="font-medium">{{ customerSearch }}</span>" as new customer
-                                    </button>
-                                </div>
-
-                                <div v-else-if="customerSearch.trim() && filteredCustomers.length" class="px-3 py-2 border-t border-slate-100">
-                                    <button
-                                        type="button"
-                                        class="w-full flex items-center justify-center gap-2 rounded-lg border border-dashed border-[#0D1527]/30 px-3 py-2 text-sm font-semibold text-[#0D1527] transition hover:border-[#0D1527] hover:bg-[#0D1527] hover:text-white"
-                                        @click="openCustomerModal('new')"
-                                    >
-                                        <i class="bi bi-person-plus" />
-                                        Create with details (phone, email, etc.)
-                                    </button>
-                                </div>
-
-                                <div v-if="!customerSearch && !form.customer_id" class="px-3 py-3 text-center text-xs text-slate-400">
-                                    <i class="bi bi-person-fill text-emerald-500 mr-1" />
-                                    Walk-in Customer selected — type to search or select existing
-                                </div>
-
-                                <div v-if="!customerSearch && form.customer_id" class="px-3 py-3 text-center text-xs text-slate-400">
-                                    <i class="bi bi-person-check text-[#0D1527] mr-1" />
-                                    {{ selectedCustomer?.name }} selected — clear to switch to walk-in
-                                </div>
-
-                                <div class="px-3 py-2 border-t border-slate-100 flex items-center justify-between">
-                                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-500">All Customers</span>
-                                    <span class="text-xs text-slate-400">{{ customersList.length }} total</span>
-                                </div>
-
-                                <button
-                                    v-for="(c, idx) in filteredCustomers"
-                                    :key="c.id"
-                                    type="button"
-                                    class="w-full flex items-center gap-3 px-3 py-2.5 text-left transition hover:bg-slate-50"
-                                    :class="{ 'bg-[#0D1527]/5': idx === selectedCustomerResultIndex }"
-                                    @click="selectCustomer(c)"
-                                    @mouseenter="selectedCustomerResultIndex = idx"
-                                >
-                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#0D1527]/5 text-xs font-bold text-[#0D1527]">
-                                        {{ initials(c.name) }}
-                                    </span>
-                                    <div class="min-w-0 flex-1">
-                                        <p class="truncate font-medium text-slate-900">{{ c.name }}</p>
-                                        <p class="text-xs text-slate-400 flex items-center gap-1.5">
-                                            <span v-if="c.phone">{{ c.phone }}</span>
-                                            <span v-else-if="c.email">{{ c.email }}</span>
-                                            <span v-else class="text-slate-400">No contact</span>
-                                            <span class="text-slate-400">·</span>
-                                            <span
-                                                :class="{
-                                                    'text-emerald-600': c.customer_type === 'regular',
-                                                    'text-amber-600': c.customer_type === 'corporate',
-                                                    'text-slate-500': c.customer_type === 'walk_in',
-                                                }"
-                                            >
-                                                {{ customerTypeLabel(c.customer_type) }}
-                                            </span>
-                                        </p>
-                                    </div>
-                                    <div class="flex items-center gap-2 shrink-0">
-                                        <span v-if="c.has_outstanding"
-                                            class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 border border-amber-200"
-                                        >
-                                            Owes {{ naira(Number(c.outstanding) || 0) }}
-                                        </span>
-                                        <i class="bi bi-chevron-right text-sm text-slate-300" />
-                                    </div>
-                                </button>
+                                    Walk-in Customer
+                                </span>
+                            </option>
+                            <option v-for="c in customersList" :key="c.id" :value="c.id">
+                                {{ c.name }} {{ c.phone ? `(${c.phone})` : '' }} {{ c.email ? `· ${c.email}` : '' }}
+                            </option>
+                        </select>
+                        <button
+                            type="button"
+                            class="absolute right-0 top-0 h-full w-10 flex items-center justify-center rounded-r-xl border-l border-slate-200 text-slate-400 hover:bg-[#0D1527] hover:text-white hover:border-[#0D1527] transition-colors"
+                            @click="openCustomerModal('new')"
+                            title="Create new customer"
+                        >
+                            <i class="bi bi-plus-circle text-lg" />
+                        </button>
                     </div>
-
-                    <div v-if="modalSuccess" class="mt-2 flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] font-medium text-amber-800">
-                        <i class="bi bi-check-circle-fill" />
-                        <span>{{ modalSuccess }}</span>
-                    </div>
-            </transition>
-                        </div>
-                    </div>
+                    <div v-if="form.errors.customer_id" class="mt-1 text-xs text-red-600">{{ form.errors.customer_id }}</div>
                 </div>
 
                 <!-- Cart Summary Badge -->

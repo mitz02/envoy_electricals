@@ -62,7 +62,9 @@ class CustomQuotationController extends Controller
             'job_description' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.item' => ['required', 'string', 'max:255'],
+            'items.*.description' => ['nullable', 'string'],
             'items.*.quantity' => ['required', 'numeric', 'min:1'],
+            'items.*.unit' => ['nullable', 'string', 'max:50'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
         ]);
 
@@ -93,9 +95,9 @@ class CustomQuotationController extends Controller
                 CustomQuotationItem::create([
                     'custom_quotation_id' => $quotation->id,
                     'item' => $item['item'],
-                    'description' => $item['description'],
+                    'description' => $item['description'] ?? null,
                     'quantity' => $item['quantity'],
-                    'unit' => $item['unit'],
+                    'unit' => $item['unit'] ?? null,
                     'unit_price' => $item['unit_price'],
                     'total' => $total,
                     'sort_order' => $index,
@@ -142,7 +144,9 @@ class CustomQuotationController extends Controller
             'job_description' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.item' => ['required', 'string', 'max:255'],
+            'items.*.description' => ['nullable', 'string'],
             'items.*.quantity' => ['required', 'numeric', 'min:1'],
+            'items.*.unit' => ['nullable', 'string', 'max:50'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
         ]);
 
@@ -163,9 +167,9 @@ class CustomQuotationController extends Controller
                 CustomQuotationItem::create([
                     'custom_quotation_id' => $customQuotation->id,
                     'item' => $item['item'],
-                    'description' => null,
+                    'description' => $item['description'] ?? null,
                     'quantity' => $item['quantity'],
-                    'unit' => 'pcs',
+                    'unit' => $item['unit'] ?? null,
                     'unit_price' => $item['unit_price'],
                     'total' => $total,
                     'sort_order' => $index,
