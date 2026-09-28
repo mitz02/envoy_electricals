@@ -239,11 +239,9 @@ class CustomQuotationController extends Controller
     {
         $customQuotation->load('items');
 
-        $pdf = Pdf::loadView('pdf.custom-quotation', [
+        return Inertia::render('Admin/CustomQuotations/Preview', [
             'quotation' => $customQuotation,
-        ])->setPaper('A4');
-
-        return $pdf->stream("Quotation-{$customQuotation->ref_id}.pdf");
+        ]);
     }
 
     public function convertToProject(CustomQuotation $customQuotation): RedirectResponse
