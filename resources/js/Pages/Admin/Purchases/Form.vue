@@ -348,15 +348,6 @@ function submit() {
                     </div>
                     <div v-if="form.errors.supplier_id" class="mt-1 text-xs text-red-600">{{ form.errors.supplier_id }}</div>
                 </div>
-
-                <div
-                    v-if="form.supplier_id"
-                    class="mt-2 flex items-center gap-1.5 rounded-lg border border-[#0D1527]/15 bg-[#0D1527]/[0.04] px-2.5 py-1.5 text-[11px] font-medium text-[#0D1527]"
-                >
-                    <i class="bi bi-building-check" />
-                    <span class="truncate">Supplier: {{ selectedSupplier?.name ?? `#${form.supplier_id}` }}</span>
-                    <span v-if="selectedSupplier?.phone" class="shrink-0 text-[#0D1527]/60">· {{ selectedSupplier.phone }}</span>
-                </div>
             </div>
         </div>
 
