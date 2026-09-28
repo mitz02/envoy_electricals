@@ -74,9 +74,6 @@ function selectCustomer(customer) {
     form.customer_id = customer.id;
     form.customer_name = '';
     form.customer_phone = '';
-    customerSearch.value = '';
-    showCustomerResults.value = false;
-    selectedCustomerResultIndex.value = -1;
     nextTick(() => searchInputRef.value?.focus());
 }
 
@@ -325,8 +322,6 @@ function selectExistingCustomer(customer) {
     form.customer_id = customer.id;
     form.customer_name = '';
     form.customer_phone = '';
-    customerSearch.value = '';
-    showCustomerResults.value = false;
     modalSuccess.value = `"${customer.name}" selected for this sale.`;
     showCustomerModal.value = false;
 }
