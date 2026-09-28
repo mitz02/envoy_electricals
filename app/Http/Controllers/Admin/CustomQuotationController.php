@@ -232,7 +232,10 @@ class CustomQuotationController extends Controller
             'quotation' => $customQuotation,
         ])->setPaper('A4');
 
-        return $pdf->download("Quotation-{$customQuotation->ref_id}.pdf");
+        return $pdf->download("Quotation-{$customQuotation->ref_id}.pdf")
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            ->header('Pragma', 'no-cache')
+            ->header('Expires', 'Sat, 01 Jan 2000 00:00:00 GMT');
     }
 
     public function previewPdf(CustomQuotation $customQuotation)
@@ -241,6 +244,10 @@ class CustomQuotationController extends Controller
 
         return Inertia::render('Admin/CustomQuotations/Preview', [
             'quotation' => $customQuotation,
+        ])->withHeaders([
+            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+            'Pragma' => 'no-cache',
+            'Expires' => 'Sat, 01 Jan 2000 00:00:00 GMT',
         ]);
     }
 
