@@ -44,34 +44,13 @@
         }
 
         .logo {
-            width: 140px;
-            height: 140px;
+            width: 280px;
+            height: 280px;
             object-fit: contain;
         }
 
-        .company-details h1 {
-            font-size: 22px;
-            font-weight: 900;
-            color: #0d1527;
-            letter-spacing: 0.05em;
-            text-transform: uppercase;
-            margin-bottom: 4px;
-        }
-
-        .company-details .tagline {
-            font-size: 10px;
-            color: #facc15;
-            font-weight: 700;
-            letter-spacing: 0.15em;
-            text-transform: uppercase;
-            margin-bottom: 8px;
-        }
-
-        .company-details p {
-            font-size: 10px;
-            color: #64748b;
-            line-height: 1.6;
-            margin: 2px 0;
+        .company-details {
+            display: none;
         }
 
         .invoice-title {
@@ -395,11 +374,7 @@
         <!-- Header -->
         <div class="header">
             <div class="company-info">
-                <img src="{{ asset('envoy_images/logo.png') }}" alt="Envoy Electricals" class="logo">
-                <div class="company-details">
-                    <h1>{{ $company['name'] }}</h1>
-                    <div class="tagline">Electrical & Solar Solutions</div>
-                </div>
+                <img src="{{ asset('envoy_images/logo.png') }}" alt="{{ $company['name'] }}" class="logo">
             </div>
 
             <div class="invoice-title">

@@ -1,6 +1,6 @@
 ﻿<script setup>
 import { ref } from 'vue';
-import { useForm } from '@inertiajs/vue3';
+import { useForm, router } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
 import PageHeader from '@/Components/PageHeader.vue';
@@ -31,6 +31,14 @@ const payForm = useForm({
 
 const paystack = ref({ busy: false, error: '' });
 
+const statusForm = useForm({ status: props.sale.status });
+
+const statusOptions = ['completed', 'pending', 'void'];
+
+function updateStatus() {
+    statusForm.post(route('admin.sales.status', props.sale.id), { preserveScroll: true });
+}
+
 function submitPay() {
     payForm.post('/admin/payments');
 }
@@ -58,6 +66,32 @@ async function payWithPaystack() {
             throw new Error(data.message || 'Could not generate a Paystack payment link.');
         }
         window.open(data.authorization_url, '_blank');
+    } catch (e) {
+        paystack.value.error = e.message;
+    } finally {
+        paystack.value.busy = false;
+    }
+}
+
+async function copyPaystackLink() {
+    paystack.value.busy = true;
+    paystack.value.error = '';
+    try {
+        const res = await fetch('/admin/payments/paystack', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-XSRF-TOKEN': xsrfToken(),
+            },
+            body: JSON.stringify({ document_type: 'sale', document_id: props.sale.id }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            throw new Error(data.message || 'Could not generate a Paystack payment link.');
+        }
+        await navigator.clipboard.writeText(data.authorization_url);
+        paystack.value.error = '✅ Payment link copied to clipboard!';
     } catch (e) {
         paystack.value.error = e.message;
     } finally {
@@ -134,14 +168,7 @@ function statusBadge(status) {
                     <!-- Company + Invoice header -->
                     <div class="relative flex flex-wrap items-start justify-between gap-6 px-6 py-7 sm:px-9">
                         <div class="flex items-start gap-3">
-                            <img src="/envoy_images/logo.png" alt="Envoy Electricals" class="h-14 w-14 shrink-0 object-contain" />
-                            <div>
-                                <p class="text-lg font-black uppercase tracking-tight text-[#0D1527]">Envoy Electricals Ltd</p>
-                                <p class="mt-1 text-xs leading-relaxed text-slate-500">
-                                    12, Industrial Avenue, Ikeja,<br />
-                                    Lagos, Nigeria.
-                                </p>
-                            </div>
+                            <img src="/envoy_images/logo.png" alt="{{ sale.company?.name ?? 'Envoy Electricals' }}" class="h-28 w-28 shrink-0 object-contain" />
                         </div>
                         <div class="text-right">
                             <p class="text-3xl font-black uppercase tracking-[0.2em] text-[#0D1527]">Invoice</p>
@@ -257,7 +284,7 @@ function statusBadge(status) {
                         <p class="text-[11px] text-slate-400">Printed {{ formatDateTime(new Date()) }}</p>
                     </div>
 
-                    <div class="relative mt-5 flex gap-2 px-6 pb-6 print:hidden sm:px-9">
+                    <div class="relative mt-5 flex flex-wrap gap-2 px-6 pb-6 print:hidden sm:px-9">
                         <a
                             :href="route('admin.sales.invoice', sale.id)"
                             target="_blank"
@@ -273,6 +300,17 @@ function statusBadge(status) {
                             <i class="bi bi-printer text-base"></i>
                             Print Invoice
                         </button>
+
+                        <div v-if="has('sales.edit')" class="flex items-center gap-2">
+                            <label class="text-xs font-semibold text-slate-500">Status</label>
+                            <select v-model="statusForm.status" :disabled="statusForm.processing" class="rounded-lg border-slate-300 px-3 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20">
+                                <option v-for="s in statusOptions" :key="s" :value="s" :disabled="sale.status === 'void' && s !== 'void'">{{ s.charAt(0).toUpperCase() + s.slice(1) }}</option>
+                            </select>
+                            <button :disabled="statusForm.processing || statusForm.status === sale.status" @click="updateStatus" class="rounded-lg bg-[#0D1527] px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50">
+                                {{ statusForm.processing ? 'Updating…' : 'Update' }}
+                            </button>
+                        </div>
+
                         <button
                             v-if="has('sales.void') && sale.status === 'completed'"
                             class="rounded-xl bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 transition hover:bg-red-100"
@@ -334,14 +372,25 @@ function statusBadge(status) {
                     </div>
 
                     <div v-if="has('payments.record') && Number(sale.balance) > 0 && sale.status === 'completed'" class="space-y-2">
-                        <button
-                            class="flex w-full items-center justify-center gap-2 rounded-lg bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-100 disabled:opacity-50"
-                            :disabled="paystack.busy"
-                            @click="payWithPaystack"
-                        >
-                            <svg v-if="paystack.busy" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
-                            Open Paystack Payment Link
-                        </button>
+                        <div class="flex gap-2">
+                            <button
+                                class="flex-1 items-center justify-center gap-2 rounded-lg bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+                                :disabled="paystack.busy"
+                                @click="payWithPaystack"
+                            >
+                                <svg v-if="paystack.busy" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                                Open Paystack Payment Link
+                            </button>
+                            <button
+                                class="items-center justify-center gap-2 rounded-lg bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-50"
+                                :disabled="paystack.busy"
+                                @click="copyPaystackLink"
+                                title="Copy payment link to clipboard"
+                            >
+                                <svg v-if="paystack.busy" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                        </div>
 
                         <button
                             v-if="sale.customer?.email"

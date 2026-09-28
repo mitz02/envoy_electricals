@@ -23,7 +23,7 @@ return new class extends Migration
             $table->decimal('amount_paid', 14, 2)->default(0);
             $table->decimal('balance', 14, 2)->default(0);
             $table->string('payment_method')->nullable();
-            $table->enum('status', ['completed', 'void'])->default('completed');
+            $table->enum('status', ['completed', 'void', 'pending'])->default('pending');
             $table->text('remarks')->nullable();
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->string('void_reason')->nullable();

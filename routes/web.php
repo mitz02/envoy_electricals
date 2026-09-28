@@ -197,6 +197,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::resource('sales', SaleController::class)->only(['index', 'create', 'store', 'show']);
     Route::post('sales/{sale}/void', [SaleController::class, 'destroy'])->middleware('permission:sales.void')->name('sales.void');
     Route::get('sales/{sale}/invoice', [SaleController::class, 'downloadInvoice'])->middleware('permission:sales.view')->name('sales.invoice');
+    Route::post('sales/{sale}/status', [SaleController::class, 'updateStatus'])->middleware('permission:sales.edit')->name('sales.status');
 
     Route::resource('purchases', PurchaseController::class)->only(['index', 'create', 'store', 'show']);
     Route::post('purchases/{purchase}/void', [PurchaseController::class, 'destroy'])->middleware('permission:purchases.void')->name('purchases.void');

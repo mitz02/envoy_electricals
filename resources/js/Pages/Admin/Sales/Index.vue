@@ -1,5 +1,5 @@
 <script setup>
-import { useForm, Link } from '@inertiajs/vue3';
+import { useForm, Link, router } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
 import PageHeader from '@/Components/PageHeader.vue';
@@ -101,9 +101,18 @@ function applyFilters() {
                                     {{ s.status }}
                                 </span>
                             </td>
+                            <td class="px-4 py-3 text-right">
+                                <Link
+                                    :href="`/admin/sales/${s.id}`"
+                                    class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-[#0D1527] transition"
+                                    title="View Sale"
+                                >
+                                    <i class="bi bi-eye text-base"></i>
+                                </Link>
+                            </td>
                         </tr>
                         <tr v-if="!sales.data.length">
-                            <td colspan="7" class="px-4 py-12 text-center text-sm text-slate-400">
+                            <td colspan="8" class="px-4 py-12 text-center text-sm text-slate-400">
                                 No sales found. Create your first sale.
                             </td>
                         </tr>

@@ -194,6 +194,23 @@ class SaleController extends Controller
     }
 
     /**
+     * Update sale status.
+     */
+    public function updateStatus(Request $request, Sale $sale): RedirectResponse
+    {
+        $data = $request->validate([
+            'status' => ['required', 'in:completed,void,pending'],
+        ]);
+
+        $previousStatus = $sale->status;
+        $sale->update(['status' => $data['status']]);
+
+        AuditLogger::log('updated', 'sale', $sale->id, "Status changed from {$previousStatus} to {$data['status']} for {$sale->invoice_no}");
+
+        return back()->with('success', "Status updated to {$sale->status}.");
+    }
+
+    /**
      * Download invoice as PDF.
      */
     public function downloadInvoice(Sale $sale, InvoicePdfService $pdf): BinaryFileResponse
