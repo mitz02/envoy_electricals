@@ -27,11 +27,6 @@ watch(
     },
 );
 
-const supplierSearch = ref('');
-const showSupplierResults = ref(false);
-const selectedSupplierResultIndex = ref(-1);
-const supplierSearchInputRef = ref(null);
-
 const search = ref('');
 const items = ref([]);
 const discount = ref(0);
@@ -57,94 +52,22 @@ function stockPill(qty) {
     return badgeClass(cls);
 }
 
-/* ---------- Supplier Autocomplete ---------- */
-
-const filteredSuppliers = computed(() => {
-    const q = supplierSearch.value.trim().toLowerCase();
-    if (!q) return [];
-    return suppliersList.value.filter(
-        (s) =>
-            s.name.toLowerCase().includes(q) ||
-            (s.phone ?? '').toLowerCase().includes(q),
-    ).slice(0, 8);
-});
-
-const selectedSupplier = computed(() => {
-    if (!form.supplier_id) return null;
-    return suppliersList.value.find((s) => s.id === Number(form.supplier_id)) ?? null;
-});
-
-// The field always displays the selection, falling back to whatever is being typed.
-const supplierDisplayValue = computed(() => {
-    if (supplierSearch.value) return supplierSearch.value;
-    return selectedSupplier.value?.name ?? '';
-});
-
-function resetSupplierSelection() {
+function clearSupplier() {
     form.supplier_id = '';
     form.supplier_name = '';
     form.supplier_phone = '';
 }
 
-function onSupplierInput(event) {
-    supplierSearch.value = event.target.value;
-
-    if (event.target.value.trim() && form.supplier_id) {
-        resetSupplierSelection();
-    }
-}
-
-function selectSupplier(supplier) {
-    form.supplier_id = supplier.id;
-    form.supplier_name = '';
-    form.supplier_phone = '';
-    supplierSearch.value = '';
-    showSupplierResults.value = false;
-    selectedSupplierResultIndex.value = -1;
-    nextTick(() => searchInputRef.value?.focus());
-}
-
-function clearSupplier() {
-    resetSupplierSelection();
-    supplierSearch.value = '';
-    showSupplierResults.value = false;
-    selectedSupplierResultIndex.value = -1;
-    nextTick(() => supplierSearchInputRef.value?.focus());
-}
-
-function handleSupplierSearchKeydown(e) {
-    const results = filteredSuppliers.value;
-    if (!results.length && e.key !== 'Enter') return;
-
-    if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        selectedSupplierResultIndex.value = Math.min(selectedSupplierResultIndex.value + 1, results.length - 1);
-    } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        selectedSupplierResultIndex.value = Math.max(selectedSupplierResultIndex.value - 1, 0);
-    } else if (e.key === 'Enter') {
-        e.preventDefault();
-        if (selectedSupplierResultIndex.value >= 0 && results[selectedSupplierResultIndex.value]) {
-            selectSupplier(results[selectedSupplierResultIndex.value]);
-        } else if (supplierSearch.value.trim()) {
-            openNewSupplierModal();
-        } else if (!form.supplier_id) {
-            // Allow empty (walk-in supplier)
+function onSupplierChange() {
+    if (form.supplier_id) {
+        const supplier = suppliersList.value.find(s => s.id == form.supplier_id);
+        if (supplier) {
+            form.supplier_name = supplier.name;
+            form.supplier_phone = supplier.phone || '';
         }
-    } else if (e.key === 'Escape') {
-        showSupplierResults.value = false;
-        selectedSupplierResultIndex.value = -1;
+    } else {
+        clearSupplier();
     }
-}
-
-watch(supplierSearch, (val) => {
-    showSupplierResults.value = val.trim().length > 0;
-    selectedSupplierResultIndex.value = -1;
-});
-
-function openNewSupplierModal() {
-    openSupplierModal();
-    supplierForm.value.name = supplierSearch.value.trim();
 }
 
 /* ---------- Product search (POS style) ---------- */
@@ -312,7 +235,7 @@ async function createSupplier() {
     supplierValidationErrors.value = {};
 
     try {
-        const { data } = await axios.post('/admin/suppliers/quick', {
+        const response = await axios.post('/admin/suppliers/quick', {
             name: supplierForm.value.name,
             phone: supplierForm.value.phone,
             email: supplierForm.value.email,
@@ -320,16 +243,22 @@ async function createSupplier() {
             contact_person: supplierForm.value.contact_person,
         });
 
-        const supplier = data.supplier;
+        const supplier = response.data.supplier;
+        if (!supplier) {
+            throw new Error('No supplier returned from server');
+        }
         suppliersList.value.push(supplier);
-        selectSupplier(supplier);
+        form.supplier_id = supplier.id;
+        form.supplier_name = supplier.name;
+        form.supplier_phone = supplier.phone || '';
         modalSuccess.value = `"${supplier.name}" created & selected for this purchase.`;
         showSupplierModal.value = false;
     } catch (e) {
+        console.error('Create supplier error:', e);
         if (e.response?.data?.errors) {
             supplierValidationErrors.value = e.response.data.errors;
         } else {
-            supplierModalError.value = e.response?.data?.message || 'Could not save supplier. Please try again.';
+            supplierModalError.value = e.response?.data?.message || e.message || 'Could not save supplier. Please try again.';
         }
     } finally {
         supplierSaving.value = false;
@@ -378,129 +307,52 @@ function submit() {
         <!-- ============ TOP BAR: Supplier ============ -->
         <div class="rounded-2xl border border-slate-200/80 bg-white shadow-xs p-4">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <!-- Supplier Autocomplete -->
+                <!-- Supplier Select -->
                 <div class="flex-1 min-w-0">
                     <label class="mb-1.5 block text-xs font-medium text-slate-600">Supplier</label>
-                    <div class="relative" @click.outside="showSupplierResults = false">
-                        <div class="relative">
-                            <i class="bi bi-building absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400" />
-                            <input
-                                ref="supplierSearchInputRef"
-                                :value="supplierDisplayValue"
-                                type="search"
-                                placeholder="Type supplier name, phone… or leave blank for new"
-                                class="w-full rounded-xl border-slate-300 py-2.5 pl-10 pr-10 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20"
-                                :class="{ 'border-[#0D1527]/40 bg-[#0D1527]/[0.03] font-medium text-[#0D1527]': form.supplier_id }"
-                                @input="onSupplierInput"
-                                @keydown="handleSupplierSearchKeydown"
-                                @focus="showSupplierResults = true"
-                                autocomplete="off"
-                            />
-                            <button
-                                v-if="supplierSearch"
-                                type="button"
-                                class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
-                                title="Clear search"
-                                @click="supplierSearch = ''; showSupplierResults = false"
-                            >
-                                <i class="bi bi-x-lg text-xs" />
-                            </button>
-                            <button
-                                v-if="!supplierSearch && !form.supplier_id"
-                                type="button"
-                                class="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500 hover:text-emerald-700"
-                                title="No supplier selected"
-                            >
-                                <i class="bi bi-dash-circle text-base" />
-                            </button>
-                            <button
-                                v-if="!supplierSearch && form.supplier_id"
-                                type="button"
-                                class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-600"
-                                @click="clearSupplier"
-                                title="Clear supplier"
-                            >
-                                <i class="bi bi-x-circle text-base" />
-                            </button>
-                        </div>
-
-                        <!-- Dropdown Results -->
-                        <transition enter-active-class="transition duration-100" leave-active-class="transition duration-75">
-                            <div
-                                v-if="showSupplierResults"
-                                class="absolute z-20 top-full left-0 right-0 mt-1.5 rounded-xl border border-slate-200 bg-white shadow-lg max-h-80 overflow-y-auto"
-                            >
-                                <button
-                                    v-for="(s, idx) in filteredSuppliers"
-                                    :key="s.id"
-                                    type="button"
-                                    class="w-full flex items-center gap-3 px-3 py-2.5 text-left transition hover:bg-slate-50"
-                                    :class="{ 'bg-[#0D1527]/5': idx === selectedSupplierResultIndex }"
-                                    @click="selectSupplier(s)"
-                                    @mouseenter="selectedSupplierResultIndex = idx"
-                                >
-                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#0D1527]/5 text-xs font-bold text-[#0D1527]">
-                                        {{ s.name.charAt(0).toUpperCase() }}
+                    <div class="relative">
+                        <select
+                            v-model="form.supplier_id"
+                            class="w-full rounded-xl border-slate-300 py-2.5 pl-4 pr-12 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 bg-white appearance-none"
+                            style="appearance: none; -webkit-appearance: none; -moz-appearance: none; background-image: none;"
+                            @change="onSupplierChange"
+                        >
+                            <option value="">
+                                <span class="flex items-center gap-2">
+                                    <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-xs font-bold text-emerald-600">
+                                        <i class="bi bi-building" />
                                     </span>
-                                    <div class="min-w-0 flex-1">
-                                        <p class="truncate font-medium text-slate-900">{{ s.name }}</p>
-                                        <p class="text-xs text-slate-400">
-                                            <span v-if="s.phone">{{ s.phone }}</span>
-                                            <span v-else class="text-slate-400">No phone</span>
-                                        </p>
-                                    </div>
-                                    <i class="bi bi-chevron-right text-sm text-slate-300 shrink-0" />
-                                </button>
-
-                                <!-- Create New Option -->
-                                <div v-if="supplierSearch.trim() && !filteredSuppliers.length" class="px-3 py-2.5 border-t border-slate-100">
-                                    <button
-                                        type="button"
-                                        class="w-full flex items-center justify-center gap-2 rounded-lg bg-[#0D1527] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#0D1527]/90"
-                                        @click="openNewSupplierModal"
-                                    >
-                                        <i class="bi bi-plus-circle" />
-                                        Add "<span class="font-medium">{{ supplierSearch }}</span>" as new supplier
-                                    </button>
-                                </div>
-
-                                <div v-else-if="supplierSearch.trim() && filteredSuppliers.length" class="px-3 py-2 border-t border-slate-100">
-                                    <button
-                                        type="button"
-                                        class="w-full flex items-center justify-center gap-2 rounded-lg border border-dashed border-[#0D1527]/30 px-3 py-2 text-sm font-semibold text-[#0D1527] transition hover:border-[#0D1527] hover:bg-[#0D1527] hover:text-white"
-                                        @click="openSupplierModal"
-                                    >
-                                        <i class="bi bi-building-plus" />
-                                        Create with details (phone, email, address)
-                                    </button>
-                                </div>
-
-                                <div v-if="!supplierSearch && !form.supplier_id" class="px-3 py-3 text-center text-xs text-slate-400">
-                                    <i class="bi bi-dash-circle text-slate-400 mr-1" />
-                                    No supplier selected — type to search or create new
-                                </div>
-
-                                <div v-if="!supplierSearch && form.supplier_id" class="px-3 py-3 text-center text-xs text-slate-400">
-                                    <i class="bi bi-building-check text-[#0D1527] mr-1" />
-                                    {{ selectedSupplier?.name }} selected — clear to remove
-                                </div>
-                            </div>
-                        </transition>
+                                    No supplier selected
+                                </span>
+                            </option>
+                            <option v-for="s in suppliersList" :key="s.id" :value="s.id">
+                                {{ s.name }} {{ s.phone ? `(${s.phone})` : '' }}
+                            </option>
+                        </select>
+                        <button
+                            type="button"
+                            class="absolute right-0 top-0 h-full w-10 flex items-center justify-center rounded-r-xl border-l border-slate-200 text-[#0D1527] hover:bg-[#0D1527] hover:text-white hover:border-[#0D1527] transition-colors"
+                            @click="openSupplierModal"
+                            title="Create new supplier"
+                        >
+                            <i class="bi bi-plus-lg text-xl" />
+                        </button>
                     </div>
+                    <div v-if="form.errors.supplier_id" class="mt-1 text-xs text-red-600">{{ form.errors.supplier_id }}</div>
+                </div>
 
-                    <div
-                        v-if="form.supplier_id"
-                        class="mt-2 flex items-center gap-1.5 rounded-lg border border-[#0D1527]/15 bg-[#0D1527]/[0.04] px-2.5 py-1.5 text-[11px] font-medium text-[#0D1527]"
-                    >
-                        <i class="bi bi-building-check" />
-                        <span class="truncate">Supplier: {{ selectedSupplier?.name ?? `#${form.supplier_id}` }}</span>
-                        <span v-if="selectedSupplier?.phone" class="shrink-0 text-[#0D1527]/60">· {{ selectedSupplier.phone }}</span>
-                    </div>
+                <div
+                    v-if="form.supplier_id"
+                    class="mt-2 flex items-center gap-1.5 rounded-lg border border-[#0D1527]/15 bg-[#0D1527]/[0.04] px-2.5 py-1.5 text-[11px] font-medium text-[#0D1527]"
+                >
+                    <i class="bi bi-building-check" />
+                    <span class="truncate">Supplier: {{ selectedSupplier?.name ?? `#${form.supplier_id}` }}</span>
+                    <span v-if="selectedSupplier?.phone" class="shrink-0 text-[#0D1527]/60">· {{ selectedSupplier.phone }}</span>
+                </div>
 
-                    <div v-if="modalSuccess" class="mt-2 flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] font-medium text-amber-800">
-                        <i class="bi bi-check-circle-fill" />
-                        <span>{{ modalSuccess }}</span>
-                    </div>
+                <div v-if="modalSuccess" class="mt-2 flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] font-medium text-amber-800">
+                    <i class="bi bi-check-circle-fill" />
+                    <span>{{ modalSuccess }}</span>
                 </div>
             </div>
         </div>
