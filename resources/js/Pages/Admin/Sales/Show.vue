@@ -259,7 +259,7 @@ function statusBadge(status) {
 
                     <div class="relative mt-5 flex gap-2 px-6 pb-6 print:hidden sm:px-9">
                         <a
-                            :href="route('sales.invoice', sale.id)"
+                            :href="route('admin.sales.invoice', sale.id)"
                             target="_blank"
                             class="inline-flex items-center gap-2 rounded-xl bg-[#0D1527] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800"
                         >
