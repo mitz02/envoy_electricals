@@ -81,10 +81,11 @@ function updateEstimatedPrice() {
                             <p v-if="form.errors.customer_phone" class="mt-1 text-xs text-red-600">{{ form.errors.customer_phone }}</p>
                         </div>
                         <div>
-                            <label class="mb-1.5 block text-xs font-medium text-slate-600">Email</label>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-600">Email *</label>
                             <input
                                 v-model="form.customer_email"
                                 type="email"
+                                required
                                 class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
                             />
                             <p v-if="form.errors.customer_email" class="mt-1 text-xs text-red-600">{{ form.errors.customer_email }}</p>
@@ -118,9 +119,9 @@ function updateEstimatedPrice() {
                             <option
                                 v-for="pkg in packages"
                                 :key="pkg.id"
-                                :value="pkg.id"
+                                :value="String(pkg.id)"
                             >
-                                {{ pkg.name }} — {{ naira(pkg.package_price) }} (Installation: {{ naira(pkg.installation_cost) }})
+                                {{ pkg.name }} — {{ naira(pkg.package_price) }} (Installation: {{ naira(pkg.installation_cost) }})<template v-if="!pkg.is_visible_online"> — hidden online</template><template v-if="pkg.availability === 'unavailable'"> — unavailable</template>
                             </option>
                         </select>
                         <p v-if="form.errors.solar_package_id" class="mt-1 text-xs text-red-600">{{ form.errors.solar_package_id }}</p>

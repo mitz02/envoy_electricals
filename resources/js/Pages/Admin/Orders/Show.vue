@@ -1,5 +1,6 @@
 <script setup>
-import { Link, router } from '@inertiajs/vue3';
+import { ref } from 'vue';
+import { Link, router, useForm } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
 import PageHeader from '@/Components/PageHeader.vue';
@@ -17,6 +18,14 @@ const pendingConfirmations = props.order.payments
     ? props.order.payments.filter((p) => p.status === 'pending' && p.gateway === 'local')
     : [];
 
+const showAddPaymentModal = ref(false);
+const paymentForm = useForm({
+    amount: '',
+    payment_method: 'cash',
+    payment_date: new Date().toISOString().split('T')[0],
+    remarks: '',
+});
+
 function confirmPayment(payment) {
     if (!confirm(`Confirm bank-transfer payment ${payment.ref_id} of ${naira(payment.amount, 2)}?`)) return;
     router.post(`/admin/orders/${props.order.id}/pay/${payment.id}`, {}, { preserveScroll: true });
@@ -25,6 +34,43 @@ function confirmPayment(payment) {
 function deliver() {
     if (!confirm(`Mark order ${props.order.ref_id} as delivered?`)) return;
     router.post(`/admin/orders/${props.order.id}/deliver`, {}, { preserveScroll: true });
+}
+
+function undoDeliver() {
+    if (!confirm(`Undo fulfillment for order ${props.order.ref_id}? This will restore stock.`)) return;
+    router.post(`/admin/orders/${props.order.id}/undo-deliver`, {}, { preserveScroll: true });
+}
+
+function cancelOrder() {
+    const refundAmount = prompt(`Cancel order ${props.order.ref_id}?\n\nEnter refund amount (leave empty for no refund):`);
+    if (refundAmount === null) return;
+    
+    const refundReason = prompt('Enter refund reason (optional):') || 'Order cancelled by admin';
+    
+    router.post(`/admin/orders/${props.order.id}/cancel`, {
+        refund_amount: refundAmount || null,
+        refund_reason: refundReason,
+    }, { preserveScroll: true });
+}
+
+function markProcessing() {
+    if (!confirm(`Mark order ${props.order.ref_id} as processing?`)) return;
+    router.post(`/admin/orders/${props.order.id}/process`, {}, { preserveScroll: true });
+}
+
+function openAddPaymentModal() {
+    paymentForm.amount = props.balance > 0 ? props.balance : '';
+    showAddPaymentModal.value = true;
+}
+
+function submitAddPayment() {
+    paymentForm.post(`/admin/orders/${props.order.id}/payments`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            showAddPaymentModal.value = false;
+            paymentForm.reset();
+        },
+    });
 }
 
 const statusBadge = {
@@ -54,13 +100,50 @@ const statusBadge = {
             <Link href="/admin/orders" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                 Back
             </Link>
+            
             <button
-                v-if="['paid', 'processing'].includes(order.status)"
+                v-if="['paid', 'processing'].includes(order.status) && order.fulfillment !== 'delivered'"
                 type="button"
                 class="rounded-lg bg-[#0D1527] px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
                 @click="deliver"
             >
                 Mark Delivered
+            </button>
+            
+            <button
+                v-if="order.fulfillment === 'delivered'"
+                type="button"
+                class="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700"
+                @click="undoDeliver"
+            >
+                Undo Delivery
+            </button>
+            
+            <button
+                v-if="['pending', 'paid', 'processing'].includes(order.status)"
+                type="button"
+                class="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
+                @click="markProcessing"
+            >
+                Mark Processing
+            </button>
+            
+            <button
+                v-if="!['cancelled', 'refunded'].includes(order.status)"
+                type="button"
+                class="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700"
+                @click="cancelOrder"
+            >
+                Cancel Order
+            </button>
+            
+            <button
+                v-if="['pending', 'paid', 'processing'].includes(order.status) && balance > 0"
+                type="button"
+                class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                @click="openAddPaymentModal"
+            >
+                Add Payment
             </button>
         </div>
     </div>
@@ -153,4 +236,86 @@ const statusBadge = {
             </div>
         </div>
     </div>
+
+    <!-- Add Payment Modal -->
+    <Transition name="fade">
+        <div v-if="showAddPaymentModal" class="fixed inset-0 z-50 overflow-y-auto" @click.self="showAddPaymentModal = false">
+            <div class="flex min-h-full items-center justify-center p-4">
+                <div class="fixed inset-0 bg-black/50" />
+                <div class="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+                    <h2 class="text-lg font-semibold text-[#0D1527]">Record Payment</h2>
+                    <p class="mt-1 text-sm text-slate-500">Order: {{ order.ref_id }} — Balance: {{ naira(balance, 2) }}</p>
+
+                    <form @submit.prevent="submitAddPayment" class="mt-4 space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Amount *</label>
+                            <input
+                                v-model="paymentForm.amount"
+                                type="number"
+                                step="0.01"
+                                min="0.01"
+                                :max="balance"
+                                class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#40e0d0] focus:ring-2 focus:ring-[#40e0d0]/20"
+                                required
+                            />
+                            <p v-if="paymentForm.errors.amount" class="mt-1 text-sm text-red-600">{{ paymentForm.errors.amount }}</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Payment Method *</label>
+                            <select
+                                v-model="paymentForm.payment_method"
+                                class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#40e0d0] focus:ring-2 focus:ring-[#40e0d0]/20"
+                                required
+                            >
+                                <option value="cash">Cash</option>
+                                <option value="bank_transfer">Bank Transfer</option>
+                                <option value="card">Card (POS)</option>
+                                <option value="pos">POS</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Payment Date *</label>
+                            <input
+                                v-model="paymentForm.payment_date"
+                                type="date"
+                                class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#40e0d0] focus:ring-2 focus:ring-[#40e0d0]/20"
+                                required
+                            />
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Remarks</label>
+                            <textarea
+                                v-model="paymentForm.remarks"
+                                rows="2"
+                                class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#40e0d0] focus:ring-2 focus:ring-[#40e0d0]/20"
+                                placeholder="Optional notes..."
+                            ></textarea>
+                        </div>
+
+                        <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                            <button
+                                type="button"
+                                @click="showAddPaymentModal = false"
+                                class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                :disabled="paymentForm.processing"
+                                class="rounded-lg bg-[#40e0d0] px-4 py-2 text-sm font-bold text-[#0D1527] hover:bg-[#35cab9] disabled:opacity-50"
+                            >
+                                <span v-if="paymentForm.processing">Recording...</span>
+                                <span v-else>Record Payment</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </Transition>
 </template>

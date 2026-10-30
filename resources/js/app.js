@@ -7,6 +7,7 @@ import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createApp, h } from 'vue';
 import { ZiggyVue } from '../../vendor/tightenco/ziggy';
 import PageLoader from './Components/PageLoader.vue';
+import FlashMessages from './Components/FlashMessages.vue';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
@@ -23,6 +24,7 @@ createInertiaApp({
         })
             .use(plugin)
             .use(ZiggyVue)
+            .component('FlashMessages', FlashMessages)
             .mount(el);
     },
 });

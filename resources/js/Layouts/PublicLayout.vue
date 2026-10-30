@@ -1,14 +1,15 @@
 <script setup>
 import { ref, computed } from 'vue';
-import { Link, router } from '@inertiajs/vue3';
+import { Link, usePage, router } from '@inertiajs/vue3';
 import { cartCount } from '../lib/cart';
 import SiteFooter from '../Components/SiteFooter.vue';
 
 const isMobileMenuOpen = ref(false);
 const isScrolled = ref(false);
 
-const whatsappNumber = '2348097089259';
-const whatsapp = computed(() => whatsappNumber.replace(/\D/g, ''));
+const page = usePage();
+const whatsappNumber = computed(() => page.props.settings?.website?.['website.whatsapp'] || '2348097089259');
+const whatsapp = computed(() => whatsappNumber.value.replace(/\D/g, ''));
 const whatsappUrl = computed(() => `https://wa.me/${whatsapp.value}`);
 
 const navLinks = [

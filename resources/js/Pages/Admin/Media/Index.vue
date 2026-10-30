@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue';
-import { useForm, Link } from '@inertiajs/vue3';
+import { useForm, router, Link } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
 import PageHeader from '@/Components/PageHeader.vue';
@@ -20,7 +20,8 @@ const form = useForm({
     category: props.filters.category ?? '',
 });
 
-const uploadForm = useForm({ file: null, category: '' });
+const uploadForm = useForm({ category: '' });
+const uploadFile = ref(null);
 const fileInput = ref(null);
 const editingMedia = ref(null);
 const detailForm = useForm({ name: '', caption: '', alt: '', category: '' });
@@ -33,12 +34,16 @@ function applyFilters() {
 }
 
 function onFileChange(e) {
-    uploadForm.file = e.target.files[0] || null;
-    if (uploadForm.file) {
-        uploadForm.post('/admin/media', {
+    uploadFile.value = e.target.files[0] || null;
+    if (uploadFile.value) {
+        uploadForm.transform((data) => ({
+            ...data,
+            file: uploadFile.value,
+        })).post('/admin/media', {
             preserveScroll: true,
             onSuccess: () => {
                 uploadForm.reset();
+                uploadFile.value = null;
                 if (fileInput.value) fileInput.value.value = '';
             },
         });
@@ -68,7 +73,7 @@ function remove(m) {
     if (!confirm(`Remove "${m.name}" from the media library?`)) {
         return;
     }
-    uploadForm.delete(`/admin/media/${m.id}`, { preserveScroll: true });
+    router.delete(`/admin/media/${m.id}`, { preserveScroll: true });
 }
 
 function mediaUrl(m) {

@@ -84,27 +84,37 @@ class HandleInertiaRequests extends Middleware
             'solarPackages' => fn () => SolarPackage::where('is_visible_online', true)
                 ->where('availability', 'available')
                 ->with('items')
-                ->get(['id', 'ref_id', 'name', 'description', 'package_price', 'installation_cost', 'estimated_load_capacity', 'inverter_capacity', 'warranty', 'availability']),
+                ->get(['id', 'ref_id', 'name', 'description', 'package_price', 'installation_cost', 'estimated_load_capacity', 'inverter_capacity', 'custom_inverter_capacity', 'panel_count', 'panel_wattage', 'warranty', 'availability']),
         ];
     }
 
     protected function settings(): array
     {
         if (! Schema::hasTable('settings')) {
-            return ['business' => [], 'bank' => [], 'currency' => '₦', 'tax_rate' => 0, 'calculator' => []];
+            return ['business' => [], 'bank' => [], 'currency' => '₦', 'tax_rate' => 0, 'calculator' => [], 'website' => []];
         }
 
+        $business = Setting::where('group', 'business')->pluck('value', 'key');
+        $bank = Setting::where('group', 'bank')->pluck('value', 'key');
+        $website = Setting::where('group', 'website')->pluck('value', 'key');
+
         return [
-            'business' => cache()->remember('settings.business', 3600, function () {
-                return Setting::where('group', 'business')->pluck('value', 'key');
-            }),
-            'bank' => cache()->remember('settings.bank', 3600, function () {
-                return Setting::where('group', 'bank')->pluck('value', 'key');
-            }),
+            'business' => [
+                'name' => $business['business.name'] ?? 'Envoy Electricals',
+                'email' => $business['business.email'] ?? 'hello@envoyelectric.com',
+                'phone' => $business['business.phone'] ?? '+234 809 708 9259',
+                'address' => $business['business.address'] ?? '',
+                'footer' => $business['business.footer'] ?? 'powering your world with innovative solutions',
+            ],
+            'bank' => [
+                'bank_name' => $bank['bank.bank_name'] ?? 'Wema Bank',
+                'account_name' => $bank['bank.account_name'] ?? 'Envoy Electricals',
+                'account_number' => $bank['bank.account_number'] ?? '0126278482',
+            ],
             'currency' => Setting::where('key', 'currency.symbol')->value('value') ?? '₦',
             'tax_rate' => (float) (Setting::where('key', 'tax.rate')->value('value') ?? 0),
-            // Calculator settings: NO CACHE - must reflect admin changes immediately
             'calculator' => Setting::where('group', 'calculator')->pluck('value', 'key'),
+            'website' => $website,
         ];
     }
 }

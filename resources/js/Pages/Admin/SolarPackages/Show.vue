@@ -31,9 +31,13 @@ function toggleVisible() {
             name: props.package.name,
             description: props.package.description ?? '',
             package_price: props.package.package_price,
-            installation_cost: props.package.installation_cost ?? 0,
             estimated_load_capacity: props.package.estimated_load_capacity ?? '',
             inverter_capacity: props.package.inverter_capacity ?? '',
+            custom_inverter_capacity: props.package.custom_inverter_capacity ?? '',
+            battery_capacity: props.package.battery_capacity ?? '',
+            custom_battery_capacity: props.package.custom_battery_capacity ?? '',
+            panel_count: props.package.panel_count ?? '',
+            panel_wattage: props.package.panel_wattage ?? '',
             warranty: props.package.warranty ?? '',
             is_featured: props.package.is_featured ? 1 : 0,
             availability: props.package.availability,
@@ -43,7 +47,6 @@ function toggleVisible() {
                 name: i.name,
                 quantity: i.quantity,
                 specification: i.specification ?? '',
-                unit_cost: i.unit_cost,
             })),
         },
         { preserveScroll: true }
@@ -74,7 +77,7 @@ const availabilityBadge = {
                 <p><strong>2. Calculator:</strong> Customer uses website calculator → system recommends this package based on load.</p>
                 <p><strong>3. POS/Sales:</strong> Staff creates sale → adds this package as a line item.</p>
                 <p><strong>4. Visibility:</strong> "Visible online" = shows on website. "Featured" = highlighted on homepage/packages page.</p>
-                <p><strong>Margin:</strong> Package price − Component costs = Gross margin. Target: ≥ 25%.</p>
+                <p><strong>Pricing:</strong> All-inclusive package price covers all equipment, listed components, and standard installation.</p>
             </div>
         </div>
     </div>
@@ -107,13 +110,13 @@ const availabilityBadge = {
 
             <div class="my-5 space-y-2 text-sm">
                 <div class="flex justify-between rounded-lg bg-emerald-50 p-3"><span class="text-emerald-600">Package price</span><span class="font-bold text-emerald-700">{{ naira(package.package_price) }}</span></div>
-                <div class="flex justify-between rounded-lg bg-slate-50 p-3"><span class="text-slate-500">Installation</span><span class="font-bold text-slate-900">{{ naira(package.installation_cost) }}</span></div>
-                <div class="flex justify-between rounded-lg bg-slate-50 p-3"><span class="text-slate-500">Total investment</span><span class="font-bold text-slate-900">{{ naira(Number(package.package_price) + Number(package.installation_cost || 0)) }}</span></div>
             </div>
 
             <dl class="space-y-2 text-sm">
                 <div class="flex justify-between"><dt class="text-slate-500">Inverter capacity</dt><dd class="font-medium text-slate-900">{{ package.inverter_capacity || '—' }}</dd></div>
+                <div class="flex justify-between"><dt class="text-slate-500">Battery capacity</dt><dd class="font-medium text-slate-900">{{ package.battery_capacity || package.custom_battery_capacity || '—' }}</dd></div>
                 <div class="flex justify-between"><dt class="text-slate-500">Load capacity</dt><dd class="font-medium text-slate-900">{{ package.estimated_load_capacity || '—' }}</dd></div>
+                <div class="flex justify-between"><dt class="text-slate-500">Panels</dt><dd class="font-medium text-slate-900">{{ package.panel_count ? `${package.panel_count}× ${package.panel_wattage || 'panel'}` : '—' }}</dd></div>
                 <div class="flex justify-between"><dt class="text-slate-500">Warranty</dt><dd class="font-medium text-slate-900">{{ package.warranty || '—' }}</dd></div>
             </dl>
 
@@ -151,8 +154,6 @@ const availabilityBadge = {
                             <th class="pb-2 pr-2">Item</th>
                             <th class="pb-2 px-2">Specification</th>
                             <th class="pb-2 px-2 text-right">Qty</th>
-                            <th class="pb-2 px-2 text-right">Unit Cost</th>
-                            <th class="pb-2 pl-2 text-right">Line Total</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -163,11 +164,9 @@ const availabilityBadge = {
                             </td>
                             <td class="py-2.5 px-2 text-slate-600">{{ item.specification || '—' }}</td>
                             <td class="py-2.5 px-2 text-right text-slate-600">{{ item.quantity }}</td>
-                            <td class="py-2.5 px-2 text-right text-slate-600">{{ naira(item.unit_cost) }}</td>
-                            <td class="py-2.5 pl-2 text-right font-semibold text-slate-900">{{ naira(Number(item.quantity) * Number(item.unit_cost)) }}</td>
                         </tr>
                         <tr v-if="!package.items.length">
-                            <td colspan="5" class="py-8 text-center text-sm text-slate-400">No components on this package yet.</td>
+                            <td colspan="3" class="py-8 text-center text-sm text-slate-400">No components on this package yet.</td>
                         </tr>
                     </tbody>
                 </table>

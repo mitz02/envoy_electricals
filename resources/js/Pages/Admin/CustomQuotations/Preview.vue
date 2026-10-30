@@ -108,10 +108,6 @@
                             <span class="text-sm font-semibold text-slate-600">Subtotal</span>
                             <span class="font-bold text-slate-900">{{ naira(subtotal) }}</span>
                         </div>
-                        <div v-if="quotation.discount > 0" class="flex items-center justify-between rounded-xl border border-red-200 bg-red-50 p-4">
-                            <span class="text-sm font-semibold text-red-700">Discount</span>
-                            <span class="font-bold text-red-600">- {{ naira(quotation.discount) }}</span>
-                        </div>
                         <div v-if="quotation.tax > 0" class="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-4">
                             <span class="text-sm font-semibold text-slate-600">Tax / VAT</span>
                             <span class="font-bold text-slate-900">+ {{ naira(quotation.tax) }}</span>
@@ -148,7 +144,7 @@
 
                 <!-- Footer for print -->
                 <div class="print:mt-10 mt-8 text-center text-xs text-slate-400 px-6 pb-6 sm:px-9">
-                    <p><strong>{{ businessName }}</strong> | Powering your world with innovative solutions</p>
+                    <p><strong>{{ businessName }}</strong> | {{ businessFooter }}</p>
                     <p>{{ businessEmail }} | {{ businessPhone }}</p>
                 </div>
             </div>
@@ -221,10 +217,11 @@ const businessName = computed(() => pageProps.settings?.business?.name ?? 'Envoy
 const businessEmail = computed(() => pageProps.settings?.business?.email ?? 'envoyelectricals@gmail.com');
 const businessPhone = computed(() => pageProps.settings?.business?.phone ?? '+234 809 708 9259');
 const businessAddress = computed(() => pageProps.settings?.business?.address ?? 'Shop 1, Peace Avenue Junction, Futa Southgate Rd, Akure');
+const businessFooter = computed(() => pageProps.settings?.business?.footer ?? 'powering your world with innovative solutions');
 
-const bankName = 'Wema Bank';
-const bankAccountName = 'Envoy Electricals';
-const bankAccountNumber = '0126278482';
+const bankName = computed(() => pageProps.settings?.bank?.bank_name ?? 'Wema Bank');
+const bankAccountName = computed(() => pageProps.settings?.bank?.account_name ?? 'Envoy Electricals');
+const bankAccountNumber = computed(() => pageProps.settings?.bank?.account_number ?? '0126278482');
 
 function printInvoice() {
     window.print();

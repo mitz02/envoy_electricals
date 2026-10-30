@@ -25,9 +25,7 @@ function parsePrice(value) {
 const packageUrl = computed(() => `${origin}/packages/${props.package.id}`);
 
 const packagePrice = computed(() => {
-    const price = parsePrice(props.package.package_price);
-    const installation = parsePrice(props.package.installation_cost);
-    return price + installation;
+    return parsePrice(props.package.package_price);
 });
 
 const firstImage = computed(() => props.images[0]?.media?.path ?? null);
@@ -149,7 +147,7 @@ function processPayment() {
     </Head>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         <nav class="flex items-center gap-2 text-xs font-semibold text-slate-500 mb-6">
-            <Link href="/packages" class="hover:text-amber-600">Solar Packages</Link>
+            <Link href="/packages" class="hover:text-[#60d4f7]">Solar Packages</Link>
             <span>/</span>
             <span class="text-slate-800 truncate">{{ package.name }}</span>
         </nav>
@@ -191,13 +189,17 @@ function processPayment() {
             <div>
                 <div class="flex items-center gap-3">
                     <h1 class="text-2xl sm:text-4xl font-extrabold text-slate-950 tracking-tight">{{ package.name }}</h1>
-                    <span v-if="package.is_featured" class="rounded-full bg-amber-400 px-3 py-1 text-[10px] font-black uppercase text-slate-950">Popular</span>
+                    <span v-if="package.is_featured" class="rounded-full bg-[#60d4f7] px-3 py-1 text-[10px] font-black uppercase text-slate-950">Popular</span>
                 </div>
                 <p class="mt-3 text-slate-600 leading-relaxed">{{ package.description }}</p>
 
                 <div class="mt-5 flex flex-wrap gap-2">
                     <span v-if="package.estimated_load_capacity" class="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">Load: {{ package.estimated_load_capacity }}W</span>
                     <span v-if="package.inverter_capacity" class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">{{ package.inverter_capacity }} inverter</span>
+                    <span v-if="package.battery_capacity" class="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">{{ package.battery_capacity }} battery</span>
+                    <span v-if="package.custom_battery_capacity" class="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">{{ package.custom_battery_capacity }} battery</span>
+                    <span v-if="package.panel_count" class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">{{ package.panel_count }} panels</span>
+                    <span v-if="package.panel_wattage" class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">{{ package.panel_wattage }}</span>
                     <span v-if="package.warranty" class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">{{ package.warranty }} warranty</span>
                 </div>
 
@@ -205,29 +207,22 @@ function processPayment() {
                     <p class="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-3">What's included</p>
                     <ul class="space-y-2.5">
                         <li v-for="item in package.items" :key="item.id" class="flex items-start gap-2 text-sm text-slate-600">
-                            <i class="bi bi-check2 text-emerald-500 mt-0.5"></i>
+                            <i class="bi bi-check2 text-[#60d4f7] mt-0.5"></i>
                             <span>{{ item.quantity }}× {{ item.name }}<span v-if="item.specification" class="text-slate-400"> — {{ item.specification }}</span></span>
                         </li>
                         <li v-if="!package.items?.length" class="text-sm text-slate-400">Components configured on request.</li>
                     </ul>
                 </div>
 
-                <div class="mt-6 flex items-end justify-between bg-[#0D1527] rounded-2xl p-6">
+                <div class="mt-6 flex flex-wrap items-center justify-between gap-4 bg-[#0D1527] rounded-2xl p-6">
                     <div>
-                        <p class="text-[11px] font-bold uppercase tracking-widest text-slate-400">Package price</p>
+                        <p class="text-[11px] font-bold uppercase tracking-widest text-slate-400">Total Package Price</p>
                         <p class="text-3xl font-extrabold text-white">{{ naira(package.package_price) }}</p>
                     </div>
-                    <div v-if="package.installation_cost > 0" class="text-right">
-                        <p class="text-[11px] font-bold uppercase tracking-widest text-slate-400">Installation</p>
-                        <p class="text-sm font-bold text-amber-400">{{ naira(package.installation_cost) }}</p>
-                    </div>
-                </div>
-
-                <!-- Total Amount -->
-                <div class="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
-                    <div class="flex items-center justify-between">
-                        <span class="font-bold text-slate-900">Total (Package + Installation)</span>
-                        <span class="text-2xl font-extrabold text-amber-600">{{ naira(totalAmount) }}</span>
+                    <div class="text-right">
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-3 py-1.5 text-xs font-bold text-emerald-400 border border-emerald-500/30">
+                            <i class="bi bi-check-circle-fill"></i> Equipment & Installation Included
+                        </span>
                     </div>
                 </div>
 
@@ -272,7 +267,7 @@ function processPayment() {
                         <button
                             @click="handlePaystackPayment"
                             :disabled="isProcessing"
-                            class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-amber-400 px-6 py-4 text-sm font-bold text-slate-950 hover:bg-amber-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-amber-400/30"
+                            class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#60d4f7] px-6 py-4 text-sm font-bold text-slate-950 hover:bg-[#60d4f7]/80 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-[#60d4f7]/30"
                         >
                             <i v-if="isProcessing" class="bi bi-arrow-clockwise animate-spin"></i>
                             <i v-else class="bi bi-credit-card"></i>

@@ -5,7 +5,7 @@ namespace App\Services;
 use App\Models\Sale;
 use App\Models\Setting;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Illuminate\Http\Response;
 
 /**
  * Generates PDF invoices for sales.
@@ -39,7 +39,7 @@ class InvoicePdfService
     /**
      * Generate and download the PDF.
      */
-    public function download(Sale $sale): BinaryFileResponse
+    public function download(Sale $sale): Response
     {
         $sale->load(['items.product', 'customer', 'salesperson', 'store']);
 

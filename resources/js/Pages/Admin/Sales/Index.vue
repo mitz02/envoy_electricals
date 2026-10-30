@@ -67,8 +67,10 @@ function applyFilters() {
                             <th class="px-4 py-3 text-left font-semibold text-slate-600">Date</th>
                             <th class="px-4 py-3 text-left font-semibold text-slate-600">Customer</th>
                             <th class="px-4 py-3 text-right font-semibold text-slate-600">Total</th>
+                            <th class="px-4 py-3 text-right font-semibold text-slate-600">Discount</th>
                             <th class="px-4 py-3 text-right font-semibold text-slate-600">Paid</th>
                             <th class="px-4 py-3 text-right font-semibold text-slate-600">Balance</th>
+                            <th class="px-4 py-3 text-center font-semibold text-slate-600">Status</th>
                             <th class="px-4 py-3 text-right font-semibold text-slate-600">Action</th>
                         </tr>
                     </thead>
@@ -92,11 +94,14 @@ function applyFilters() {
                                 </span>
                             </td>
                             <td class="px-4 py-3 text-right font-semibold text-slate-900">{{ naira(s.total) }}</td>
+                            <td class="px-4 py-3 text-right text-xs" :class="Number(s.discount) > 0 ? 'text-red-600 font-semibold' : 'text-slate-400'">
+                                {{ Number(s.discount) > 0 ? '-' + naira(s.discount) : '—' }}
+                            </td>
                             <td class="px-4 py-3 text-right text-emerald-700">{{ naira(s.amount_paid) }}</td>
                             <td class="px-4 py-3 text-right" :class="s.balance > 0 ? 'text-amber-700 font-semibold' : 'text-slate-400'">
                                 {{ naira(s.balance) }}
                             </td>
-                            <td class="px-4 py-3 text-right">
+                            <td class="px-4 py-3 text-center">
                                 <span :class="badgeClass(s.status === 'completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-700')">
                                     {{ s.status }}
                                 </span>
@@ -112,7 +117,7 @@ function applyFilters() {
                             </td>
                         </tr>
                         <tr v-if="!sales.data.length">
-                            <td colspan="8" class="px-4 py-12 text-center text-sm text-slate-400">
+                            <td colspan="9" class="px-4 py-12 text-center text-sm text-slate-400">
                                 No sales found. Create your first sale.
                             </td>
                         </tr>

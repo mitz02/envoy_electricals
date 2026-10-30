@@ -2,7 +2,7 @@
 import { Link, useForm, Head } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
-import { cartItems, cartSubtotal } from '@/lib/cart';
+import { cartItems, cartSubtotal, clearCart } from '@/lib/cart';
 import { naira } from '@/lib/format';
 
 defineOptions({ layout: PublicLayout });
@@ -20,7 +20,17 @@ function submit() {
             ...data,
             items: cartItems.value.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
         }))
-        .post('/checkout');
+        .post('/checkout', {
+            // The order now exists, so the cart must not survive to be placed a
+            // second time. A rejected order redirects back with errors, which
+            // Inertia still reports as success, so gate on the error bag or the
+            // cart would be wiped exactly when the stock check fails.
+            onSuccess: () => {
+                if (Object.keys(form.errors).length === 0) {
+                    clearCart();
+                }
+            },
+        });
 }
 
 function imageUrl(item) {

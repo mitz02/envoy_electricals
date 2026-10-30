@@ -11,6 +11,7 @@ use App\Services\AuditLogger;
 use App\Services\ReferenceGenerator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -65,7 +66,7 @@ class SolarLeadController extends Controller
             'record' => $calculation,
             'type' => 'calculation',
             'statuses' => ['new', 'contacted', 'quoted', 'approved', 'installation', 'completed', 'lost'],
-            'packages' => SolarPackage::where('is_visible_online', true)->get(['id', 'name', 'package_price']),
+            'packages' => $this->quotationPackageOptions(),
         ]);
     }
 
@@ -88,6 +89,10 @@ class SolarLeadController extends Controller
             'additional_logistics' => ['nullable', 'numeric', 'min:0'],
         ]);
 
+        $package = isset($data['solar_package_id'])
+            ? SolarPackage::find($data['solar_package_id'])
+            : null;
+
         $quotation = Quotation::create([
             'ref_id' => ReferenceGenerator::generate('quotation'),
             'customer_id' => null,
@@ -96,12 +101,16 @@ class SolarLeadController extends Controller
             'customer_email' => $calculation->customer_email,
             'location' => $calculation->location,
             'appliances_json' => $calculation->appliances_json,
-            'recommended_system' => $calculation->recommended_inverter,
+            'recommended_system' => $package
+                ? ($package->custom_inverter_capacity ?: $package->inverter_capacity ?: $package->name)
+                : $calculation->recommended_inverter,
             'solar_package_id' => $data['solar_package_id'] ?? null,
-            'estimated_price' => $calculation->estimated_price,
+            'estimated_price' => $package
+                ? ((float) $package->package_price + (float) ($package->installation_cost ?? 0))
+                : $calculation->estimated_price,
             'additional_logistics' => $data['additional_logistics'] ?? 0,
             'status' => 'quoted',
-            'notes' => $data['notes'],
+            'notes' => $data['notes'] ?? null,
         ]);
 
         $calculation->update(['lead_status' => 'quoted']);
@@ -157,12 +166,8 @@ class SolarLeadController extends Controller
 
     public function createQuotationManual(): Response
     {
-        $packages = SolarPackage::where('is_visible_online', true)
-            ->where('availability', 'available')
-            ->get(['id', 'name', 'package_price', 'installation_cost', 'inverter_capacity', 'estimated_load_capacity']);
-
         return Inertia::render('Admin/SolarLeads/CreateQuotation', [
-            'packages' => $packages,
+            'packages' => $this->quotationPackageOptions(),
         ]);
     }
 
@@ -171,7 +176,7 @@ class SolarLeadController extends Controller
         $data = $request->validate([
             'customer_name' => ['required', 'string', 'max:255'],
             'customer_phone' => ['required', 'string', 'max:255'],
-            'customer_email' => ['nullable', 'email', 'max:255'],
+            'customer_email' => ['required', 'email', 'max:255'],
             'location' => ['nullable', 'string', 'max:255'],
             'solar_package_id' => ['required', 'exists:solar_packages,id'],
             'estimated_price' => ['nullable', 'numeric', 'min:0'],
@@ -179,7 +184,7 @@ class SolarLeadController extends Controller
             'additional_logistics' => ['nullable', 'numeric', 'min:0'],
         ]);
 
-        $package = SolarPackage::find($data['solar_package_id']);
+        $package = SolarPackage::findOrFail($data['solar_package_id']);
 
         $quotation = Quotation::create([
             'ref_id' => ReferenceGenerator::generate('quotation'),
@@ -187,13 +192,14 @@ class SolarLeadController extends Controller
             'customer_name' => $data['customer_name'],
             'customer_phone' => $data['customer_phone'],
             'customer_email' => $data['customer_email'],
-            'location' => $data['location'],
+            'location' => $data['location'] ?? null,
             'appliances_json' => null,
-            'recommended_system' => $package->inverter_capacity ?? 'Custom System',
+            'recommended_system' => $package->custom_inverter_capacity ?: $package->inverter_capacity ?: $package->name,
             'solar_package_id' => $data['solar_package_id'],
-            'estimated_price' => $data['estimated_price'] ?? ($package->package_price + $package->installation_cost),
+            'estimated_price' => $data['estimated_price'] ?? ((float) $package->package_price + (float) ($package->installation_cost ?? 0)),
+            'additional_logistics' => $data['additional_logistics'] ?? 0,
             'status' => 'quoted',
-            'notes' => $data['notes'],
+            'notes' => $data['notes'] ?? null,
         ]);
 
         AuditLogger::log('created', 'quotation', $quotation->id, "Created manual quotation {$quotation->ref_id} for {$data['customer_name']}");
@@ -204,14 +210,16 @@ class SolarLeadController extends Controller
 
     public function sendQuotation(Request $request, Quotation $quotation): RedirectResponse
     {
+        if (! $quotation->customer_email) {
+            return redirect()->back()->with('error', 'Customer email is required to send the quotation.');
+        }
+
         $quotation->load('solarPackage');
 
-        // Update status to quoted if not already
         if ($quotation->status !== 'quoted') {
             $quotation->update(['status' => 'quoted']);
         }
 
-        // Send email with quotation
         try {
             Mail::to($quotation->customer_email)->send(new QuotationMail($quotation));
             $quotation->update(['notes' => ($quotation->notes ?? '')."\n\n[Quotation sent via email on ".now()->format('Y-m-d H:i').']']);
@@ -227,5 +235,25 @@ class SolarLeadController extends Controller
 
             return redirect()->back()->with('error', 'Failed to send email: '.$e->getMessage());
         }
+    }
+
+    /**
+     * @return Collection<int, SolarPackage>
+     */
+    protected function quotationPackageOptions()
+    {
+        return SolarPackage::query()
+            ->orderBy('name')
+            ->get([
+                'id',
+                'name',
+                'package_price',
+                'installation_cost',
+                'inverter_capacity',
+                'custom_inverter_capacity',
+                'estimated_load_capacity',
+                'is_visible_online',
+                'availability',
+            ]);
     }
 }

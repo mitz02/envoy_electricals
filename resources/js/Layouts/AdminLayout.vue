@@ -54,6 +54,7 @@ const canShow = (perm) =>
 const sidebarMenu = [
     { type: 'link', label: 'Dashboard', href: '/admin', icon: 'bi-grid-1x2-fill', perm: 'dashboard.view' },
     { type: 'link', label: 'Sales', href: '/admin/sales', icon: 'bi-cart-check-fill', perm: 'sales.view' },
+    { type: 'link', label: 'Receipt', href: '/admin/receipts', icon: 'bi-receipt-cutoff', perm: 'sales.view' },
     { type: 'link', label: 'Customers', href: '/admin/customers', icon: 'bi-people-fill', perm: 'customers.manage' },
     { type: 'link', label: 'Purchases', href: '/admin/purchases', icon: 'bi-basket-fill', perm: 'purchases.view' },
     { type: 'link', label: 'Suppliers', href: '/admin/suppliers', icon: 'bi-buildings-fill', perm: ['suppliers.view', 'purchases.view'] },
@@ -84,6 +85,7 @@ const sidebarMenu = [
             { label: 'Overview', href: '/admin/marketing', perm: 'marketing.newsletter' },
             { label: 'Newsletters', href: '/admin/marketing/newsletters', perm: 'marketing.newsletter' },
             { label: 'Subscribers', href: '/admin/marketing/subscribers', perm: 'marketing.newsletter' },
+            { label: 'Testimonials', href: '/admin/marketing/testimonials', perm: 'marketing.testimonials' },
             { label: 'Feedback', href: '/admin/marketing/feedback', perm: 'feedback.manage' },
         ],
     },
@@ -161,16 +163,16 @@ function groupOpen(label) {
 
 function navLinkClass(href) {
     return isCurrentRoute(href)
-        ? 'bg-yellow-400/10 text-yellow-400 font-semibold'
+        ? 'bg-[#60d4f7]/10 text-[#60d4f7] font-semibold'
         : 'text-slate-300 hover:bg-white/10 hover:text-white font-medium';
 }
 
 function navSubClass(href) {
-    return isCurrentRoute(href) ? 'text-yellow-400 font-semibold' : 'text-slate-400 hover:text-white';
+    return isCurrentRoute(href) ? 'text-[#60d4f7] font-semibold' : 'text-slate-400 hover:text-white';
 }
 
 function dotClass(href) {
-    return isCurrentRoute(href) ? 'bg-yellow-400' : 'bg-slate-600';
+    return isCurrentRoute(href) ? 'bg-[#60d4f7]' : 'bg-slate-600';
 }
 
 let searchTimer = null;
@@ -440,7 +442,7 @@ onBeforeUnmount(() => {
                             class="relative flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm transition-all duration-150"
                             @click="showingSidebar = false"
                         >
-                            <span v-if="isCurrentRoute(entry.href)" class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-yellow-400" />
+                            <span v-if="isCurrentRoute(entry.href)" class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-[#60d4f7]" />
                             <i :class="`bi ${entry.icon} text-sm shrink-0`"></i>
                             <span class="truncate">{{ entry.label }}</span>
                         </Link>
@@ -517,7 +519,7 @@ onBeforeUnmount(() => {
             <div class="mt-4 rounded-2xl border border-white/10 bg-white/5 p-3 shrink-0">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2.5 min-w-0">
-                        <div class="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-yellow-400 text-xs font-bold text-[#0D1527] shadow-xs">
+                        <div class="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#60d4f7] text-xs font-bold text-[#0D1527] shadow-xs">
                             {{ (currentUser?.name || 'A').charAt(0).toUpperCase() }}
                             <span class="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-[#0D1527]" />
                         </div>
@@ -630,7 +632,7 @@ onBeforeUnmount(() => {
                             aria-label="Select store"
                             class="flex h-10 shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950 sm:px-3 sm:text-sm"
                         >
-                            <i class="bi bi-shop text-lg text-[#40e0d0] shrink-0"></i>
+                            <i class="bi bi-shop text-lg text-[#60d4f7] shrink-0"></i>
                             <span class="hidden max-w-[120px] truncate sm:inline xl:max-w-[160px]">
                                 {{ selectedStore ? selectedStore.name : 'All Stores' }}
                             </span>
@@ -654,11 +656,11 @@ onBeforeUnmount(() => {
                                 <button
                                     @click="selectAllStores"
                                     class="flex w-full items-center gap-3 px-3 py-2 text-sm transition-colors hover:bg-slate-50"
-                                    :class="!selectedStore ? 'bg-[#40e0d0]/10 text-[#40e0d0] font-semibold' : 'text-slate-700'"
+                                    :class="!selectedStore ? 'bg-[#60d4f7]/10 text-[#60d4f7] font-semibold' : 'text-slate-700'"
                                 >
                                     <i class="bi bi-grid-1x2-fill text-lg" />
                                     <span>All Stores</span>
-                                    <i v-if="!selectedStore" class="bi bi-check ml-auto text-[#40e0d0]" />
+                                    <i v-if="!selectedStore" class="bi bi-check ml-auto text-[#60d4f7]" />
                                 </button>
                                 <hr class="my-1 border-slate-100" />
                                 <button
@@ -666,12 +668,12 @@ onBeforeUnmount(() => {
                                     :key="store.id"
                                     @click="selectStore(store)"
                                     class="flex w-full items-center gap-3 px-3 py-2 text-sm transition-colors hover:bg-slate-50"
-                                    :class="selectedStore?.id === store.id ? 'bg-[#40e0d0]/10 text-[#40e0d0] font-semibold' : 'text-slate-700'"
+                                    :class="selectedStore?.id === store.id ? 'bg-[#60d4f7]/10 text-[#60d4f7] font-semibold' : 'text-slate-700'"
                                 >
                                     <i :class="store.is_active ? 'bi bi-shop-fill text-lg text-emerald-600' : 'bi bi-shop text-lg text-slate-400'" />
                                     <span class="truncate">{{ store.name }}</span>
                                     <span class="text-[10px] text-slate-400">{{ store.code }}</span>
-                                    <i v-if="selectedStore?.id === store.id" class="bi bi-check ml-auto text-[#40e0d0]" />
+                                    <i v-if="selectedStore?.id === store.id" class="bi bi-check ml-auto text-[#60d4f7]" />
                                 </button>
                             </div>
                         </transition>
@@ -683,7 +685,7 @@ onBeforeUnmount(() => {
                     <Link
                         v-if="has('sales.create')"
                         href="/admin/sales/create"
-                        class="hidden h-10 items-center gap-2 rounded-xl bg-[#0D1527] px-4 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-md xl:inline-flex"
+                        class="hidden h-10 items-center gap-2 rounded-xl bg-[#60d4f7] px-4 text-xs font-semibold text-slate-950 shadow-sm transition hover:-translate-y-0.5 hover:bg-[#60d4f7]/80 hover:shadow-md xl:inline-flex"
                     >
                         <i class="bi bi-plus-lg text-sm shrink-0"></i>
                         <span>New Sale / POS</span>
@@ -722,7 +724,7 @@ onBeforeUnmount(() => {
                                     <button
                                         v-if="unreadCount > 0"
                                         type="button"
-                                        class="text-xs font-medium text-[#40e0d0] hover:underline"
+                                        class="text-xs font-medium text-[#60d4f7] hover:underline"
                                         @click="markAllNotificationsRead"
                                     >
                                         Mark all read
@@ -756,7 +758,7 @@ onBeforeUnmount(() => {
                                 <div class="border-t border-slate-100 px-4 py-2.5">
                                     <Link
                                         href="/admin/notifications"
-                                        class="block text-center text-xs font-semibold text-[#0D1527] hover:text-[#40e0d0]"
+                                        class="block text-center text-xs font-semibold text-[#0D1527] hover:text-[#60d4f7]"
                                         @click="notificationsOpen = false"
                                     >
                                         View all notifications
@@ -800,6 +802,6 @@ onBeforeUnmount(() => {
 
 <style scoped>
 nav .bi {
-    color: #40e0d0;
+    color: #60d4f7;
 }
 </style>

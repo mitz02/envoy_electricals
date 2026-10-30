@@ -36,6 +36,7 @@ class ReferenceGenerator
         'training' => 'TRG',
         'enrollment' => 'ENR',
         'certificate' => 'CERT',
+        'receipt' => 'REC',
     ];
 
     public static function generate(string $type, ?string $year = null): string
@@ -68,6 +69,7 @@ class ReferenceGenerator
             'training' => 'trainings',
             'enrollment' => 'enrollments',
             'certificate' => 'certificates',
+            'receipt' => 'receipts',
             default => null,
         };
 
@@ -83,7 +85,7 @@ class ReferenceGenerator
         }
 
         // Products use a continuous no-year sequence (EV-PROD-000001, EV-PROD-000002, ...).
-        $yearly = in_array($type, ['sale', 'purchase', 'expense', 'project', 'payment', 'stock_movement', 'customer', 'supplier', 'staff', 'payroll', 'trainee', 'training', 'enrollment', 'certificate']);
+        $yearly = in_array($type, ['sale', 'purchase', 'expense', 'project', 'payment', 'stock_movement', 'customer', 'supplier', 'staff', 'payroll', 'trainee', 'training', 'enrollment', 'certificate', 'receipt']);
 
         if ($yearly && $table) {
             // Monotonic sequence: advance from the highest reference ever seen
@@ -105,9 +107,15 @@ class ReferenceGenerator
         }
 
         if ($type === 'product') {
-            $count = DB::table('products')->whereNull('deleted_at')->count();
+            $last = DB::table('products')->where('ref_id', 'like', 'EV-PROD-%')->max('ref_id');
 
-            return sprintf('EV-PROD-%06d', $count + 1);
+            $seq = 1;
+            if ($last) {
+                preg_match('/(\d+)$/', (string) $last, $m);
+                $seq = ((int) ($m[1] ?? 0)) + 1;
+            }
+
+            return sprintf('EV-PROD-%06d', $seq);
         }
 
         $count = DB::table($table ?? 'products')->count();

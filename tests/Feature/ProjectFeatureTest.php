@@ -343,4 +343,49 @@ class ProjectFeatureTest extends TestCase
         Storage::disk('public')->assertMissing($media->path);
         $this->assertDatabaseMissing('project_media', ['id' => $media->id]);
     }
+
+    public function test_custom_non_inventory_material_can_be_added_and_reflects_in_profit(): void
+    {
+        $owner = $this->owner();
+        $project = $this->project(500000, $owner->id);
+
+        $this->actingAs($owner)
+            ->post("/admin/projects/{$project->id}/materials", [
+                'name' => 'Conduit Pipes & Screws (Local Store)',
+                'quantity' => 10,
+                'unit_cost' => 2500,
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('project_materials', [
+            'project_id' => $project->id,
+            'product_id' => null,
+            'name' => 'Conduit Pipes & Screws (Local Store)',
+            'quantity' => 10,
+            'unit_cost' => 2500,
+            'total' => 25000,
+            'issued_to_inventory' => false,
+        ]);
+
+        $project->refresh();
+        $this->assertEquals(25000.0, (float) $project->material_cost);
+        $this->assertEquals(25000.0, (float) $project->project_cost);
+        $this->assertEquals(475000.0, (float) $project->gross_profit);
+    }
+
+    public function test_project_can_be_published_and_appears_on_storefront(): void
+    {
+        $owner = $this->owner();
+        $project = $this->project(500000, $owner->id);
+        $project->update(['published' => false]);
+
+        $this->actingAs($owner)
+            ->post("/admin/projects/{$project->id}/publish", ['published' => true])
+            ->assertRedirect();
+
+        $this->assertTrue((bool) $project->fresh()->published);
+
+        $response = $this->get('/projects');
+        $response->assertOk();
+    }
 }

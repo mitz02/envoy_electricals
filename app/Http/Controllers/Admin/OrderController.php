@@ -36,7 +36,20 @@ class OrderController extends Controller
         $totals = Order::query()
             ->selectRaw('count(*) as total_orders')
             ->selectRaw("COALESCE(SUM(CASE WHEN status != 'cancelled' THEN total ELSE 0 END), 0) as booking_value")
-            ->selectRaw("COALESCE(SUM(CASE WHEN status = 'paid' THEN total ELSE 0 END), 0) as collected")
+            // Sum real successful payments rather than inferring from status:
+            // a delivered order becomes 'completed', and assuming full payment
+            // over-reports part-paid orders. Cancelled/refunded orders are
+            // excluded because that money went back out.
+            ->selectSub(
+                Payment::query()
+                    ->selectRaw('COALESCE(SUM(payments.amount), 0)')
+                    ->join('orders', 'orders.id', '=', 'payments.document_id')
+                    ->where('payments.document_type', '=', 'order')
+                    ->where('payments.status', '=', Payment::STATUS_SUCCESS)
+                    ->whereNotIn('orders.status', ['cancelled', 'refunded'])
+                    ->whereNull('orders.deleted_at'),
+                'collected'
+            )
             ->first();
 
         return Inertia::render('Admin/Orders/Index', [
@@ -99,5 +112,97 @@ class OrderController extends Controller
         AuditLogger::log('updated', 'order', $order->id, "Order {$order->ref_id} fulfilled and stock deducted.");
 
         return back()->with('success', "Order {$order->ref_id} fulfilled and stock updated.");
+    }
+
+    /**
+     * Cancel an order. If paid, optionally issue a refund.
+     */
+    public function cancel(Request $request, Order $order): RedirectResponse
+    {
+        $request->validate([
+            'refund_amount' => ['nullable', 'numeric', 'min:0'],
+            'refund_reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        try {
+            $order = $this->orders->cancelOrder(
+                $order,
+                $request->user()->id,
+                $request->input('refund_amount'),
+                $request->input('refund_reason')
+            );
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors());
+        }
+
+        $message = $order->status === 'refunded'
+            ? "Order {$order->ref_id} cancelled and refunded."
+            : "Order {$order->ref_id} cancelled.";
+
+        AuditLogger::log('updated', 'order', $order->id, "Order {$order->ref_id} cancelled (status: {$order->status}).");
+
+        return back()->with('success', $message);
+    }
+
+    /**
+     * Mark an order as processing.
+     */
+    public function process(Request $request, Order $order): RedirectResponse
+    {
+        try {
+            $order = $this->orders->markProcessing($order);
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors());
+        }
+
+        AuditLogger::log('updated', 'order', $order->id, "Order {$order->ref_id} marked as processing.");
+
+        return back()->with('success', "Order {$order->ref_id} is now being processed.");
+    }
+
+    /**
+     * Record a manual payment for an order.
+     */
+    public function addPayment(Request $request, Order $order): RedirectResponse
+    {
+        $request->validate([
+            'amount' => ['required', 'numeric', 'min:0.01'],
+            'payment_method' => ['required', 'string', 'in:cash,bank_transfer,card,pos,other'],
+            'payment_date' => ['required', 'date'],
+            'remarks' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        try {
+            $payment = $this->orders->addPayment(
+                $order,
+                (float) $request->input('amount'),
+                $request->input('payment_method'),
+                $request->user()->id,
+                $request->input('remarks'),
+                $request->input('payment_date')
+            );
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors());
+        }
+
+        AuditLogger::log('recorded', 'payment', $payment->id, "Recorded manual payment ₦{$payment->amount} for order {$order->ref_id}.");
+
+        return back()->with('success', 'Payment of ₦'.number_format((float) $payment->amount, 2)." recorded for order {$order->ref_id}.");
+    }
+
+    /**
+     * Undo order fulfillment (restore stock).
+     */
+    public function undoDeliver(Request $request, Order $order): RedirectResponse
+    {
+        try {
+            $order = $this->orders->undoFulfillment($order, $request->user()->id);
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors());
+        }
+
+        AuditLogger::log('updated', 'order', $order->id, "Order {$order->ref_id} fulfillment undone, stock restored.");
+
+        return back()->with('success', "Order {$order->ref_id} fulfillment undone. Stock restored.");
     }
 }

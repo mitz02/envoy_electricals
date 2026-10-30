@@ -19,6 +19,7 @@ class WebsiteController extends Controller
             'business.email' => 'email',
             'business.phone' => 'text',
             'business.address' => 'textarea',
+            'business.footer' => 'text',
         ],
         'website' => [
             'website.announcement' => 'text',

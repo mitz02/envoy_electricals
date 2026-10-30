@@ -74,10 +74,7 @@ function sendQuotation() {
     const form = useForm({});
     form.post(`/admin/solar-leads/quotations/${props.record.id}/send`, {
         preserveScroll: true,
-        onSuccess: () => {
-            sendLoading.value = false;
-        },
-        onError: () => {
+        onFinish: () => {
             sendLoading.value = false;
         },
     });
@@ -276,9 +273,9 @@ const appliances = computed(() => {
                     <option
                         v-for="pkg in props.packages"
                         :key="pkg.id"
-                        :value="pkg.id"
+                        :value="String(pkg.id)"
                     >
-                        {{ pkg.name }} — {{ naira(pkg.package_price) }}
+                        {{ pkg.name }} — {{ naira(pkg.package_price) }}<template v-if="!pkg.is_visible_online"> — hidden online</template>
                     </option>
                 </select>
                 <p v-if="quotationForm.errors.solar_package_id" class="mt-1 text-xs text-red-600">{{ quotationForm.errors.solar_package_id }}</p>

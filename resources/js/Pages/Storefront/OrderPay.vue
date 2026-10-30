@@ -5,6 +5,7 @@ import axios from 'axios';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
 import { naira, badgeClass } from '@/lib/format';
+import { clearCart, restoreCart, hasCartItems } from '@/lib/cart';
 
 defineOptions({ layout: PublicLayout });
 
@@ -24,19 +25,31 @@ const props = defineProps({
 
 const page = usePage();
 
-const whatsapp = computed(() => (props.whatsappNumber || '2348097089259').replace(/\D/g, ''));
+const whatsappNumber = computed(() => page.props.settings?.website?.['website.whatsapp'] || '2348097089259');
+const whatsapp = computed(() => whatsappNumber.value.replace(/\D/g, ''));
 
 const paying = ref(false);
 const payloadError = ref('');
 const paystackError = ref('');
 const verifying = ref(false);
 const paymentSuccess = ref(false);
+const cartRestored = ref(false);
 
 const isPaid = computed(() => props.balance <= 0 || ['cancelled', 'refunded'].includes(props.order.status) || paymentSuccess.value);
 
 // Check for Paystack callback on page load
 onMounted(() => {
-    const reference = page.props.url.query.reference ?? page.props.url.query.trxref;
+    // Checkout cleared the cart when this order was placed, so a cancelled or
+    // refunded order would otherwise leave the customer with nothing. Put the
+    // items back, but never over a cart they have since rebuilt themselves.
+    if (['cancelled', 'refunded'].includes(props.order.status) && !hasCartItems()) {
+        cartRestored.value = restoreCart(props.order.items ?? []) > 0;
+    }
+
+    // Inertia v2 exposes `url` as a plain string on the page object; the query
+    // string is not a prop, so parse it from the URL instead of `page.props.url`.
+    const params = new URL(page.url, window.location.origin).searchParams;
+    const reference = params.get('reference') ?? params.get('trxref');
     if (reference) {
         verifyPayment(reference);
     }
@@ -51,8 +64,13 @@ async function verifyPayment(reference) {
         });
         if (data.success) {
             paymentSuccess.value = true;
-            // Refresh page data to show updated balance
-            window.location.reload();
+            // Payment is settled, so nothing is left to buy.
+            clearCart();
+            // Consume the callback params. Reloading the current URL would keep
+            // `?reference=` in place, so every subsequent load would re-verify
+            // and reload again. `replace` also keeps the back button from
+            // re-triggering verification.
+            window.location.replace(`/orders/${props.order.ref_id}/pay`);
         } else {
             paystackError.value = data.message ?? 'Payment verification failed.';
         }
@@ -204,6 +222,10 @@ const statusBadge = {
                         {{ order.status === 'cancelled' || order.status === 'refunded'
                             ? 'This order has been closed and can no longer be paid.'
                             : 'Your payment has been received. We will dispatch your order shortly.' }}
+                    </p>
+                    <p v-if="cartRestored" class="mt-2 text-sm text-emerald-700">
+                        We've put these items back in your cart so you can order again.
+                        <Link href="/cart" class="font-semibold underline">View cart</Link>
                     </p>
                 </div>
 

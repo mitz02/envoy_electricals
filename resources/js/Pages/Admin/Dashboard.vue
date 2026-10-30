@@ -9,7 +9,7 @@ import { useCan } from '@/composables/permissions';
 defineOptions({ layout: AdminLayout });
 
 const { has } = useCan();
-const canSeeFinancials = computed(() => has('reports.view'));
+const canSeeFinancials = computed(() => has('reports.profit'));
 
 const props = defineProps({
     period: { type: String, default: 'month' },
@@ -327,6 +327,10 @@ function getStatusBadge(status) {
                 <div class="mt-1.5 flex items-center justify-between text-[11px] text-slate-400">
                     <span>Today: {{ canSeeFinancials ? naira(stats.today_sales) : MASK_GLYPH }}</span>
                     <span class="font-medium text-slate-600">{{ stats.today_orders_count || 0 }} sales</span>
+                </div>
+                <div class="mt-1 flex items-center justify-between border-t border-slate-100 pt-1.5 text-[11px]">
+                    <span class="text-slate-400">Cash collected</span>
+                    <span class="font-semibold text-teal-700">{{ canSeeFinancials ? naira(stats.month_collected) : MASK_GLYPH }}</span>
                 </div>
             </div>
 

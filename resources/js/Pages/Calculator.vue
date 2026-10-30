@@ -1,4 +1,4 @@
-﻿<script setup>
+<script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
 import { Link, useForm, usePage, Head } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
@@ -7,26 +7,94 @@ defineOptions({ layout: PublicLayout });
 
 const origin = window.location.origin;
 
-const props = defineProps({});
-
 const page = usePage();
+
+// WhatsApp number from settings
+const whatsappNumber = computed(() => page.props.settings?.website?.['website.whatsapp'] || '2348097089259');
+const whatsapp = computed(() => whatsappNumber.value.replace(/\D/g, ''));
+const whatsappUrl = computed(() => `https://wa.me/${whatsapp.value}`);
 
 // Get calculator settings from shared props (set by admin)
 const calculatorSettings = computed(() => page.props.settings?.calculator || {});
 
-// Helper to parse JSON settings
-function parseJsonSetting(key, fallback = {}) {
+// Settings are stored as plain strings/JSON. Decode JSON-wrapped scalars too,
+// so values saved by older builds (quoted JSON strings) still work.
+function settingValue(key, fallback = null) {
     const val = calculatorSettings.value[`calculator.${key}`];
-    if (!val) return fallback;
+    if (val == null || val === '') {
+        return fallback;
+    }
+    if (typeof val !== 'string') {
+        return val;
+    }
+    const trimmed = val.trim();
+    if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+        try {
+            return JSON.parse(trimmed);
+        } catch {
+            return val;
+        }
+    }
+    return val;
+}
+
+function settingNumber(key, fallback) {
+    const value = Number(settingValue(key, fallback));
+    return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function parseJsonSetting(key, fallback = {}) {
+    const val = settingValue(key, null);
+    if (val == null || val === '') {
+        return fallback;
+    }
+    if (typeof val === 'object') {
+        return val;
+    }
     try {
-        return JSON.parse(val);
+        const parsed = JSON.parse(val);
+        return parsed == null ? fallback : parsed;
     } catch {
         return fallback;
     }
 }
 
+function settingListText(key, fallback) {
+    const val = settingValue(key, null);
+    if (val == null || val === '') {
+        return fallback;
+    }
+    if (Array.isArray(val)) {
+        return val.join(', ');
+    }
+    if (typeof val === 'object') {
+        return fallback;
+    }
+    return String(val);
+}
+
 function getPrice(prices, size, fallback = 0) {
-    return prices[String(size)] ?? fallback;
+    if (!prices || typeof prices !== 'object') {
+        return fallback;
+    }
+    const exact = prices[String(size)];
+    if (exact != null && exact !== '') {
+        return exact;
+    }
+    const numericSize = Number(size);
+    if (!Number.isFinite(numericSize)) {
+        return fallback;
+    }
+    const match = Object.entries(prices).find(([key]) => Number(key) === numericSize);
+    return match ? match[1] : fallback;
+}
+
+function parseKw(value) {
+    if (value == null || value === '') {
+        return 0;
+    }
+    const n = parseFloat(String(value).replace(/,/g, ''));
+    return Number.isFinite(n) ? n : 0;
 }
 
 // Check if user is admin (has admin permissions)
@@ -36,11 +104,13 @@ const isAdmin = computed(() => {
 });
 
 // System parameters - use admin settings as defaults, fallback to hardcoded values
-const panelWattage = ref(Number(calculatorSettings.value['calculator.panel_wattage']) || 620);
-const panelEfficiency = ref(Number(calculatorSettings.value['calculator.panel_efficiency']) || 0.8);
-const inverterSafetyFactor = ref(Number(calculatorSettings.value['calculator.inverter_safety_factor']) || 1.4);
-const inverterSizesText = ref(calculatorSettings.value['calculator.inverter_sizes'] || '1.5, 3, 5, 8, 10, 12');
-const batteryCapacitiesText = ref(calculatorSettings.value['calculator.battery_capacities'] || '1.2, 2.56, 5.12, 10.24, 16, 20, 25.6, 32');
+const panelWattage = ref(settingNumber('panel_wattage', 620));
+const panelEfficiency = ref(settingNumber('panel_efficiency', 0.8));
+const peakSunHours = ref(settingNumber('peak_sun_hours', 4.5));
+const batteryDepthOfDischarge = ref(settingNumber('battery_depth_of_discharge', 0.8));
+const inverterSafetyFactor = ref(settingNumber('inverter_safety_factor', 1.4));
+const inverterSizesText = ref(settingListText('inverter_sizes', '1.5, 3, 5, 8, 10, 12'));
+const batteryCapacitiesText = ref(settingListText('battery_capacities', '1.2, 2.56, 5.12, 10.24, 16, 20, 25.6, 32'));
 
 // Available inverter sizes (parsed from settings)
 const availableInverterSizes = computed(() =>
@@ -58,23 +128,18 @@ const availableBatteryCapacities = computed(() =>
         .filter((n) => Number.isFinite(n) && n > 0),
 );
 
-// Recommended battery capacity: smallest capacity that meets or exceeds required storage per battery
-// For now, use the first capacity as default, or select based on total storage needed
-const batteryCapacity = computed(() => {
-    const caps = availableBatteryCapacities.value;
-    if (!caps.length) return 5.12;
-    // Default to the smallest capacity (most granular)
-    return caps[0];
-});
-
 // Detailed pricing settings (JSON)
 const inverterPrices = computed(() => parseJsonSetting('inverter_prices', {}));
 const batteryPrices = computed(() => parseJsonSetting('battery_prices', {}));
 const installationCosts = computed(() => parseJsonSetting('installation_costs', {}));
 
 // Legacy pricing parameters (fallback)
-const pricePerPanel = ref(Number(calculatorSettings.value['calculator.price_per_panel']) || 185000);
-const pricePerKwhDaily = ref(Number(calculatorSettings.value['calculator.price_per_kwh_daily']) || 220000);
+const pricePerPanel = ref(settingNumber('price_per_panel', 185000));
+const pricePerKwhDaily = ref(settingNumber('price_per_kwh_daily', 220000));
+
+// Inverter losses are not included in the battery capacity, so account for them
+// when working out how much energy the battery bank must actually deliver.
+const batteryInverterEfficiency = 0.9;
 
 const applianceDefs = [
     { name: 'LED Bulbs', watts: 9 },
@@ -154,16 +219,21 @@ const totalDailyWh = computed(() => appliances.reduce((sum, a) => sum + rowDaily
 const totalDailyKwh = computed(() => totalDailyWh.value / 1000);
 
 // ---- Solar panel sizing ----
+// Formula: No of panels = total daily energy (Wh) / (panel size × efficiency × peak sun hours)
 const panelWattageValid = computed(() => num(panelWattage.value) > 0);
-const efficiencyValid = computed(() => {
-    const e = num(panelEfficiency.value);
-    return e > 0 && e <= 1;
-});
-const panelParamsValid = computed(() => panelWattageValid.value && efficiencyValid.value);
+const panelParamsValid = computed(
+    () =>
+        panelWattageValid.value &&
+        num(panelEfficiency.value) > 0 &&
+        num(peakSunHours.value) > 0,
+);
 
 const panelsRequired = computed(() =>
     panelParamsValid.value && totalDailyWh.value > 0
-        ? Math.ceil(totalDailyWh.value / (num(panelWattage.value) * num(panelEfficiency.value)))
+        ? Math.ceil(
+              totalDailyWh.value /
+                  (num(panelWattage.value) * num(panelEfficiency.value) * num(peakSunHours.value)),
+          )
         : 0,
 );
 const arrayCapacityKw = computed(() => (panelsRequired.value * num(panelWattage.value)) / 1000);
@@ -177,42 +247,55 @@ const inverterRequiredKw = computed(() => inverterRequiredW.value / 1000);
 const recommendedInverterKw = computed(() => {
     const need = inverterRequiredKw.value;
     if (!need) return 0;
-    const found = availableInverterSizes.value.filter((s) => s >= need).sort((a, b) => a - b)[0];
+    const sizes = availableInverterSizes.value;
+    const found = sizes.filter((s) => s >= need).sort((a, b) => a - b)[0];
     if (found) return found;
+    // Above the largest configured size: keep using that size and add more units
+    // so the price always matches a size the admin has configured.
+    if (sizes.length) return Math.max(...sizes);
     return Math.ceil(need / 5) * 5;
 });
 
 // ---- Battery sizing ----
-// Select battery capacity: find the smallest capacity that can cover daily consumption with a single battery,
-// otherwise use the largest capacity to minimize battery count
+// Usable energy per battery is limited by its depth of discharge, and the bank
+// must also cover inverter losses. Required bank energy = daily kWh / inverter efficiency.
+const usableBatteryFraction = computed(() => {
+    const dod = num(batteryDepthOfDischarge.value);
+    return dod > 0 && dod <= 1 ? dod : 0.8;
+});
+
+const requiredStorageKwh = computed(() =>
+    batteryInverterEfficiency > 0 ? totalDailyKwh.value / batteryInverterEfficiency : 0,
+);
+
 const recommendedBatteryCapacity = computed(() => {
-    const caps = availableBatteryCapacities.value;
+    const caps = [...availableBatteryCapacities.value].sort((a, b) => a - b);
     if (!caps.length) return 5.12;
-    const need = totalDailyKwh.value;
+    const need = requiredStorageKwh.value;
     if (!need) return caps[0];
-    // Find smallest capacity >= daily consumption (single battery covers it)
-    const singleBatteryFit = caps.filter((c) => c >= need).sort((a, b) => a - b)[0];
+    // Smallest capacity whose usable energy covers the whole daily need.
+    const singleBatteryFit = caps.find((c) => c * usableBatteryFraction.value >= need);
     if (singleBatteryFit) return singleBatteryFit;
-    // Otherwise use largest capacity to minimize count
-    return caps.reduce((max, c) => (c > max ? c : max), caps[0]);
+    // Otherwise use the largest capacity to minimise the number of batteries.
+    return caps[caps.length - 1];
 });
 
 const batteryValid = computed(() => num(recommendedBatteryCapacity.value) > 0);
 
-const batteriesRequired = computed(() =>
-    batteryValid.value && totalDailyKwh.value > 0
-        ? Math.ceil(totalDailyKwh.value / num(recommendedBatteryCapacity.value))
-        : 0,
-);
+const batteriesRequired = computed(() => {
+    const perBatteryKwh = num(recommendedBatteryCapacity.value) * usableBatteryFraction.value;
+    if (!batteryValid.value || totalDailyKwh.value <= 0 || perBatteryKwh <= 0) return 0;
+    return Math.ceil(requiredStorageKwh.value / perBatteryKwh);
+});
 const totalStorageKwh = computed(() => batteriesRequired.value * num(recommendedBatteryCapacity.value));
 
 // ---- Inverter Quantity Calculation ----
-// Calculate how many inverters of the recommended size are needed
+// If the load exceeds the largest configured inverter, use multiple units of that size.
 const inverterQuantity = computed(() => {
     const recommendedSize = recommendedInverterKw.value;
     const requiredKw = inverterRequiredKw.value;
-    if (!recommendedSize || !requiredKw) return 1;
-    return Math.ceil(requiredKw / recommendedSize);
+    if (!recommendedSize || !requiredKw) return 0;
+    return Math.max(1, Math.ceil(requiredKw / recommendedSize));
 });
 
 // ---- Pricing (New Detailed Calculation) ----
@@ -240,9 +323,17 @@ const installationCost = computed(() => {
     return Math.round(qty * num(cost));
 });
 
-// Final Estimate: Panel + Inverter + Battery + Installation
+const hasComponentPrices = computed(() => {
+    const inverterPrice = getPrice(inverterPrices.value, recommendedInverterKw.value, 0);
+    const batteryPrice = getPrice(batteryPrices.value, recommendedBatteryCapacity.value, 0);
+    return num(pricePerPanel.value) > 0 && num(inverterPrice) > 0 && num(batteryPrice) > 0;
+});
+
 const estimatedPrice = computed(() => {
-    return panelCost.value + inverterCost.value + batteryCost.value + installationCost.value;
+    if (hasComponentPrices.value) {
+        return panelCost.value + inverterCost.value + batteryCost.value + installationCost.value;
+    }
+    return Math.round(panelsRequired.value * num(pricePerPanel.value) + totalDailyKwh.value * num(pricePerKwhDaily.value));
 });
 
 // ---- Formatting ----
@@ -278,32 +369,36 @@ const matchedPackages = computed(() => {
             let score = 0;
             let matches = [];
             
-            // Check inverter capacity match
-            if (pkg.inverter_capacity && requiredInverterKw) {
-                const diff = Math.abs(pkg.inverter_capacity - requiredInverterKw);
+            const pkgInverterKw = parseKw(
+                pkg.inverter_capacity === 'custom' ? pkg.custom_inverter_capacity : pkg.inverter_capacity,
+            );
+            if (pkgInverterKw && requiredInverterKw) {
+                const diff = Math.abs(pkgInverterKw - requiredInverterKw);
                 if (diff <= 1) {
                     score += 30;
-                    matches.push(`Inverter: ${pkg.inverter_capacity}kW (need ~${requiredInverterKw}kW)`);
+                    matches.push(`Inverter: ${pkgInverterKw}kW (need ~${requiredInverterKw}kW)`);
                 } else if (diff <= 3) {
                     score += 15;
-                    matches.push(`Inverter: ${pkg.inverter_capacity}kW (close to ${requiredInverterKw}kW)`);
+                    matches.push(`Inverter: ${pkgInverterKw}kW (close to ${requiredInverterKw}kW)`);
                 }
             }
-            
-            // Check estimated load capacity match
-            if (pkg.estimated_load_capacity && totalLoadKw.value) {
-                const diff = Math.abs(pkg.estimated_load_capacity - totalLoadKw.value);
+
+            const pkgLoadKw = parseKw(pkg.estimated_load_capacity);
+            if (pkgLoadKw && totalLoadKw.value) {
+                const diff = Math.abs(pkgLoadKw - totalLoadKw.value);
                 if (diff <= 1) {
                     score += 25;
-                    matches.push(`Load: ${pkg.estimated_load_capacity}kW (need ~${totalLoadKw.value.toFixed(2)}kW)`);
+                    matches.push(`Load: ${pkgLoadKw}kW (need ~${totalLoadKw.value.toFixed(2)}kW)`);
                 } else if (diff <= 3) {
                     score += 10;
-                    matches.push(`Load: ${pkg.estimated_load_capacity}kW (close to ${totalLoadKw.value.toFixed(2)}kW)`);
+                    matches.push(`Load: ${pkgLoadKw}kW (close to ${totalLoadKw.value.toFixed(2)}kW)`);
                 }
             }
-            
-            // Check if package has panel items that match panel count
-            const panelItems = pkg.items?.filter(item => item.name.toLowerCase().includes('panel') || item.name.toLowerCase().includes('solar')) || [];
+
+            const panelItems = pkg.items?.filter((item) => {
+                const name = (item.name || '').toLowerCase();
+                return name.includes('panel') || name.includes('solar');
+            }) || [];
             const totalPanelQty = panelItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
             if (totalPanelQty > 0 && requiredPanels > 0) {
                 const diff = Math.abs(totalPanelQty - requiredPanels);
@@ -358,15 +453,13 @@ function submit() {
             total_connected_load: totalLoadW.value,
             daily_consumption_kwh: totalDailyKwh.value,
             peak_load_kw: totalLoadKw.value,
-            recommended_inverter: fmtKw(recommendedInverterKw.value),
+            recommended_inverter:
+                inverterQuantity.value > 1
+                    ? `${inverterQuantity.value} × ${fmtKw(recommendedInverterKw.value)}`
+                    : fmtKw(recommendedInverterKw.value),
             recommended_panels: panelsRequired.value,
             recommended_battery: `${batteriesRequired.value} × ${recommendedBatteryCapacity.value}kWh battery`,
             estimated_price: estimatedPrice.value,
-            recommended_products: {
-                panels: recommendedPanels.value.map(p => ({ id: p.id, name: p.name, sku: p.sku, price: p.selling_price })),
-                inverters: recommendedInverters.value.map(p => ({ id: p.id, name: p.name, sku: p.sku, price: p.selling_price })),
-                batteries: recommendedBatteries.value.map(p => ({ id: p.id, name: p.name, sku: p.sku, price: p.selling_price })),
-            },
             matched_packages: matchedPackages.value.map(p => ({
                 id: p.id,
                 ref_id: p.ref_id,
@@ -379,6 +472,9 @@ function submit() {
         }))
         .post('/calculator', {
             preserveScroll: true,
+            onSuccess: () => {
+                form.reset();
+            },
         });
 }
 
@@ -415,18 +511,18 @@ onMounted(() => {
     <!-- ============================ HERO ============================ -->
     <section class="relative overflow-hidden">
         <div class="absolute -top-20 -right-16 w-96 h-96 rounded-full bg-yellow-400/[0.10] blur-[120px] pointer-events-none"></div>
-        <div class="absolute -top-24 -left-16 w-80 h-80 rounded-full bg-[#40e0d0]/[0.08] blur-[120px] pointer-events-none"></div>
+        <div class="absolute -top-24 -left-16 w-80 h-80 rounded-full bg-[#60d4f7]/[0.08] blur-[120px] pointer-events-none"></div>
         <div class="absolute inset-0" style="background-image:radial-gradient(rgba(13,21,39,0.05) 1px, transparent 1px); background-size:26px 26px;" aria-hidden="true"></div>
 
         <div class="relative max-w-3xl mx-auto text-center pt-20 sm:pt-28 pb-14 px-6">
             <span class="inline-flex items-center gap-2.5 mb-6">
-                <span class="w-10 h-[2px] bg-[#40e0d0]"></span>
-                <span class="text-[#40e0d0] text-xs font-bold uppercase tracking-[0.3em]">Free Solar Load Calculator</span>
-                <span class="w-10 h-[2px] bg-[#40e0d0]"></span>
+                <span class="w-10 h-[2px] bg-[#60d4f7]"></span>
+                <span class="text-[#60d4f7] text-xs font-bold uppercase tracking-[0.3em]">Free Solar Load Calculator</span>
+                <span class="w-10 h-[2px] bg-[#60d4f7]"></span>
             </span>
             <h1 class="text-4xl sm:text-5xl lg:text-[56px] font-extrabold tracking-tight text-slate-950 leading-[1.08]">
                 Size Your
-                <span class="bg-gradient-to-r from-yellow-500 via-amber-400 to-amber-500 bg-clip-text text-transparent">Solar System</span>
+                <span class="bg-gradient-to-r from-yellow-500 via-amber-400 to-[#60d4f7] bg-clip-text text-transparent">Solar System</span>
             </h1>
             <p class="mt-5 text-slate-600 text-base sm:text-lg leading-relaxed max-w-xl mx-auto">
                 Add the appliances you run every day and we'll instantly size your solar panels, inverter and battery bank — accurate to the exact watt, every time.
@@ -440,7 +536,7 @@ onMounted(() => {
                 </div>
                 <div class="reveal bg-white rounded-2xl rounded-tr-none px-5 py-4 shadow-[0_2px_14px_rgba(0,0,0,0.06)] text-left min-w-[150px]" style="transition-delay: 60ms">
                     <p class="text-[10px] uppercase tracking-widest text-slate-400">Daily Energy</p>
-                    <p class="text-xl font-black text-[#40e0d0] mt-0.5">{{ totalDailyKwh.toFixed(2) }} <span class="text-xs font-bold text-slate-400">kWh/day</span></p>
+                    <p class="text-xl font-black text-[#60d4f7] mt-0.5">{{ totalDailyKwh.toFixed(2) }} <span class="text-xs font-bold text-slate-400">kWh/day</span></p>
                 </div>
                 <div class="reveal bg-white rounded-2xl rounded-tr-none px-5 py-4 shadow-[0_2px_14px_rgba(0,0,0,0.06)] text-left min-w-[150px]" style="transition-delay: 120ms">
                     <p class="text-[10px] uppercase tracking-widest text-slate-400">Panels Needed</p>
@@ -501,6 +597,7 @@ onMounted(() => {
                                                 type="text"
                                                 list="appliance-options"
                                                 placeholder="Select or type appliance…"
+                                                @change="selectDef(a, a.name)"
                                                 class="w-full min-w-[130px] rounded-lg rounded-tr-none border-[1.5px] border-[#d9d7d0] bg-[#fbfbf9] px-2.5 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:border-yellow-500 focus:ring-4 focus:ring-yellow-400/15 focus:bg-white transition-all"
                                             />
                                             <datalist id="appliance-options">
@@ -610,7 +707,7 @@ onMounted(() => {
                             </div>
                             <div class="rounded-2xl rounded-tr-none border border-white/10 bg-white/5 p-3.5">
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Daily Energy</p>
-                                <p class="mt-1 text-lg font-black text-[#40e0d0]">{{ totalDailyKwh.toFixed(2) }} <span class="text-xs font-bold text-slate-300">kWh</span></p>
+                                <p class="mt-1 text-lg font-black text-[#60d4f7]">{{ totalDailyKwh.toFixed(2) }} <span class="text-xs font-bold text-slate-300">kWh</span></p>
                             </div>
                             <div class="rounded-2xl rounded-tr-none border border-white/10 bg-white/5 p-3.5">
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Solar Panels</p>
@@ -624,10 +721,11 @@ onMounted(() => {
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Inverter Required</p>
                                 <p class="mt-1 text-lg font-black text-yellow-400">{{ inverterRequiredKw.toFixed(2) }} <span class="text-xs font-bold text-slate-300">kW</span></p>
                             </div>
-                            <div class="rounded-2xl rounded-tr-none border border-[#40e0d0]/30 bg-[#40e0d0]/10 p-3.5">
-                                <p class="text-[10px] font-bold uppercase tracking-widest text-[#40e0d0]">Recommended Inverter</p>
+                            <div class="rounded-2xl rounded-tr-none border border-[#60d4f7]/30 bg-[#60d4f7]/10 p-3.5">
+                                <p class="text-[10px] font-bold uppercase tracking-widest text-[#60d4f7]">Recommended Inverter</p>
                                 <p class="mt-1 text-lg font-black text-white">{{ fmtKw(recommendedInverterKw) }}</p>
-                                <p class="text-[10.5px] font-semibold text-slate-400">nearest size ≥ required</p>
+                                <p v-if="inverterQuantity > 1" class="text-[10.5px] font-semibold text-slate-400">× {{ inverterQuantity }} units</p>
+                                <p v-else class="text-[10.5px] font-semibold text-slate-400">nearest size ≥ required</p>
                             </div>
                             <div class="rounded-2xl rounded-tr-none border border-white/10 bg-white/5 p-3.5">
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Batteries Required</p>
@@ -639,13 +737,18 @@ onMounted(() => {
                             </div>
                         </div>
 
-                        <!-- Total Estimated Price -->
                         <div class="mt-4 border-t border-white/10 pt-4">
                             <div class="flex items-baseline justify-between">
                                 <span class="text-xs font-bold uppercase tracking-wide text-slate-300">Estimated Price</span>
                                 <span class="text-3xl font-black text-yellow-400">{{ naira(estimatedPrice) }}</span>
                             </div>
                             <p class="mt-1 text-xs text-slate-400">Includes panels, inverter, batteries, installation & logistics</p>
+                            <div v-if="hasComponentPrices" class="mt-3 grid grid-cols-2 gap-2 text-[11px] text-slate-400">
+                                <p>Panels: <span class="font-semibold text-white">{{ naira(panelCost) }}</span></p>
+                                <p>Inverter: <span class="font-semibold text-white">{{ naira(inverterCost) }}</span></p>
+                                <p>Batteries: <span class="font-semibold text-white">{{ naira(batteryCost) }}</span></p>
+                                <p>Install: <span class="font-semibold text-white">{{ naira(installationCost) }}</span></p>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -664,7 +767,7 @@ onMounted(() => {
                             </div>
                             <div class="mt-1.5 h-2 rounded-full bg-slate-100 overflow-hidden">
                                 <div
-                                    class="h-full rounded-full bg-gradient-to-r from-yellow-400 to-[#40e0d0] transition-all duration-500"
+                                    class="h-full rounded-full bg-gradient-to-r from-yellow-400 to-[#60d4f7] transition-all duration-500"
                                     :style="{ width: `${(rowDailyWh(a) / maxRowWh) * 100}%` }"
                                 ></div>
                             </div>
@@ -672,7 +775,7 @@ onMounted(() => {
                         <div v-if="appliances.length === 0" class="py-6 text-center text-sm text-slate-400">Add appliances to see the breakdown.</div>
                         <div class="border-t border-slate-100 pt-4 flex items-center justify-between">
                             <span class="text-xs font-bold uppercase tracking-widest text-slate-500">Total / day</span>
-                            <span class="text-lg font-black text-[#40e0d0]">{{ totalDailyKwh.toFixed(2) }} <span class="text-xs text-slate-400">kWh</span></span>
+                            <span class="text-lg font-black text-[#60d4f7]">{{ totalDailyKwh.toFixed(2) }} <span class="text-xs text-slate-400">kWh</span></span>
                         </div>
                     </div>
                 </section>
@@ -792,6 +895,7 @@ onMounted(() => {
                                                 type="text"
                                                 list="appliance-options"
                                                 placeholder="Select or type appliance…"
+                                                @change="selectDef(a, a.name)"
                                                 class="w-full min-w-[130px] rounded-lg rounded-tr-none border-[1.5px] border-[#d9d7d0] bg-[#fbfbf9] px-2.5 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:border-yellow-500 focus:ring-4 focus:ring-yellow-400/15 focus:bg-white transition-all"
                                             />
                                             <datalist id="appliance-options">
@@ -958,7 +1062,7 @@ onMounted(() => {
                             </div>
                             <div class="rounded-2xl rounded-tr-none border border-white/10 bg-white/5 p-3.5">
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Daily Energy</p>
-                                <p class="mt-1 text-lg font-black text-[#40e0d0]">{{ totalDailyKwh.toFixed(2) }} <span class="text-xs font-bold text-slate-300">kWh</span></p>
+                                <p class="mt-1 text-lg font-black text-[#60d4f7]">{{ totalDailyKwh.toFixed(2) }} <span class="text-xs font-bold text-slate-300">kWh</span></p>
                             </div>
                             <div class="rounded-2xl rounded-tr-none border border-white/10 bg-white/5 p-3.5">
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Solar Panels</p>
@@ -972,10 +1076,11 @@ onMounted(() => {
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Inverter Required</p>
                                 <p class="mt-1 text-lg font-black text-yellow-400">{{ inverterRequiredKw.toFixed(2) }} <span class="text-xs font-bold text-slate-300">kW</span></p>
                             </div>
-                            <div class="rounded-2xl rounded-tr-none border border-[#40e0d0]/30 bg-[#40e0d0]/10 p-3.5">
-                                <p class="text-[10px] font-bold uppercase tracking-widest text-[#40e0d0]">Recommended Inverter</p>
+                            <div class="rounded-2xl rounded-tr-none border border-[#60d4f7]/30 bg-[#60d4f7]/10 p-3.5">
+                                <p class="text-[10px] font-bold uppercase tracking-widest text-[#60d4f7]">Recommended Inverter</p>
                                 <p class="mt-1 text-lg font-black text-white">{{ fmtKw(recommendedInverterKw) }}</p>
-                                <p class="text-[10.5px] font-semibold text-slate-400">nearest size ≥ required</p>
+                                <p v-if="inverterQuantity > 1" class="text-[10.5px] font-semibold text-slate-400">× {{ inverterQuantity }} units</p>
+                                <p v-else class="text-[10.5px] font-semibold text-slate-400">nearest size ≥ required</p>
                             </div>
                             <div class="rounded-2xl rounded-tr-none border border-white/10 bg-white/5 p-3.5">
                                 <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Batteries Required</p>
@@ -987,13 +1092,18 @@ onMounted(() => {
                             </div>
                         </div>
 
-                        <!-- Total Estimated Price -->
                         <div class="mt-4 border-t border-white/10 pt-4">
                             <div class="flex items-baseline justify-between">
                                 <span class="text-xs font-bold uppercase tracking-wide text-slate-300">Estimated Price</span>
                                 <span class="text-3xl font-black text-yellow-400">{{ naira(estimatedPrice) }}</span>
                             </div>
                             <p class="mt-1 text-xs text-slate-400">Includes panels, inverter, batteries, installation & logistics</p>
+                            <div v-if="hasComponentPrices" class="mt-3 grid grid-cols-2 gap-2 text-[11px] text-slate-400">
+                                <p>Panels: <span class="font-semibold text-white">{{ naira(panelCost) }}</span></p>
+                                <p>Inverter: <span class="font-semibold text-white">{{ naira(inverterCost) }}</span></p>
+                                <p>Batteries: <span class="font-semibold text-white">{{ naira(batteryCost) }}</span></p>
+                                <p>Install: <span class="font-semibold text-white">{{ naira(installationCost) }}</span></p>
+                            </div>
                         </div>
 
                         <!-- Matched Solar Packages -->
@@ -1010,8 +1120,8 @@ onMounted(() => {
                                             </div>
                                         </div>
                                         <div class="shrink-0 text-right">
-                                            <p class="text-lg font-black text-yellow-400">{{ naira(pkg.package_price + (pkg.installation_cost || 0)) }}</p>
-                                            <p class="text-[10px] text-slate-400">Match: {{ pkg.match_score }}%</p>
+                                            <p class="text-lg font-black text-yellow-400">{{ naira(Number(pkg.package_price) + Number(pkg.installation_cost || 0)) }}</p>
+                                            <p class="text-[10px] text-emerald-400 font-semibold">✓ Installation Included</p>
                                         </div>
                                     </div>
                                 </div>
@@ -1068,7 +1178,7 @@ onMounted(() => {
         target="_blank"
         rel="noopener"
         title="Chat on WhatsApp"
-        class="fixed bottom-6 right-6 z-50 w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#25D366] text-white flex items-center justify-center shadow-[0_6px_18px_rgba(37,211,102,0.4)] hover:bg-[#1fb858] hover:-translate-y-1 active:translate-y-0 transition-all duration-200"
+        class="fixed bottom-6 right-6 z-50 w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#60d4f7] text-white flex items-center justify-center shadow-[0_6px_18px_rgba(96,212,247,0.4)] hover:bg-[#60d4f7]/80 hover:-translate-y-1 active:translate-y-0 transition-all duration-200"
     >
         <svg class="w-7 h-7 sm:w-8 sm:h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm4.5 13c-.2.2-1.4.7-1.7.8s-.4.1-.7 0-.9-.3-1.4-.7a5.6 5.6 0 0 1-1.9-2.5c-.1-.2.2-.4.4-.6l.4-.6a.8.8 0 0 0 .1-.2.5.5 0 0 0 0-.4c-.1-.2-.6-1.4-.8-1.9s-.4-.4-.6-.4h-.5a.8.8 0 0 0-.6.3 2.6 2.6 0 0 0-.8 1.9 4.5 4.5 0 0 0 .9 2.4 10 10 0 0 0 3.9 3.4c1.2.6 1.7.6 2.1.6a2.6 2.6 0 0 0 1.7-1.2 2 2 0 0 0 .1-1.2z"/></svg>
         <span class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#E4312B] border-2 border-white"></span>

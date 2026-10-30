@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AssetController;
+use App\Http\Controllers\Admin\BatteryCapacityController;
 use App\Http\Controllers\Admin\BrandController;
 use App\Http\Controllers\Admin\BuyerController;
 use App\Http\Controllers\Admin\CertificateController;
@@ -9,6 +10,7 @@ use App\Http\Controllers\Admin\CustomQuotationController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\EnrollmentController;
 use App\Http\Controllers\Admin\ExpenseController;
+use App\Http\Controllers\Admin\InverterCapacityController;
 use App\Http\Controllers\Admin\MarketingController;
 use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\OrderController;
@@ -21,6 +23,7 @@ use App\Http\Controllers\Admin\ProjectMaterialController;
 use App\Http\Controllers\Admin\ProjectMediaController;
 use App\Http\Controllers\Admin\ProjectPaymentController;
 use App\Http\Controllers\Admin\PurchaseController;
+use App\Http\Controllers\Admin\ReceiptController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\RoleAccessController;
 use App\Http\Controllers\Admin\SaleController;
@@ -39,11 +42,13 @@ use App\Http\Controllers\Buyer\DashboardController as BuyerDashboardController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\PaystackWebhookController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\PublicReceiptController;
 use App\Http\Controllers\SeoController;
 use App\Http\Controllers\StorefrontController;
 use App\Models\AuditLog;
 use App\Models\Product;
 use App\Models\Setting;
+use App\Models\Testimonial;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -52,6 +57,13 @@ use Inertia\Inertia;
 // ==========================================================
 Route::get('/robots.txt', [SeoController::class, 'robots'])->name('robots');
 Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('sitemap');
+
+// Public E-Receipt view, download & customer signing
+Route::get('/receipt/{token}', [PublicReceiptController::class, 'show'])->name('receipt.show');
+Route::get('/receipt/{token}/sign', [PublicReceiptController::class, 'signPage'])->name('receipt.sign');
+Route::post('/receipt/{token}/sign', [PublicReceiptController::class, 'saveSignature'])->name('receipt.save-signature');
+Route::get('/receipt/{token}/pdf', [PublicReceiptController::class, 'downloadPdf'])->name('receipt.pdf');
+Route::get('/receipt/{token}/image', [PublicReceiptController::class, 'downloadImage'])->name('receipt.image');
 
 Route::get('/', function () {
     // First try to get featured products with images
@@ -93,10 +105,17 @@ Route::get('/', function () {
 
     $whatsappNumber = preg_replace('/\D/', '', (string) Setting::where('key', 'business.phone')->value('value'));
 
+    $testimonials = Testimonial::where('is_published', true)
+        ->where('status', 'approved')
+        ->latest()
+        ->take(6)
+        ->get(['id', 'author_name', 'author_role', 'content', 'rating', 'photo_path']);
+
     return Inertia::render('Welcome', [
         'canLogin' => Route::has('login'),
         'canRegister' => Route::has('register'),
         'featuredProducts' => $featuredProducts,
+        'testimonials' => $testimonials,
         'whatsappNumber' => $whatsappNumber,
     ]);
 })->name('home');
@@ -173,12 +192,23 @@ Route::get('/dashboard', function () {
     ->middleware('auth')
     ->name('dashboard');
 
+// Public testimonial submission routes (no auth required)
+Route::get('testimonial/submit', [MarketingController::class, 'publicTestimonialCreate'])->name('public.testimonial.create');
+Route::post('testimonial/submit', [MarketingController::class, 'publicTestimonialStore'])->name('public.testimonial.store');
+Route::get('testimonial/thankyou', [MarketingController::class, 'publicTestimonialThankyouSimple'])->name('public.testimonial.thankyou.simple');
+
+// Token-based routes (for specific testimonial requests)
+Route::get('testimonial/submit/{token}', [MarketingController::class, 'publicTestimonialForm'])->name('public.testimonial.form');
+Route::post('testimonial/submit/{token}', [MarketingController::class, 'publicTestimonialSubmit'])->name('public.testimonial.submit');
+Route::get('testimonial/thankyou/{token}', [MarketingController::class, 'publicTestimonialThankyou'])->name('public.testimonial.thankyou');
+
 Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('search', [SearchController::class, 'index'])->middleware('permission:dashboard.view')->name('search');
 
     // Custom product routes (must come before resource)
     Route::get('products/movements', [ProductController::class, 'stockMovements'])->middleware('permission:inventory.view')->name('products.movements');
     Route::post('products/{product}/adjust-stock', [ProductController::class, 'adjustStock'])->middleware('permission:inventory.adjust')->name('products.adjust-stock');
+    Route::patch('products/{product}/quick-update', [ProductController::class, 'quickUpdate'])->middleware('permission:products.edit')->name('products.quick-update');
     Route::post('products/bulk-delete', [ProductController::class, 'bulkDelete'])->middleware('permission:products.delete')->name('products.bulk-delete');
     Route::post('products/bulk-status', [ProductController::class, 'bulkStatus'])->middleware('permission:products.edit')->name('products.bulk-status');
     Route::post('products/bulk-featured', [ProductController::class, 'bulkFeatured'])->middleware('permission:products.edit')->name('products.bulk-featured');
@@ -223,6 +253,10 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::get('orders/{order}', [OrderController::class, 'show'])->middleware('permission:orders.view')->name('orders.show');
     Route::post('orders/{order}/pay/{payment}', [OrderController::class, 'confirmPayment'])->middleware('permission:orders.manage')->name('orders.confirm-payment');
     Route::post('orders/{order}/deliver', [OrderController::class, 'deliver'])->middleware('permission:orders.manage')->name('orders.deliver');
+    Route::post('orders/{order}/cancel', [OrderController::class, 'cancel'])->middleware('permission:orders.manage')->name('orders.cancel');
+    Route::post('orders/{order}/process', [OrderController::class, 'process'])->middleware('permission:orders.manage')->name('orders.process');
+    Route::post('orders/{order}/payments', [OrderController::class, 'addPayment'])->middleware('permission:orders.manage')->name('orders.add-payment');
+    Route::post('orders/{order}/undo-deliver', [OrderController::class, 'undoDeliver'])->middleware('permission:orders.manage')->name('orders.undo-deliver');
 
     Route::get('buyers', [BuyerController::class, 'index'])->middleware('permission:orders.view')->name('buyers.index');
     Route::get('buyers/{buyer}', [BuyerController::class, 'show'])->middleware('permission:orders.view')->name('buyers.show');
@@ -241,6 +275,8 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::put('projects/{project}', [ProjectController::class, 'update'])->middleware('permission:projects.edit')->name('projects.update');
     Route::delete('projects/{project}', [ProjectController::class, 'destroy'])->middleware('permission:projects.delete')->name('projects.destroy');
     Route::post('projects/{project}/status', [ProjectController::class, 'status'])->middleware('permission:projects.edit')->name('projects.status');
+    Route::post('projects/{project}/publish', [ProjectController::class, 'publish'])->middleware('permission:projects.edit')->name('projects.publish');
+    Route::post('projects/{project}/clear-manual-costs', [ProjectController::class, 'clearManualCosts'])->middleware('permission:projects.edit')->name('projects.clear-manual-costs');
 
     Route::post('projects/{project}/materials', [ProjectMaterialController::class, 'store'])->middleware('permission:projects.materials')->name('projects.materials.store');
     Route::post('projects/{project}/materials/{material}/issue', [ProjectMaterialController::class, 'issue'])->middleware('permission:projects.materials')->name('projects.materials.issue');
@@ -324,23 +360,34 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::get('solar-packages', [SolarPackageController::class, 'index'])->middleware('permission:solar.view')->name('solar-packages.index');
     Route::get('solar-packages/create', [SolarPackageController::class, 'create'])->middleware('permission:solar.manage')->name('solar-packages.create');
     Route::post('solar-packages', [SolarPackageController::class, 'store'])->middleware('permission:solar.manage')->name('solar-packages.store');
-    Route::get('solar-packages/{solarPackage}', [SolarPackageController::class, 'show'])->middleware('permission:solar.view')->name('solar-packages.show');
-    Route::get('solar-packages/{solarPackage}/edit', [SolarPackageController::class, 'edit'])->middleware('permission:solar.manage')->name('solar-packages.edit');
-    Route::put('solar-packages/{solarPackage}', [SolarPackageController::class, 'update'])->middleware('permission:solar.manage')->name('solar-packages.update');
-    Route::delete('solar-packages/{solarPackage}', [SolarPackageController::class, 'destroy'])->middleware('permission:solar.manage')->name('solar-packages.destroy');
+    Route::get('solar-packages/{package}', [SolarPackageController::class, 'show'])->middleware('permission:solar.view')->name('solar-packages.show');
+    Route::get('solar-packages/{package}/edit', [SolarPackageController::class, 'edit'])->middleware('permission:solar.manage')->name('solar-packages.edit');
+    Route::put('solar-packages/{package}', [SolarPackageController::class, 'update'])->middleware('permission:solar.manage')->name('solar-packages.update');
+    Route::delete('solar-packages/{package}', [SolarPackageController::class, 'destroy'])->middleware('permission:solar.manage')->name('solar-packages.destroy');
+
+    Route::resource('inverter-capacities', InverterCapacityController::class)
+        ->parameters(['inverter-capacities' => 'inverterCapacity'])
+        ->middleware('permission:solar.manage');
+    Route::post('inverter-capacities/quick', [InverterCapacityController::class, 'quickCreate'])->middleware('permission:solar.manage')->name('inverter-capacities.quick');
+
+    Route::resource('battery-capacities', BatteryCapacityController::class)
+        ->parameters(['battery-capacities' => 'batteryCapacity'])
+        ->middleware('permission:solar.manage');
+    Route::post('battery-capacities/quick', [BatteryCapacityController::class, 'quickCreate'])->middleware('permission:solar.manage')->name('battery-capacities.quick');
 
     Route::get('solar-leads', [SolarLeadController::class, 'index'])->middleware('permission:solar.leads')->name('solar-leads.index');
-    Route::get('solar-leads/quotations/{quotation}', [SolarLeadController::class, 'showQuotation'])->middleware('permission:solar.leads')->name('solar-leads.quotations.show');
     Route::post('solar-leads/status', [SolarLeadController::class, 'updateStatus'])->middleware('permission:solar.leads')->name('solar-leads.status');
-    Route::get('solar-leads/{calculation}', [SolarLeadController::class, 'show'])->middleware('permission:solar.leads')->name('solar-leads.show');
-    Route::post('solar-leads/{calculation}/quotation', [SolarLeadController::class, 'createQuotation'])->middleware('permission:solar.leads')->name('solar-leads.quotation.create');
-    Route::delete('solar-leads/{calculation}', [SolarLeadController::class, 'destroy'])->middleware('permission:solar.leads')->name('solar-leads.destroy');
-    Route::delete('solar-leads/quotations/{quotation}', [SolarLeadController::class, 'destroyQuotation'])->middleware('permission:solar.leads')->name('solar-leads.quotations.destroy');
 
-    // Manual quotation creation (without lead)
+    // Static quotation paths must be registered before {quotation} / {calculation}.
     Route::get('solar-leads/quotations/create', [SolarLeadController::class, 'createQuotationManual'])->middleware('permission:solar.leads')->name('solar-leads.quotations.create');
     Route::post('solar-leads/quotations', [SolarLeadController::class, 'storeQuotationManual'])->middleware('permission:solar.leads')->name('solar-leads.quotations.store');
-    Route::post('solar-leads/quotations/{quotation}/send', [SolarLeadController::class, 'sendQuotation'])->middleware('permission:solar.leads')->name('solar-leads.quotations.send');
+    Route::get('solar-leads/quotations/{quotation}', [SolarLeadController::class, 'showQuotation'])->middleware('permission:solar.leads')->name('solar-leads.quotations.show')->whereNumber('quotation');
+    Route::post('solar-leads/quotations/{quotation}/send', [SolarLeadController::class, 'sendQuotation'])->middleware('permission:solar.leads')->name('solar-leads.quotations.send')->whereNumber('quotation');
+    Route::delete('solar-leads/quotations/{quotation}', [SolarLeadController::class, 'destroyQuotation'])->middleware('permission:solar.leads')->name('solar-leads.quotations.destroy')->whereNumber('quotation');
+
+    Route::get('solar-leads/{calculation}', [SolarLeadController::class, 'show'])->middleware('permission:solar.leads')->name('solar-leads.show')->whereNumber('calculation');
+    Route::post('solar-leads/{calculation}/quotation', [SolarLeadController::class, 'createQuotation'])->middleware('permission:solar.leads')->name('solar-leads.quotation.create')->whereNumber('calculation');
+    Route::delete('solar-leads/{calculation}', [SolarLeadController::class, 'destroy'])->middleware('permission:solar.leads')->name('solar-leads.destroy')->whereNumber('calculation');
 
     // Custom Quotations (general purpose - CCTV, Electrical, Fence, etc.)
     Route::resource('custom-quotations', CustomQuotationController::class)
@@ -362,6 +409,16 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         ->middleware('permission:custom-quotations.edit')
         ->name('custom-quotations.convert');
 
+    // Cash Receipts
+    Route::post('receipts/default-envoy-signature', [ReceiptController::class, 'saveDefaultEnvoySignature'])->middleware('permission:sales.view')->name('receipts.default-envoy-signature');
+    Route::resource('receipts', ReceiptController::class)->middleware('permission:sales.view');
+    Route::get('receipts/{receipt}/pdf', [ReceiptController::class, 'downloadPdf'])->middleware('permission:sales.view')->name('receipts.pdf');
+    Route::get('receipts/{receipt}/stream', [ReceiptController::class, 'streamPdf'])->middleware('permission:sales.view')->name('receipts.stream');
+    Route::get('receipts/{receipt}/image', [ReceiptController::class, 'downloadImage'])->middleware('permission:sales.view')->name('receipts.image');
+    Route::post('receipts/{receipt}/send-email', [ReceiptController::class, 'sendEmail'])->middleware('permission:sales.view')->name('receipts.send-email');
+    Route::post('receipts/{receipt}/record-whatsapp', [ReceiptController::class, 'recordWhatsApp'])->middleware('permission:sales.view')->name('receipts.record-whatsapp');
+    Route::post('receipts/{receipt}/signing-link', [ReceiptController::class, 'sendSignatureLink'])->middleware('permission:sales.view')->name('receipts.signing-link');
+
     Route::prefix('marketing')->name('marketing.')->group(function () {
         Route::get('/', [MarketingController::class, 'index'])->middleware('permission:marketing.newsletter')->name('index');
 
@@ -378,6 +435,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::put('newsletters/{newsletter}', [MarketingController::class, 'newsletterUpdate'])->middleware('permission:marketing.newsletter')->name('newsletters.update');
         Route::post('newsletters/{newsletter}/send', [MarketingController::class, 'newsletterSend'])->middleware('permission:marketing.newsletter')->name('newsletters.send');
         Route::post('newsletters/{newsletter}/resend', [MarketingController::class, 'newsletterResend'])->middleware('permission:marketing.newsletter')->name('newsletters.resend');
+        Route::post('newsletters/{newsletter}/test', [MarketingController::class, 'newsletterSendTest'])->middleware('permission:marketing.newsletter')->name('newsletters.test');
         Route::delete('newsletters/{newsletter}', [MarketingController::class, 'newsletterDestroy'])->middleware('permission:marketing.newsletter')->name('newsletters.destroy');
 
         Route::get('testimonials', [MarketingController::class, 'testimonials'])->middleware('permission:marketing.testimonials')->name('testimonials.index');
@@ -386,6 +444,11 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('testimonials/{testimonial}/edit', [MarketingController::class, 'testimonialEdit'])->middleware('permission:marketing.testimonials')->name('testimonials.edit');
         Route::put('testimonials/{testimonial}', [MarketingController::class, 'testimonialUpdate'])->middleware('permission:marketing.testimonials')->name('testimonials.update');
         Route::post('testimonials/{testimonial}/toggle', [MarketingController::class, 'testimonialToggle'])->middleware('permission:marketing.testimonials')->name('testimonials.toggle');
+        Route::post('testimonials/{testimonial}/approve', [MarketingController::class, 'testimonialApprove'])->middleware('permission:marketing.testimonials')->name('testimonials.approve');
+        Route::post('testimonials/{testimonial}/reject', [MarketingController::class, 'testimonialReject'])->middleware('permission:marketing.testimonials')->name('testimonials.reject');
+        Route::post('testimonials/{testimonial}/status', [MarketingController::class, 'testimonialStatus'])->middleware('permission:marketing.testimonials')->name('testimonials.status');
+        Route::post('testimonials/{testimonial}/generate-link', [MarketingController::class, 'testimonialGenerateLink'])->middleware('permission:marketing.testimonials')->name('testimonials.generate-link');
+        Route::post('testimonials/{testimonial}/revoke-link', [MarketingController::class, 'testimonialRevokeLink'])->middleware('permission:marketing.testimonials')->name('testimonials.revoke-link');
         Route::delete('testimonials/{testimonial}', [MarketingController::class, 'testimonialDestroy'])->middleware('permission:marketing.testimonials')->name('testimonials.destroy');
 
         Route::get('feedback', [MarketingController::class, 'feedback'])->middleware('permission:feedback.manage')->name('feedback.index');
@@ -425,6 +488,8 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::post('settings/categories', [SettingsController::class, 'storeCategory'])->middleware('permission:settings.manage')->name('settings.categories.store');
     Route::delete('settings/categories/{category}', [SettingsController::class, 'destroyCategory'])->middleware('permission:settings.manage')->name('settings.categories.destroy');
     Route::post('settings/calculator', [SettingsController::class, 'storeCalculator'])->middleware('permission:settings.manage')->name('settings.calculator.store');
+    Route::post('settings/business', [SettingsController::class, 'updateBusiness'])->middleware('permission:settings.manage')->name('settings.business.update');
+    Route::post('settings/bank', [SettingsController::class, 'updateBank'])->middleware('permission:settings.manage')->name('settings.bank.update');
 
     Route::get('settings/roles', [RoleAccessController::class, 'index'])->middleware('permission:settings.roles')->name('settings.roles');
     Route::post('settings/roles', [RoleAccessController::class, 'store'])->middleware('permission:settings.roles')->name('settings.roles.store');

@@ -1,11 +1,17 @@
 <script setup>
 import { computed } from 'vue';
-import { Link, Head } from '@inertiajs/vue3';
+import { Link, Head, usePage } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
 import { naira, badgeClass, formatDate } from '@/lib/format';
 
 defineOptions({ layout: PublicLayout });
+
+const page = usePage();
+
+const whatsappNumber = computed(() => page.props.settings?.website?.['website.whatsapp'] || '2348097089259');
+const whatsapp = computed(() => whatsappNumber.value.replace(/\D/g, ''));
+const whatsappUrl = computed(() => `https://wa.me/${whatsapp.value}`);
 
 const props = defineProps({
     user: { type: Object, required: true },
@@ -244,11 +250,11 @@ const quickLinks = [
                     Questions about an order, delivery or a product? Our team is one message away.
                 </p>
                 <div class="mt-4 flex flex-wrap gap-2">
-                    <a href="https://wa.me/2348097089259" target="_blank" rel="noopener" class="inline-flex h-10 items-center gap-2 rounded-xl border border-[#25D366]/40 bg-[#25D366]/10 px-4 text-sm font-semibold text-[#1fb858] transition hover:bg-[#25D366]/20">
+                    <a :href="whatsappUrl" target="_blank" rel="noopener" class="inline-flex h-10 items-center gap-2 rounded-xl border border-[#60d4f7]/40 bg-[#60d4f7]/10 px-4 text-sm font-semibold text-[#60d4f7] transition hover:bg-[#60d4f7]/20">
                         <i class="bi bi-whatsapp"></i>
                         WhatsApp us
                     </a>
-                    <Link href="/contact" class="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-[#40e0d0]">
+                    <Link href="/contact" class="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-[#60d4f7]">
                         Contact page
                     </Link>
                 </div>

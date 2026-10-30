@@ -1,27 +1,15 @@
 ﻿<script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { cartCount } from '../lib/cart';
 
 defineOptions({ layout: PublicLayout });
 
-const props = defineProps({
-    canLogin: {
-        type: Boolean,
-        default: true,
-    },
-    canRegister: {
-        type: Boolean,
-        default: true,
-    },
-    whatsappNumber: {
-        type: String,
-        default: '',
-    },
-});
+const page = usePage();
 
-const whatsapp = computed(() => (props.whatsappNumber || '2348097089259').replace(/\D/g, ''));
+const whatsappNumber = computed(() => page.props.settings?.website?.['website.whatsapp'] || '2348097089259');
+const whatsapp = computed(() => whatsappNumber.value.replace(/\D/g, ''));
 const whatsappUrl = computed(() => `https://wa.me/${whatsapp.value}`);
 
 const isContactModalOpen = ref(false);
@@ -29,7 +17,7 @@ const contactForm = ref({ name: '', email: '', phone: '', message: '' });
 const contactSubmitted = ref(false);
 const contactSending = ref(false);
 
-const heroGridPattern = `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z' stroke='%23FFCC00' stroke-width='0.5'/%3E%3C/g%3E%3C/svg%3E")`;
+const heroGridPattern = `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z' stroke='%2360d4f7' stroke-width='0.5'/%3E%3C/g%3E%3C/svg%3E")`;
 
 function submitContact() {
     if (!contactForm.value.name || !contactForm.value.email) return;
@@ -184,8 +172,8 @@ function onKeydown(e) {
 
                 <!-- Animated Orbs -->
                 <div class="absolute -top-64 -right-64 w-128 h-128 rounded-full bg-gradient-to-br from-yellow-400/15 to-transparent blur-3xl animate-float-slow"></div>
-                <div class="absolute -bottom-64 -left-64 w-128 h-128 rounded-full bg-gradient-to-tr from-teal-400/15 to-transparent blur-3xl animate-float-slow" style="animation-delay: -3s;"></div>
-                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full bg-gradient-to-r from-yellow-400/10 to-teal-400/10 blur-3xl animate-pulse-slow"></div>
+                <div class="absolute -bottom-64 -left-64 w-128 h-128 rounded-full bg-gradient-to-tr from-[#60d4f7]/15 to-transparent blur-3xl animate-float-slow" style="animation-delay: -3s;"></div>
+                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full bg-gradient-to-r from-yellow-400/10 to-[#60d4f7]/10 blur-3xl animate-pulse-slow"></div>
 
                 <!-- Grid Pattern -->
                 <div class="absolute inset-0 opacity-5" :style="{ backgroundImage: heroGridPattern }"></div>
@@ -208,12 +196,12 @@ function onKeydown(e) {
 
                 <div class="max-w-3xl reveal" style="transition-delay: 100ms;">
                     <span class="inline-flex items-center gap-2 text-yellow-400 text-xs font-bold uppercase tracking-[0.3em] mb-5">
-                        <span class="w-10 h-px bg-gradient-to-r from-yellow-400 to-teal-400"></span>
+                        <span class="w-10 h-px bg-gradient-to-r from-yellow-400 to-[#60d4f7]"></span>
                         Who We Are
                     </span>
                     <h1 class="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-black uppercase tracking-tight text-white leading-[1.05] mb-6">
                         Powering Progress,<br />
-                        <span class="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-amber-400 to-teal-400">One Home At A Time</span>
+                        <span class="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-amber-400 to-[#60d4f7]">One Home At A Time</span>
                     </h1>
                     <p class="mt-6 text-slate-300 text-base sm:text-lg leading-relaxed max-w-2xl text-balance">
                         Envoy Electricals is a solar energy and electrical company built on dependable service —
@@ -295,12 +283,12 @@ function onKeydown(e) {
 
                 <div class="reveal">
                     <span class="inline-flex items-center gap-2 text-yellow-500 text-xs font-bold uppercase tracking-[0.3em] mb-4">
-                        <span class="w-8 h-px bg-yellow-500"></span>
+                        <span class="w-8 h-px bg-gradient-to-r from-yellow-500 to-[#60d4f7]"></span>
                         Our Story
                     </span>
                     <h2 class="text-3xl sm:text-5xl font-black uppercase tracking-tight text-slate-950 leading-tight">
                         Solar Built On<br />
-                        <span class="text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-yellow-400">Trust & Craftsmanship</span>
+                        <span class="text-transparent bg-clip-text bg-gradient-to-r from-amber-500 via-yellow-400 to-[#60d4f7]">Trust & Craftsmanship</span>
                     </h2>
                     <p class="mt-6 text-slate-600 text-sm sm:text-base leading-relaxed">
                         Envoy Electricals started with a simple conviction: reliable energy should be within everyone's
@@ -342,10 +330,10 @@ function onKeydown(e) {
                     <div class="mt-8 flex flex-col sm:flex-row sm:items-center gap-4">
                         <Link
                             href="/contact"
-                            class="inline-flex items-center gap-2.5 bg-[#0D1527] hover:bg-slate-800 text-white font-bold px-7 py-3.5 rounded-full transition-all duration-300 shadow-md"
+                            class="inline-flex items-center gap-2.5 bg-[#0D1527] hover:bg-slate-800 text-white font-bold px-7 py-3.5 rounded-full border border-[#60d4f7]/30 transition-all duration-300 shadow-md"
                         >
                             Learn More With Us
-                            <span class="w-7 h-7 rounded-full bg-yellow-400 text-slate-950 flex items-center justify-center group-hover:translate-x-0.5 transition-transform">
+                            <span class="w-7 h-7 rounded-full bg-[#60d4f7] text-slate-950 flex items-center justify-center group-hover:translate-x-0.5 transition-transform">
                                 <i class="bi bi-arrow-right text-sm"></i>
                             </span>
                         </Link>
@@ -360,9 +348,9 @@ function onKeydown(e) {
             <div class="max-w-7xl mx-auto relative">
                 <div class="text-center max-w-2xl mx-auto reveal">
                     <span class="inline-flex items-center gap-2 text-yellow-500 text-xs font-bold uppercase tracking-[0.3em] mb-4">
-                        <span class="w-8 h-px bg-yellow-500"></span>
+                        <span class="w-8 h-px bg-gradient-to-r from-yellow-500 to-[#60d4f7]"></span>
                         What We Stand For
-                        <span class="w-8 h-px bg-yellow-500"></span>
+                        <span class="w-8 h-px bg-gradient-to-r from-[#60d4f7] to-yellow-500"></span>
                     </span>
                     <h2 class="text-3xl sm:text-5xl font-black uppercase tracking-tight text-slate-950">Our Core Values</h2>
                     <p class="mt-4 text-slate-600 text-sm sm:text-base">
@@ -378,7 +366,7 @@ function onKeydown(e) {
                         :style="{ transitionDelay: `${i * 80}ms` }"
                     >
                         <!-- Glow effect on hover -->
-                        <div class="absolute inset-0 bg-gradient-to-br" :class="['from-' + v.color + '-400/10', 'to-transparent', 'opacity-0', 'group-hover:opacity-100', 'transition-opacity', 'duration-500']"></div>
+                        <div class="absolute inset-0 bg-gradient-to-br" :class="['from-' + v.color + '-400/10', 'via-[#60d4f7]/5', 'to-transparent', 'opacity-0', 'group-hover:opacity-100', 'transition-opacity', 'duration-500']"></div>
 
                         <span class="absolute top-0 right-6 text-6xl font-black text-slate-100 group-hover:text-yellow-400/20 transition-colors duration-500 leading-none relative z-10">
                             {{ String(i + 1).padStart(2, '0') }}
@@ -450,9 +438,9 @@ function onKeydown(e) {
             <div class="max-w-7xl mx-auto relative">
                 <div class="text-center max-w-2xl mx-auto reveal">
                     <span class="inline-flex items-center gap-2 text-yellow-400 text-xs font-bold uppercase tracking-[0.3em] mb-4">
-                        <span class="w-8 h-px bg-yellow-400"></span>
+                        <span class="w-8 h-px bg-gradient-to-r from-yellow-400 to-[#60d4f7]"></span>
                         How We Work
-                        <span class="w-8 h-px bg-yellow-400"></span>
+                        <span class="w-8 h-px bg-gradient-to-r from-[#60d4f7] to-yellow-400"></span>
                     </span>
                     <h2 class="text-3xl sm:text-5xl font-black uppercase tracking-tight text-white">A Proven 4-Step Process</h2>
                     <p class="mt-4 text-slate-400 text-sm sm:text-base">
@@ -462,7 +450,7 @@ function onKeydown(e) {
 
                 <div class="mt-14 relative">
                     <!-- Connecting line -->
-                    <div class="hidden lg:block absolute top-14 left-1/2 -translate-x-1/2 w-0.5 h-[calc(100%-56px)] bg-gradient-to-b from-yellow-400/30 via-transparent to-teal-400/30"></div>
+                    <div class="hidden lg:block absolute top-14 left-1/2 -translate-x-1/2 w-0.5 h-[calc(100%-56px)] bg-gradient-to-b from-yellow-400/30 via-[#60d4f7]/30 to-transparent"></div>
 
                     <div class="mt-14 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative">
                         <div
@@ -488,7 +476,7 @@ function onKeydown(e) {
                                 <div class="absolute left-1/2 top-full w-0.5 h-full bg-gradient-to-b from-yellow-400/30 to-transparent"></div>
                             </div>
 
-                            <span class="absolute bottom-0 left-8 right-8 h-[3px] bg-gradient-to-r from-yellow-400 to-teal-400 scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-500 rounded-t-full"></span>
+                            <span class="absolute bottom-0 left-8 right-8 h-[3px] bg-gradient-to-r from-yellow-400 to-[#60d4f7] scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-500 rounded-t-full"></span>
                         </div>
                     </div>
                 </div>
@@ -498,12 +486,12 @@ function onKeydown(e) {
         <!-- ===================== TEAM ===================== -->
         <section class="relative py-20 sm:py-28 px-4 sm:px-6 lg:px-8 overflow-hidden">
             <div class="absolute -bottom-24 -right-16 w-72 h-72 rounded-full bg-yellow-300/20 blur-3xl pointer-events-none"></div>
-            <div class="absolute -top-24 -left-16 w-72 h-72 rounded-full bg-teal-400/10 blur-3xl pointer-events-none"></div>
+            <div class="absolute -top-24 -left-16 w-72 h-72 rounded-full bg-[#60d4f7]/10 blur-3xl pointer-events-none"></div>
             <div class="max-w-7xl mx-auto">
                 <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6 reveal">
                     <div class="max-w-xl">
                         <span class="inline-flex items-center gap-2 text-yellow-500 text-xs font-bold uppercase tracking-[0.3em] mb-4">
-                            <span class="w-8 h-px bg-yellow-500"></span>
+                            <span class="w-8 h-px bg-gradient-to-r from-yellow-500 to-[#60d4f7]"></span>
                             The Team Behind The Panels
                         </span>
                         <h2 class="text-3xl sm:text-5xl font-black uppercase tracking-tight text-slate-950 leading-tight">
@@ -535,7 +523,7 @@ function onKeydown(e) {
                             <div class="absolute inset-0 bg-gradient-to-t from-[#0D1527] via-transparent to-transparent group-hover:from-transparent transition-all duration-500"></div>
 
                             <!-- Color accent bar -->
-                            <div class="absolute top-0 left-0 w-full h-1" :class="['bg-' + m.color + '-400', 'scale-x-0', 'group-hover:scale-x-100', 'origin-left', 'transition-transform', 'duration-500']"></div>
+                            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r" :class="['from-' + m.color + '-400', 'to-[#60d4f7]', 'scale-x-0', 'group-hover:scale-x-100', 'origin-left', 'transition-transform', 'duration-500']"></div>
                         </div>
                         <div class="relative p-6 -mt-16 z-10">
                             <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-4" :class="['bg-' + m.color + '-400/20', 'text-' + m.color + '-400', 'text-xs', 'font-bold', 'uppercase', 'tracking-wider']">
@@ -543,7 +531,7 @@ function onKeydown(e) {
                             </div>
                             <h3 class="text-xl font-black text-white mb-2">{{ m.name }}</h3>
                             <p class="text-sm text-slate-400 leading-relaxed">{{ m.bio }}</p>
-                            <span class="block mt-5 h-[3px] w-12 bg-yellow-400 rounded-full group-hover:w-full transition-all duration-500"></span>
+                            <span class="block mt-5 h-[3px] w-12 bg-gradient-to-r from-yellow-400 to-[#60d4f7] rounded-full group-hover:w-full transition-all duration-500"></span>
                         </div>
                     </div>
                 </div>
@@ -556,8 +544,8 @@ function onKeydown(e) {
                 <div class="reveal relative bg-gradient-to-br from-[#0D1527] via-[#12203C] to-[#1A365D] rounded-[2.5rem] px-8 sm:px-14 py-14 sm:py-20 text-center overflow-hidden shadow-2xl">
                     <div class="absolute inset-0" aria-hidden="true">
                         <div class="absolute -top-20 -right-16 w-64 h-64 rounded-full bg-yellow-400/20 blur-3xl"></div>
-                        <div class="absolute -bottom-24 -left-16 w-64 h-64 rounded-full bg-teal-400/10 blur-3xl"></div>
-                        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[2px] bg-yellow-400/10 rotate-[-2deg]"></div>
+                        <div class="absolute -bottom-24 -left-16 w-64 h-64 rounded-full bg-[#60d4f7]/10 blur-3xl"></div>
+                        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[2px] bg-gradient-to-r from-yellow-400/10 to-[#60d4f7]/10 rotate-[-2deg]"></div>
 
                         <!-- Floating elements -->
                         <div v-for="i in 8" :key="i" class="absolute w-3 h-3 rounded-full bg-yellow-400/20 animate-float-particle" :style="{
@@ -573,7 +561,7 @@ function onKeydown(e) {
                             <i class="bi bi-lightning-charge-fill text-slate-950 text-3xl"></i>
                         </span>
                         <h2 class="relative text-3xl sm:text-5xl font-black uppercase tracking-tight text-white leading-tight max-w-2xl mx-auto">
-                            Ready To Cut Your <span class="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-yellow-300 to-teal-400">Energy Bills?</span>
+                            Ready To Cut Your <span class="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-yellow-300 to-[#60d4f7]">Energy Bills?</span>
                         </h2>
                         <p class="relative mt-4 text-slate-300 max-w-xl mx-auto text-sm sm:text-base leading-relaxed">
                             Get a free solar assessment and honest advice from our engineers. No pressure — just straight answers.

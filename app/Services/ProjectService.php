@@ -144,33 +144,45 @@ class ProjectService
     /**
      * Attach a material to the project. When issueNow is set the stock is
      * deducted from inventory in the same operation.
+     * If product_id is provided, links to product for inventory tracking.
+     * Otherwise creates a custom material entry with just a name.
      */
     public function addMaterial(Project $project, array $data, int $userId): ProjectMaterial
     {
-        $product = Product::findOrFail($data['product_id']);
+        $product = null;
+        if (! empty($data['product_id'])) {
+            $product = Product::findOrFail($data['product_id']);
+        }
 
         $quantity = (int) $data['quantity'];
         $unitCost = isset($data['unit_cost']) && $data['unit_cost'] !== null && $data['unit_cost'] !== ''
             ? round((float) $data['unit_cost'], 2)
-            : round((float) $product->average_cost, 2);
+            : ($product ? round((float) $product->average_cost, 2) : 0);
 
-        return DB::transaction(function () use ($project, $product, $quantity, $unitCost, $data, $userId) {
+        $materialName = ! empty($data['name']) ? $data['name'] : ($product ? $product->name : 'Material');
+
+        return DB::transaction(function () use ($project, $product, $quantity, $unitCost, $data, $materialName, $userId) {
             $material = ProjectMaterial::create([
                 'project_id' => $project->id,
-                'product_id' => $product->id,
+                'product_id' => $product?->id,
+                'name' => $materialName,
                 'quantity' => $quantity,
                 'unit_cost' => $unitCost,
                 'total' => round($quantity * $unitCost, 2),
             ]);
 
             if (! empty($data['issue_now'])) {
-                $this->issueMaterial($project, $material, $userId);
+                if ($product) {
+                    $this->issueMaterial($project, $material, $userId);
+                } else {
+                    $this->recompute($project);
+                }
             } else {
                 $this->recompute($project);
             }
 
             AuditLogger::log('created', 'project_material', $material->id,
-                "Added {$quantity} x {$product->name} to project {$project->ref_id}");
+                "Added {$quantity} x {$materialName} to project {$project->ref_id}");
 
             return $material;
         });
@@ -179,6 +191,7 @@ class ProjectService
     /**
      * Issue a material to the project: inventory decreases, movement ledger
      * records project_issue, and project cost is updated (§14, TEST 4).
+     * Only works for materials linked to a product (inventory-tracked).
      */
     public function issueMaterial(Project $project, ProjectMaterial $material, int $userId): void
     {
@@ -188,6 +201,12 @@ class ProjectService
 
         if ($material->issued_to_inventory) {
             return;
+        }
+
+        if (! $material->product) {
+            throw ValidationException::withMessages([
+                'material' => 'Cannot issue material without a linked product. Only inventory-tracked materials can be issued.',
+            ]);
         }
 
         DB::transaction(function () use ($project, $material, $userId) {
@@ -350,26 +369,40 @@ class ProjectService
 
     /**
      * Project cost = materials (issued) + labour + transportation + other.
-     * Gross profit = contract value - project cost (§37). Balance is derived
+     * Gross profit = contract value - project cost. Balance is derived
      * from recorded payments so the stored numbers never drift.
+     * Manual cost fields override calculated values when set.
      */
     public function recompute(Project $project): void
     {
-        $material = round((float) $project->materials()->where('issued_to_inventory', true)->sum('total'), 2);
-        $labour = round((float) $project->expenses()->where('expense_type', ProjectExpense::TYPE_LABOUR)->sum('amount'), 2);
-        $transport = round((float) $project->expenses()->where('expense_type', ProjectExpense::TYPE_TRANSPORT)->sum('amount'), 2);
-        $other = round((float) $project->expenses()->where('expense_type', ProjectExpense::TYPE_OTHER)->sum('amount'), 2);
+        $calculatedMaterial = round((float) $project->materials()
+            ->where(function ($q) {
+                // Count inventory-issued materials AND custom (no product_id) materials always
+                $q->where('issued_to_inventory', true)
+                    ->orWhereNull('product_id');
+            })->sum('total'), 2);
+        $calculatedLabour = round((float) $project->expenses()->where('expense_type', ProjectExpense::TYPE_LABOUR)->sum('amount'), 2);
+        $calculatedTransport = round((float) $project->expenses()->where('expense_type', ProjectExpense::TYPE_TRANSPORT)->sum('amount'), 2);
+        $calculatedOther = round((float) $project->expenses()->where('expense_type', ProjectExpense::TYPE_OTHER)->sum('amount'), 2);
 
-        $cost = round($material + $labour + $transport + $other, 2);
+        // Use manual override if set, otherwise use calculated
+        $material = $project->manual_material_cost !== null ? (float) $project->manual_material_cost : $calculatedMaterial;
+        $labour = $project->manual_labour_cost !== null ? (float) $project->manual_labour_cost : $calculatedLabour;
+        $transport = $project->manual_transport_cost !== null ? (float) $project->manual_transport_cost : $calculatedTransport;
+        $other = $project->manual_other_cost !== null ? (float) $project->manual_other_cost : $calculatedOther;
+
+        $calculatedCost = round($calculatedMaterial + $calculatedLabour + $calculatedTransport + $calculatedOther, 2);
+        $cost = $project->manual_project_cost !== null ? (float) $project->manual_project_cost : round($material + $labour + $transport + $other, 2);
+
         $contract = round((float) $project->contract_value, 2);
         $received = round((float) $project->payments()->sum('amount'), 2);
 
         $project->forceFill([
-            'material_cost' => $material,
-            'labour_cost' => $labour,
-            'transport_cost' => $transport,
-            'other_cost' => $other,
-            'project_cost' => $cost,
+            'material_cost' => round($material, 2),
+            'labour_cost' => round($labour, 2),
+            'transport_cost' => round($transport, 2),
+            'other_cost' => round($other, 2),
+            'project_cost' => round($cost, 2),
             'amount_received' => $received,
             'balance' => round($contract - $received, 2),
             'gross_profit' => round($contract - $cost, 2),

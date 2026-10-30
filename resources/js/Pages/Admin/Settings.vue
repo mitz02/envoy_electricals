@@ -10,6 +10,8 @@ defineOptions({ layout: AdminLayout });
 const props = defineProps({
     categories: { type: Array, default: () => [] },
     calculatorSettings: { type: Object, default: () => ({}) },
+    businessSettings: { type: Object, default: () => ({}) },
+    bankSettings: { type: Object, default: () => ({}) },
 });
 
 const form = useForm({
@@ -18,7 +20,12 @@ const form = useForm({
 
 function parseJsonSetting(key, fallback = []) {
     const val = props.calculatorSettings[`calculator.${key}`];
-    if (!val) return fallback;
+    if (val == null || val === '') {
+        return fallback;
+    }
+    if (typeof val === 'object') {
+        return val;
+    }
     try {
         return JSON.parse(val);
     } catch {
@@ -34,6 +41,8 @@ function getPrice(key, size, fallback = 0) {
 const calcForm = useForm({
     panel_wattage: props.calculatorSettings['calculator.panel_wattage'] || 620,
     panel_efficiency: props.calculatorSettings['calculator.panel_efficiency'] || 0.8,
+    peak_sun_hours: props.calculatorSettings['calculator.peak_sun_hours'] || 4.5,
+    battery_depth_of_discharge: props.calculatorSettings['calculator.battery_depth_of_discharge'] || 0.8,
     inverter_safety_factor: props.calculatorSettings['calculator.inverter_safety_factor'] || 1.4,
     battery_capacities: props.calculatorSettings['calculator.battery_capacities'] || '1.2, 2.56, 5.12, 10.24, 16, 20, 25.6, 32',
     inverter_sizes: props.calculatorSettings['calculator.inverter_sizes'] || '1.5, 3, 5, 8, 10, 12',
@@ -43,6 +52,34 @@ const calcForm = useForm({
     battery_prices: parseJsonSetting('battery_prices', {}),
     installation_costs: parseJsonSetting('installation_costs', {}),
 });
+
+const businessForm = useForm({
+    'business.name': props.businessSettings['business.name'] || 'Envoy Electric',
+    'business.email': props.businessSettings['business.email'] || 'hello@envoyelectric.com',
+    'business.phone': props.businessSettings['business.phone'] || '+234 809 708 9259',
+    'business.address': props.businessSettings['business.address'] || 'Shop 1, Peace Avenue Junction, opp Goddy Royal Hotel, Futa Southgate Road, Akure',
+    'business.footer': props.businessSettings['business.footer'] || 'powering your world with innovative solutions',
+    'currency.symbol': props.businessSettings['currency.symbol'] || '₦',
+});
+
+const bankForm = useForm({
+    'bank.bank_name': props.bankSettings['bank.bank_name'] || 'Wema Bank',
+    'bank.account_name': props.bankSettings['bank.account_name'] || 'Envoy Electricals',
+    'bank.account_number': props.bankSettings['bank.account_number'] || '0126278482',
+    'bank.instructions': props.bankSettings['bank.instructions'] || 'Transfer the exact order amount and quote your order reference (ORD-...) as the narration. Our team verifies bank transfers before confirming your order.',
+});
+
+function saveBusinessSettings() {
+    businessForm.post('/admin/settings/business', {
+        preserveScroll: true,
+    });
+}
+
+function saveBankSettings() {
+    bankForm.post('/admin/settings/bank', {
+        preserveScroll: true,
+    });
+}
 
 const inverterSizesArray = computed(() => 
     calcForm.inverter_sizes
@@ -112,7 +149,7 @@ function naira(v) {
             </div>
             <p class="mb-4 text-sm text-slate-500">These values are used as defaults in the public load calculator. Only administrators can modify them.</p>
 
-            <form @submit.prevent="saveCalculatorSettings" class="space-y-6">
+            <form @submit.prevent="saveCalculatorSettings" class="space-y-6" novalidate>
                 <!-- Basic Parameters -->
                 <div class="rounded-xl border border-slate-200 p-4 bg-slate-50/50">
                     <h3 class="mb-3 text-sm font-semibold text-slate-700">Basic Parameters</h3>
@@ -122,8 +159,6 @@ function naira(v) {
                             <input
                                 v-model.number="calcForm.panel_wattage"
                                 type="number"
-                                min="1"
-                                step="1"
                                 class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
                             />
                             <p v-if="calcForm.errors.panel_wattage" class="mt-1 text-xs text-red-600">{{ calcForm.errors.panel_wattage }}</p>
@@ -133,20 +168,44 @@ function naira(v) {
                             <input
                                 v-model.number="calcForm.panel_efficiency"
                                 type="number"
+                                step="0.01"
                                 min="0.01"
                                 max="1"
-                                step="0.01"
                                 class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
                             />
                             <p v-if="calcForm.errors.panel_efficiency" class="mt-1 text-xs text-red-600">{{ calcForm.errors.panel_efficiency }}</p>
+                            <p class="mt-1.5 text-[11px] text-slate-400">Decimal between 0 and 1, e.g. 0.8 for 80%.</p>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-600">Peak Sun Hours (hrs/day)</label>
+                            <input
+                                v-model.number="calcForm.peak_sun_hours"
+                                type="number"
+                                step="0.1"
+                                min="0.1"
+                                max="24"
+                                class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
+                            />
+                            <p v-if="calcForm.errors.peak_sun_hours" class="mt-1 text-xs text-red-600">{{ calcForm.errors.peak_sun_hours }}</p>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-600">Battery Depth of Discharge</label>
+                            <input
+                                v-model.number="calcForm.battery_depth_of_discharge"
+                                type="number"
+                                step="0.05"
+                                min="0.1"
+                                max="1"
+                                class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
+                            />
+                            <p v-if="calcForm.errors.battery_depth_of_discharge" class="mt-1 text-xs text-red-600">{{ calcForm.errors.battery_depth_of_discharge }}</p>
+                            <p class="mt-1.5 text-[11px] text-slate-400">Decimal between 0.1 and 1, e.g. 0.8 = 80% usable capacity.</p>
                         </div>
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-slate-600">Inverter Safety Factor</label>
                             <input
                                 v-model.number="calcForm.inverter_safety_factor"
                                 type="number"
-                                min="0.01"
-                                step="0.05"
                                 class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
                             />
                             <p v-if="calcForm.errors.inverter_safety_factor" class="mt-1 text-xs text-red-600">{{ calcForm.errors.inverter_safety_factor }}</p>
@@ -185,8 +244,6 @@ function naira(v) {
                             <input
                                 v-model.number="calcForm.price_per_panel"
                                 type="number"
-                                min="0"
-                                step="1000"
                                 class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
                             />
                             <p v-if="calcForm.errors.price_per_panel" class="mt-1 text-xs text-red-600">{{ calcForm.errors.price_per_panel }}</p>
@@ -196,8 +253,6 @@ function naira(v) {
                             <input
                                 v-model.number="calcForm.price_per_kwh_daily"
                                 type="number"
-                                min="0"
-                                step="1000"
                                 class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
                             />
                             <p v-if="calcForm.errors.price_per_kwh_daily" class="mt-1 text-xs text-red-600">{{ calcForm.errors.price_per_kwh_daily }}</p>
@@ -215,8 +270,6 @@ function naira(v) {
                             <input
                                 v-model.number="calcForm.inverter_prices[String(size)]"
                                 type="number"
-                                min="0"
-                                step="1000"
                                 placeholder="₦"
                                 class="flex-1 rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
                             />
@@ -235,8 +288,6 @@ function naira(v) {
                             <input
                                 v-model.number="calcForm.battery_prices[String(cap)]"
                                 type="number"
-                                min="0"
-                                step="1000"
                                 placeholder="₦"
                                 class="flex-1 rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
                             />
@@ -255,8 +306,6 @@ function naira(v) {
                             <input
                                 v-model.number="calcForm.installation_costs[String(size)]"
                                 type="number"
-                                min="0"
-                                step="1000"
                                 placeholder="₦"
                                 class="flex-1 rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
                             />
@@ -271,6 +320,158 @@ function naira(v) {
                 >
                     <i :class="calcForm.processing ? 'bi bi-hourglass-split animate-spin' : 'bi bi-save'"></i>
                     {{ calcForm.processing ? 'Saving…' : 'Save Calculator Settings' }}
+                </button>
+            </form>
+        </div>
+
+        <!-- Business Settings -->
+        <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
+            <div class="mb-4 flex items-center justify-between">
+                <h2 class="text-sm font-semibold text-slate-900">Business Information</h2>
+                <span class="rounded-full bg-[#40e0d0]/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[#40e0d0]">
+                    Admin Only
+                </span>
+            </div>
+            <p class="mb-4 text-sm text-slate-500">These values appear on the public website (contact page, footer, etc.) and in emails/documents.</p>
+
+            <form @submit.prevent="saveBusinessSettings" class="space-y-5">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                        <label class="mb-1.5 block text-xs font-medium text-slate-600">Business Name *</label>
+                        <input
+                            v-model="businessForm['business.name']"
+                            type="text"
+                            required
+                            class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
+                        />
+                        <p v-if="businessForm.errors['business.name']" class="mt-1 text-xs text-red-600">{{ businessForm.errors['business.name'] }}</p>
+                    </div>
+                    <div>
+                        <label class="mb-1.5 block text-xs font-medium text-slate-600">Email *</label>
+                        <input
+                            v-model="businessForm['business.email']"
+                            type="email"
+                            required
+                            class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
+                        />
+                        <p v-if="businessForm.errors['business.email']" class="mt-1 text-xs text-red-600">{{ businessForm.errors['business.email'] }}</p>
+                    </div>
+                    <div>
+                        <label class="mb-1.5 block text-xs font-medium text-slate-600">Phone *</label>
+                        <input
+                            v-model="businessForm['business.phone']"
+                            type="tel"
+                            required
+                            class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
+                        />
+                        <p v-if="businessForm.errors['business.phone']" class="mt-1 text-xs text-red-600">{{ businessForm.errors['business.phone'] }}</p>
+                    </div>
+                    <div>
+                        <label class="mb-1.5 block text-xs font-medium text-slate-600">Currency Symbol *</label>
+                        <input
+                            v-model="businessForm['currency.symbol']"
+                            type="text"
+                            required
+                            maxlength="10"
+                            class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
+                        />
+                        <p v-if="businessForm.errors['currency.symbol']" class="mt-1 text-xs text-red-600">{{ businessForm.errors['currency.symbol'] }}</p>
+                    </div>
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-xs font-medium text-slate-600">Address *</label>
+                    <textarea
+                        v-model="businessForm['business.address']"
+                        rows="3"
+                        required
+                        class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20 resize-y"
+                        placeholder="Full address for contact page and Google Maps"
+                    ></textarea>
+                    <p v-if="businessForm.errors['business.address']" class="mt-1 text-xs text-red-600">{{ businessForm.errors['business.address'] }}</p>
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-xs font-medium text-slate-600">Footer Tagline</label>
+                    <input
+                        v-model="businessForm['business.footer']"
+                        type="text"
+                        class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
+                        placeholder="Short tagline for website footer"
+                    />
+                    <p v-if="businessForm.errors['business.footer']" class="mt-1 text-xs text-red-600">{{ businessForm.errors['business.footer'] }}</p>
+                </div>
+
+                <button
+                    type="submit"
+                    class="inline-flex items-center gap-2 rounded-lg bg-[#0D1527] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0D1527]/90 disabled:opacity-50"
+                    :disabled="businessForm.processing"
+                >
+                    <i :class="businessForm.processing ? 'bi bi-hourglass-split animate-spin' : 'bi bi-save'"></i>
+                    {{ businessForm.processing ? 'Saving…' : 'Save Business Settings' }}
+                </button>
+            </form>
+        </div>
+
+        <!-- Bank Settings -->
+        <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
+            <div class="mb-4 flex items-center justify-between">
+                <h2 class="text-sm font-semibold text-slate-900">Bank Details</h2>
+                <span class="rounded-full bg-[#40e0d0]/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[#40e0d0]">
+                    Admin Only
+                </span>
+            </div>
+            <p class="mb-4 text-sm text-slate-500">Bank account details shown on checkout for bank transfer payments.</p>
+
+            <form @submit.prevent="saveBankSettings" class="space-y-5">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                        <label class="mb-1.5 block text-xs font-medium text-slate-600">Bank Name *</label>
+                        <input
+                            v-model="bankForm['bank.bank_name']"
+                            type="text"
+                            required
+                            class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
+                        />
+                        <p v-if="bankForm.errors['bank.bank_name']" class="mt-1 text-xs text-red-600">{{ bankForm.errors['bank.bank_name'] }}</p>
+                    </div>
+                    <div>
+                        <label class="mb-1.5 block text-xs font-medium text-slate-600">Account Name *</label>
+                        <input
+                            v-model="bankForm['bank.account_name']"
+                            type="text"
+                            required
+                            class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
+                        />
+                        <p v-if="bankForm.errors['bank.account_name']" class="mt-1 text-xs text-red-600">{{ bankForm.errors['bank.account_name'] }}</p>
+                    </div>
+                    <div>
+                        <label class="mb-1.5 block text-xs font-medium text-slate-600">Account Number *</label>
+                        <input
+                            v-model="bankForm['bank.account_number']"
+                            type="text"
+                            required
+                            class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20"
+                        />
+                        <p v-if="bankForm.errors['bank.account_number']" class="mt-1 text-xs text-red-600">{{ bankForm.errors['bank.account_number'] }}</p>
+                    </div>
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-xs font-medium text-slate-600">Transfer Instructions</label>
+                    <textarea
+                        v-model="bankForm['bank.instructions']"
+                        rows="3"
+                        class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20 resize-y"
+                        placeholder="Instructions shown to customers during bank transfer checkout"
+                    ></textarea>
+                    <p v-if="bankForm.errors['bank.instructions']" class="mt-1 text-xs text-red-600">{{ bankForm.errors['bank.instructions'] }}</p>
+                </div>
+
+                <button
+                    type="submit"
+                    class="inline-flex items-center gap-2 rounded-lg bg-[#0D1527] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0D1527]/90 disabled:opacity-50"
+                    :disabled="bankForm.processing"
+                >
+                    <i :class="bankForm.processing ? 'bi bi-hourglass-split animate-spin' : 'bi bi-save'"></i>
+                    {{ bankForm.processing ? 'Saving…' : 'Save Bank Settings' }}
                 </button>
             </form>
         </div>

@@ -53,8 +53,8 @@ const availabilityBadge = {
             </div>
             <div class="text-sm text-blue-800 space-y-1">
                 <p class="font-semibold">How Solar Packages Work:</p>
-                <p><strong>1. Create Package:</strong> Define name, price, installation cost, inverter capacity, load capacity, warranty.</p>
-                <p><strong>2. Add Components:</strong> Select products (inverters, batteries, panels, etc.) with quantities and unit costs. System auto-calculates margin.</p>
+                <p><strong>1. Create Package:</strong> Define name, price (includes equipment & installation), inverter capacity, load capacity, warranty.</p>
+                <p><strong>2. Add Components:</strong> Select products (inverters, batteries, panels, etc.) with quantities and specifications. Cost is included in package price.</p>
                 <p><strong>3. Visibility:</strong> "Visible online" → shows on website calculator & packages page. "Featured" → highlighted on homepage.</p>
                 <p><strong>4. Availability:</strong> "Available" → customers can buy/quote. "Unavailable" → hidden from purchase.</p>
                 <p><strong>Flow:</strong> Package created → Added to quotations/leads → Customer selects package → Order/Sale created.</p>
@@ -99,7 +99,6 @@ const availabilityBadge = {
                         <th class="px-4 py-3 text-left font-semibold text-slate-600">Inverter</th>
                         <th class="px-4 py-3 text-right font-semibold text-slate-600">Load</th>
                         <th class="px-4 py-3 text-right font-semibold text-slate-600">Price</th>
-                        <th class="px-4 py-3 text-right font-semibold text-slate-600">Installation</th>
                         <th class="px-4 py-3 text-center font-semibold text-slate-600">Items</th>
                         <th class="px-4 py-3 text-center font-semibold text-slate-600">Status</th>
                         <th class="px-4 py-3 text-right font-semibold text-slate-600">Action</th>
@@ -114,7 +113,6 @@ const availabilityBadge = {
                         <td class="px-4 py-3 text-slate-600">{{ p.inverter_capacity || '—' }}</td>
                         <td class="px-4 py-3 text-right text-slate-600">{{ p.estimated_load_capacity || '—' }}</td>
                         <td class="px-4 py-3 text-right font-bold text-slate-900">{{ naira(p.package_price) }}</td>
-                        <td class="px-4 py-3 text-right text-slate-600">{{ naira(p.installation_cost) }}</td>
                         <td class="px-4 py-3 text-center text-slate-600">{{ p.items_count ?? 0 }}</td>
                         <td class="px-4 py-3 text-center">
                             <span :class="badgeClass(availabilityBadge[p.availability] || 'bg-slate-100 text-slate-500')">{{ p.availability }}</span>
@@ -127,7 +125,7 @@ const availabilityBadge = {
                         </td>
                     </tr>
                     <tr v-if="!packages.data.length">
-                        <td colspan="8" class="px-4 py-12 text-center text-sm text-slate-400">No solar packages found.</td>
+                        <td colspan="7" class="px-4 py-12 text-center text-sm text-slate-400">No solar packages found.</td>
                     </tr>
                 </tbody>
             </table>

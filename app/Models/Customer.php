@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Traits\HasStoreScope;
+use App\Services\ReferenceGenerator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -25,6 +26,17 @@ class Customer extends Model
     ];
 
     protected $casts = ['customer_type' => 'string'];
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            if (empty($model->ref_id)) {
+                $model->ref_id = ReferenceGenerator::generate('customer');
+            }
+        });
+    }
 
     public function user(): BelongsTo
     {

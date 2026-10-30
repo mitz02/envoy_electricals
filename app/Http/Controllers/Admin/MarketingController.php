@@ -122,26 +122,50 @@ class MarketingController extends Controller
     {
         $data = $this->validateNewsletter($request);
 
+        $initialStatus = $data['status'] === 'send_now' ? 'draft' : $data['status'];
+
         $newsletter = Newsletter::create([
-            ...$data,
-            'scheduled_at' => $data['scheduled_at'] ?? null,
+            'subject' => $data['subject'],
+            'content' => $data['content'],
+            'status' => $initialStatus,
+            'scheduled_at' => $data['status'] === 'scheduled' ? ($data['scheduled_at'] ?? null) : null,
             'image_path' => $this->storeNewsletterImage($request),
             'created_by' => $request->user()->id,
         ]);
 
         AuditLogger::log('created', 'newsletter', $newsletter->id, "Created newsletter: {$newsletter->subject}");
 
+        if ($data['status'] === 'send_now' || $request->boolean('send_now')) {
+            $subscriberCount = NewsletterSubscriber::where('status', 'subscribed')->count();
+            if ($subscriberCount > 0) {
+                $result = app(NewsletterService::class)->send($newsletter);
+                $message = "Newsletter created and sent to {$result['delivered']} of {$result['total']} subscriber(s).";
+                AuditLogger::log('sent', 'newsletter', $newsletter->id, $message);
+
+                return redirect()->route('admin.marketing.newsletters.show', $newsletter->id)->with('success', $message);
+            } else {
+                return redirect()->route('admin.marketing.newsletters.show', $newsletter->id)
+                    ->with('warning', 'Newsletter created as draft. Could not broadcast because there are 0 active subscribers yet.');
+            }
+        }
+
         return redirect()->route('admin.marketing.newsletters.show', $newsletter->id)->with('success', 'Newsletter saved.');
     }
 
     protected function validateNewsletter(Request $request): array
     {
+        // Sanitize image field if empty string or string 'null' was sent via FormData
+        if ($request->input('image') === 'null' || $request->input('image') === 'undefined' || $request->input('image') === '') {
+            $request->request->remove('image');
+        }
+
         return $request->validate([
             'subject' => ['required', 'string', 'max:255'],
             'content' => ['required', 'string'],
-            'status' => ['required', 'in:draft,scheduled'],
+            'status' => ['required', 'in:draft,scheduled,send_now'],
             'scheduled_at' => ['nullable', 'date', 'required_if:status,scheduled'],
             'image' => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:5120'],
+            'remove_image' => ['nullable', 'boolean'],
         ]);
     }
 
@@ -154,6 +178,28 @@ class MarketingController extends Controller
         return $request->file('image')->store('newsletters', 'public');
     }
 
+    protected function storeTestimonialPhoto(Request $request): ?string
+    {
+        if (! $request->hasFile('photo')) {
+            return null;
+        }
+
+        return $request->file('photo')->store('testimonials', 'public');
+    }
+
+    protected function deleteTestimonialPhoto(?string $path): void
+    {
+        if (! $path) {
+            return;
+        }
+
+        try {
+            Storage::disk('public')->delete($path);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
     public function newsletterShow(Newsletter $newsletter): Response
     {
         $newsletter->load('creator:id,name');
@@ -161,6 +207,7 @@ class MarketingController extends Controller
         return Inertia::render('Admin/Marketing/Newsletters/Show', [
             'newsletter' => $newsletter,
             'subscriber_count' => NewsletterSubscriber::where('status', 'subscribed')->count(),
+            'current_user_email' => auth()->user()?->email,
             'mail_from' => [
                 'name' => config('mail.from.name', config('app.name', 'Envoy Electricals')),
                 'address' => config('mail.from.address', 'hello@example.com'),
@@ -183,20 +230,74 @@ class MarketingController extends Controller
 
         $data = $this->validateNewsletter($request);
 
-        if ($request->hasFile('image')) {
+        $updateData = [
+            'subject' => $data['subject'],
+            'content' => $data['content'],
+            'status' => $data['status'] === 'send_now' ? 'draft' : $data['status'],
+            'scheduled_at' => $data['status'] === 'scheduled' ? ($data['scheduled_at'] ?? null) : null,
+        ];
+
+        // Handle image removal
+        if (! empty($data['remove_image']) && $newsletter->image_path) {
             $this->deleteNewsletterImage($newsletter->image_path);
-            $data['image_path'] = $this->storeNewsletterImage($request);
+            $updateData['image_path'] = null;
         }
 
-        $newsletter->update([
-            ...$data,
-            'scheduled_at' => $data['scheduled_at'] ?? null,
-            'sent_at' => null,
-        ]);
+        // Handle new image upload
+        if ($request->hasFile('image')) {
+            if ($newsletter->image_path) {
+                $this->deleteNewsletterImage($newsletter->image_path);
+            }
+            $updateData['image_path'] = $this->storeNewsletterImage($request);
+        }
+
+        $newsletter->update($updateData);
 
         AuditLogger::log('updated', 'newsletter', $newsletter->id, "Updated newsletter: {$newsletter->subject}");
 
+        if ($data['status'] === 'send_now' || $request->boolean('send_now')) {
+            $subscriberCount = NewsletterSubscriber::where('status', 'subscribed')->count();
+            if ($subscriberCount > 0) {
+                $result = app(NewsletterService::class)->send($newsletter);
+                $message = "Newsletter updated and sent to {$result['delivered']} of {$result['total']} subscriber(s).";
+                AuditLogger::log('sent', 'newsletter', $newsletter->id, $message);
+
+                return redirect()->route('admin.marketing.newsletters.show', $newsletter->id)->with('success', $message);
+            } else {
+                return redirect()->route('admin.marketing.newsletters.show', $newsletter->id)
+                    ->with('warning', 'Newsletter updated as draft. Could not broadcast because there are 0 active subscribers yet.');
+            }
+        }
+
         return redirect()->route('admin.marketing.newsletters.show', $newsletter->id)->with('success', 'Newsletter updated.');
+    }
+
+    public function newsletterSendTest(Request $request, Newsletter $newsletter)
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email', 'max:255'],
+        ]);
+
+        $recipientEmail = $data['email'];
+
+        // Mock subscriber object for test email rendering
+        $subscriber = new NewsletterSubscriber([
+            'email' => $recipientEmail,
+            'name' => $request->user()->name ?? 'Test Recipient',
+            'token' => 'preview-test-token',
+            'status' => 'subscribed',
+        ]);
+
+        try {
+            Mail::to($recipientEmail)->send(new NewsletterMail($newsletter, $subscriber));
+            AuditLogger::log('test_sent', 'newsletter', $newsletter->id, "Sent test newsletter to {$recipientEmail}");
+
+            return redirect()->back()->with('success', "Test email sent successfully to {$recipientEmail}.");
+        } catch (\Throwable $e) {
+            report($e);
+
+            return redirect()->back()->with('error', "Failed to send test email: {$e->getMessage()}");
+        }
     }
 
     protected function deleteNewsletterImage(?string $path): void
@@ -298,13 +399,22 @@ class MarketingController extends Controller
             ->with('feedback')
             ->when($request->search, fn ($q, $s) => $q->where('author_name', 'like', "%{$s}%")->orWhere('content', 'like', "%{$s}%"))
             ->when($request->published, fn ($q, $p) => $q->where('is_published', (bool) $p))
+            ->when($request->status, fn ($q, $s) => $q->where('status', $s))
             ->latest()
             ->paginate(15)
             ->withQueryString();
 
+        $counts = [
+            'all' => Testimonial::count(),
+            'pending' => Testimonial::where('status', 'pending')->count(),
+            'approved' => Testimonial::where('status', 'approved')->count(),
+            'rejected' => Testimonial::where('status', 'rejected')->count(),
+        ];
+
         return Inertia::render('Admin/Marketing/Testimonials/Index', [
             'testimonials' => $testimonials,
-            'filters' => $request->only(['search', 'published']),
+            'filters' => $request->only(['search', 'published', 'status']),
+            'counts' => $counts,
         ]);
     }
 
@@ -322,14 +432,21 @@ class MarketingController extends Controller
             'feedback_id' => ['nullable', 'int', 'exists:feedback,id'],
             'author_name' => ['required', 'string', 'max:255'],
             'author_role' => ['nullable', 'string', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:50'],
             'content' => ['required', 'string'],
             'rating' => ['nullable', 'int', 'min:1', 'max:5'],
+            'status' => ['nullable', 'in:pending,approved,rejected'],
+            'admin_notes' => ['nullable', 'string'],
             'is_published' => ['boolean'],
+            'photo' => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:2048'],
         ]);
 
         $testimonial = Testimonial::create([
             ...$data,
+            'status' => $data['status'] ?? 'approved',
             'is_published' => (bool) ($data['is_published'] ?? false),
+            'photo_path' => $this->storeTestimonialPhoto($request),
         ]);
 
         AuditLogger::log('created', 'testimonial', $testimonial->id, "Created testimonial from {$testimonial->author_name}");
@@ -351,15 +468,37 @@ class MarketingController extends Controller
             'feedback_id' => ['nullable', 'int', 'exists:feedback,id'],
             'author_name' => ['required', 'string', 'max:255'],
             'author_role' => ['nullable', 'string', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:50'],
             'content' => ['required', 'string'],
             'rating' => ['nullable', 'int', 'min:1', 'max:5'],
+            'status' => ['nullable', 'in:pending,approved,rejected'],
+            'admin_notes' => ['nullable', 'string'],
             'is_published' => ['boolean'],
+            'photo' => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:2048'],
+            'remove_photo' => ['boolean'],
         ]);
 
-        $testimonial->update([
+        $updateData = [
             ...$data,
             'is_published' => (bool) ($data['is_published'] ?? false),
-        ]);
+        ];
+
+        // Handle photo removal
+        if (! empty($data['remove_photo']) && $testimonial->photo_path) {
+            $this->deleteTestimonialPhoto($testimonial->photo_path);
+            $updateData['photo_path'] = null;
+        }
+
+        // Handle new photo upload
+        if ($request->hasFile('photo')) {
+            if ($testimonial->photo_path) {
+                $this->deleteTestimonialPhoto($testimonial->photo_path);
+            }
+            $updateData['photo_path'] = $this->storeTestimonialPhoto($request);
+        }
+
+        $testimonial->update($updateData);
 
         AuditLogger::log('updated', 'testimonial', $testimonial->id, "Updated testimonial from {$testimonial->author_name}");
 
@@ -375,6 +514,50 @@ class MarketingController extends Controller
         return redirect()->back()->with('success', $testimonial->is_published ? 'Testimonial published.' : 'Testimonial hidden.');
     }
 
+    public function testimonialApprove(Request $request, Testimonial $testimonial)
+    {
+        $testimonial->update([
+            'status' => 'approved',
+            'is_published' => true,
+        ]);
+
+        AuditLogger::log('updated', 'testimonial', $testimonial->id, "Approved and published testimonial from {$testimonial->author_name}");
+
+        return redirect()->back()->with('success', "Testimonial from {$testimonial->author_name} approved and published.");
+    }
+
+    public function testimonialReject(Request $request, Testimonial $testimonial)
+    {
+        $testimonial->update([
+            'status' => 'rejected',
+            'is_published' => false,
+        ]);
+
+        AuditLogger::log('updated', 'testimonial', $testimonial->id, "Rejected testimonial from {$testimonial->author_name}");
+
+        return redirect()->back()->with('success', "Testimonial from {$testimonial->author_name} marked as rejected.");
+    }
+
+    public function testimonialStatus(Request $request, Testimonial $testimonial)
+    {
+        $data = $request->validate([
+            'status' => ['required', 'in:pending,approved,rejected'],
+        ]);
+
+        $update = ['status' => $data['status']];
+        if ($data['status'] === 'approved') {
+            $update['is_published'] = true;
+        } elseif ($data['status'] === 'rejected') {
+            $update['is_published'] = false;
+        }
+
+        $testimonial->update($update);
+
+        AuditLogger::log('updated', 'testimonial', $testimonial->id, "Changed testimonial status to {$data['status']} for {$testimonial->author_name}");
+
+        return redirect()->back()->with('success', "Testimonial marked as {$data['status']}.");
+    }
+
     public function testimonialDestroy(Testimonial $testimonial)
     {
         $author = $testimonial->author_name;
@@ -383,6 +566,127 @@ class MarketingController extends Controller
         AuditLogger::log('deleted', 'testimonial', $testimonial->id, "Removed testimonial from {$author}");
 
         return redirect()->route('admin.marketing.testimonials.index')->with('success', 'Testimonial removed.');
+    }
+
+    public function testimonialGenerateLink(Testimonial $testimonial)
+    {
+        if (! $testimonial->token) {
+            $testimonial->update(['token' => Testimonial::generateToken()]);
+        }
+
+        return redirect()->back()->with('success', 'Link generated: '.$testimonial->getPublicSubmissionUrl());
+    }
+
+    public function testimonialRevokeLink(Testimonial $testimonial)
+    {
+        $testimonial->update(['token' => null]);
+
+        return redirect()->back()->with('success', 'Submission link revoked.');
+    }
+
+    // ---------- Public Testimonial Submission ----------
+
+    public function publicTestimonialForm(string $token): Response
+    {
+        $testimonial = Testimonial::where('token', $token)->firstOrFail();
+
+        // Only allow if status is pending (not yet submitted) or if we want to allow updates
+        if ($testimonial->status !== 'pending') {
+            abort(403, 'This testimonial link has already been used or is no longer valid.');
+        }
+
+        return Inertia::render('Public/TestimonialSubmit', [
+            'testimonial' => $testimonial->only(['id', 'token', 'author_name', 'author_role', 'content', 'rating', 'email', 'phone', 'photo_path']),
+        ]);
+    }
+
+    public function publicTestimonialSubmit(Request $request, string $token)
+    {
+        $testimonial = Testimonial::where('token', $token)->firstOrFail();
+
+        if ($testimonial->status !== 'pending') {
+            return redirect()->back()->with('error', 'This testimonial link has already been used or is no longer valid.');
+        }
+
+        $data = $request->validate([
+            'author_name' => ['required', 'string', 'max:255'],
+            'author_role' => ['nullable', 'string', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'content' => ['required', 'string', 'min:10'],
+            'rating' => ['required', 'int', 'min:1', 'max:5'],
+            'photo' => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:2048'],
+        ]);
+
+        $updateData = [
+            ...$data,
+            'status' => 'pending', // Keep as pending for admin review
+            'is_published' => false,
+        ];
+
+        // Handle photo upload
+        if ($request->hasFile('photo')) {
+            $updateData['photo_path'] = $this->storeTestimonialPhoto($request);
+        }
+
+        $testimonial->update($updateData);
+
+        AuditLogger::log('updated', 'testimonial', $testimonial->id, "Public testimonial submitted by {$testimonial->author_name}");
+
+        return redirect()->route('public.testimonial.thankyou', $token)->with('success', 'Thank you for your testimonial! It will be reviewed before publishing.');
+    }
+
+    public function publicTestimonialThankyou(string $token): Response
+    {
+        $testimonial = Testimonial::where('token', $token)->firstOrFail();
+
+        return Inertia::render('Public/TestimonialThankyou', [
+            'testimonial' => $testimonial->only(['author_name']),
+        ]);
+    }
+
+    // Simple public submission (no token required) - creates new testimonial
+    public function publicTestimonialCreate(): Response
+    {
+        return Inertia::render('Public/TestimonialSubmit', [
+            'testimonial' => null,
+        ]);
+    }
+
+    public function publicTestimonialStore(Request $request)
+    {
+        $data = $request->validate([
+            'author_name' => ['required', 'string', 'max:255'],
+            'author_role' => ['nullable', 'string', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'content' => ['required', 'string', 'min:10'],
+            'rating' => ['required', 'int', 'min:1', 'max:5'],
+            'photo' => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:2048'],
+        ]);
+
+        $createData = [
+            ...$data,
+            'status' => 'pending',
+            'is_published' => false,
+        ];
+
+        if ($request->hasFile('photo')) {
+            $createData['photo_path'] = $this->storeTestimonialPhoto($request);
+        }
+
+        $testimonial = Testimonial::create($createData);
+
+        AuditLogger::log('created', 'testimonial', $testimonial->id, "Public testimonial submitted by {$testimonial->author_name}");
+
+        return redirect()->route('public.testimonial.thankyou.simple')->with('success', 'Thank you for your testimonial! It will be reviewed before publishing.');
+    }
+
+    public function publicTestimonialThankyouSimple(): Response
+    {
+        return Inertia::render('Public/TestimonialThankyou', [
+            'testimonial' => null,
+        ]);
     }
 
     // ---------- Feedback ----------

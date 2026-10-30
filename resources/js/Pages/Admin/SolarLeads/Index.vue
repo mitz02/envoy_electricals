@@ -92,6 +92,8 @@ const pipelineStats = computed(() => {
     <PageHeader
         title="Solar Leads"
         subtitle="Calculator submissions and quotations from the website."
+        action-label="Quote from package"
+        action-href="/admin/solar-leads/quotations/create"
     />
 
     <!-- Flow Explanation -->

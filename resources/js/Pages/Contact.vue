@@ -1,27 +1,20 @@
 ﻿<script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { Head, useForm } from '@inertiajs/vue3';
+import { ref, computed, onMounted, onUnmounted, unref } from 'vue';
+import { Head, useForm, usePage } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 
 defineOptions({ layout: PublicLayout });
 
-const props = defineProps({
-    canLogin: {
-        type: Boolean,
-        default: true,
-    },
-    canRegister: {
-        type: Boolean,
-        default: true,
-    },
-    whatsappNumber: {
-        type: String,
-        default: '',
-    },
-});
+const page = usePage();
 
-const whatsapp = computed(() => (props.whatsappNumber || '2348097089259').replace(/\D/g, ''));
+const whatsappNumber = computed(() => page.props.settings?.website?.['website.whatsapp'] || page.props.settings?.business?.phone || '2348097089259');
+const whatsapp = computed(() => whatsappNumber.value.replace(/\D/g, ''));
 const whatsappUrl = computed(() => `https://wa.me/${whatsapp.value}`);
+
+const businessAddress = computed(() => page.props.settings?.business?.address || 'Shop 1, Peace Avenue Junction, opp Goddy Royal Hotel, Futa Southgate Road, Akure');
+const businessPhone = computed(() => page.props.settings?.business?.phone || '+234 809 708 9259');
+const businessEmail = computed(() => page.props.settings?.business?.email || 'hello@envoyelectricals.com');
+const businessName = computed(() => page.props.settings?.business?.name || 'Envoy Electricals');
 
 const isContactModalOpen = ref(false);
 
@@ -68,30 +61,30 @@ function resetForm() {
     submitted.value = false;
 }
 
-const infoCards = [
+const infoCards = computed(() => [
     {
         icon: 'M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11zM10 10a2 2 0 1 1 4 0 2 2 0 0 1-4 0z',
         title: 'Office Address',
-        lines: ['Shop 1, Peace Avenue Junction,', 'opp Goddy Royal Hotel, Futa Southgate Road, Akure'],
+        lines: businessAddress.value.split(',').map(l => l.trim()),
         href: null,
     },
     {
         icon: 'M2 4l3 0 2 7-2.5 1.5a15 15 0 0 0 5 5L11 15l7 2 0 3a2 2 0 0 1-2 2A16 16 0 0 1 0 6a2 2 0 0 1 2-2z',
         title: 'Telephone',
         lines: [],
-        href: 'tel:+2348097089259',
-        linkText: '+234 809 708 9259',
+        href: `tel:${businessPhone.value}`,
+        linkText: businessPhone.value,
     },
     {
         icon: 'M3 8 11 16 19 8M5 5h14a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z',
         title: 'Email Address',
         lines: [],
-        href: 'mailto:hello@envoyelectricals.com',
-        linkText: 'hello@envoyelectricals.com',
+        href: `mailto:${businessEmail.value}`,
+        linkText: businessEmail.value,
     },
-];
+]);
 
-const supportCards = [
+const supportCards = computed(() => [
     {
         icon: 'M12 6v6l4 2M12 22a10 10 0 1 1 0-20 10 10 0 0 1 0 20z',
         title: 'Office Hours',
@@ -107,7 +100,7 @@ const supportCards = [
         body: 'Quick questions about products, pricing or quotes? Chat with our sales team directly.',
         badge: false,
         badgeText: null,
-        link: 'https://wa.me/2348097089259',
+        link: whatsappUrl.value,
         linkText: 'Chat with Support',
     },
     {
@@ -116,10 +109,10 @@ const supportCards = [
         body: 'Schedule a free site assessment with our engineers and get an accurate system design.',
         badge: false,
         badgeText: null,
-        link: 'tel:+2348097089259',
+        link: `tel:${businessPhone.value}`,
         linkText: 'Call Our Advisor',
     },
-];
+]);
 
 const faqs = [
     {
@@ -177,18 +170,18 @@ onUnmounted(() => {
     <!-- ===================== HERO ===================== -->
     <section class="relative overflow-hidden">
         <div class="absolute -top-20 -right-16 w-96 h-96 rounded-full bg-yellow-400/[0.10] blur-[120px] pointer-events-none"></div>
-        <div class="absolute -top-24 -left-16 w-80 h-80 rounded-full bg-[#40e0d0]/[0.08] blur-[120px] pointer-events-none"></div>
+        <div class="absolute -top-24 -left-16 w-80 h-80 rounded-full bg-[#60d4f7]/[0.08] blur-[120px] pointer-events-none"></div>
         <div class="absolute inset-0" style="background-image:radial-gradient(rgba(13,21,39,0.05) 1px, transparent 1px); background-size:26px 26px;" aria-hidden="true"></div>
 
         <div class="relative max-w-3xl mx-auto text-center pt-20 sm:pt-28 pb-16 px-6">
             <span class="inline-flex items-center gap-2.5 mb-6">
-                <span class="w-10 h-[2px] bg-[#40e0d0]"></span>
-                <span class="text-[#40e0d0] text-xs font-bold uppercase tracking-[0.3em]">Contact Us</span>
-                <span class="w-10 h-[2px] bg-[#40e0d0]"></span>
+                <span class="w-10 h-[2px] bg-[#60d4f7]"></span>
+                <span class="text-[#60d4f7] text-xs font-bold uppercase tracking-[0.3em]">Contact Us</span>
+                <span class="w-10 h-[2px] bg-[#60d4f7]"></span>
             </span>
             <h1 class="text-4xl sm:text-5xl lg:text-[56px] font-extrabold tracking-tight text-slate-950 leading-[1.08]">
                 Let's Talk About Your<br class="hidden sm:block" />
-                <span class="bg-gradient-to-r from-yellow-500 via-amber-400 to-amber-500 bg-clip-text text-transparent">Next Power Project</span>
+                <span class="bg-gradient-to-r from-yellow-500 via-amber-400 to-[#60d4f7] bg-clip-text text-transparent">Next Power Project</span>
             </h1>
             <p class="mt-6 text-slate-600 text-base sm:text-lg leading-relaxed max-w-xl mx-auto">
                 Whether you need a solar system, a full installation, training, or a partnership formed — we'd love to hear from you. Reach out and we'll respond promptly.
@@ -204,9 +197,9 @@ onUnmounted(() => {
                 <a
                     v-for="(card, i) in infoCards"
                     :key="card.title"
-                    :href="card.href || undefined"
-                    :target="card.href && card.href.startsWith('http') ? '_blank' : undefined"
-                    :rel="card.href && card.href.startsWith('http') ? 'noopener' : undefined"
+                    :href="unref(card.href) || undefined"
+                    :target="unref(card.href)?.startsWith('http') ? '_blank' : undefined"
+                    :rel="unref(card.href)?.startsWith('http') ? 'noopener' : undefined"
                     class="reveal group bg-white rounded-2xl rounded-tr-none p-7 flex items-start gap-5 shadow-[0_2px_14px_rgba(0,0,0,0.06)] hover:shadow-[0_10px_30px_rgba(0,0,0,0.10)] hover:-translate-y-1 transition-all duration-300"
                     :style="{ transitionDelay: `${i * 60}ms` }"
                 >
@@ -223,7 +216,7 @@ onUnmounted(() => {
                 <div class="reveal relative bg-gradient-to-br from-[#0D1527] via-[#12203C] to-[#1A365D] rounded-2xl rounded-tr-none p-7 overflow-hidden shadow-xl" :style="{ transitionDelay: '180ms' }">
                     <div class="absolute -top-12 -right-12 w-40 h-40 rounded-full bg-yellow-400/[0.10] blur-3xl pointer-events-none"></div>
                     <div class="flex items-center gap-4 relative">
-                        <span class="w-12 h-12 rounded-2xl bg-white/10 text-[#40e0d0] flex items-center justify-center shrink-0">
+                        <span class="w-12 h-12 rounded-2xl bg-white/10 text-[#60d4f7] flex items-center justify-center shrink-0">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 5a2 2 0 0 1 2-2h2l1.5 4-2 1.2a10 10 0 0 0 5 5l1.2-2 4 1.5V17a2 2 0 0 1-2 2A16 16 0 0 1 3 5z" stroke-linecap="round" stroke-linejoin="round"/></svg>
                         </span>
                         <div>
@@ -234,7 +227,7 @@ onUnmounted(() => {
                     <button
                         type="button"
                         @click="isContactModalOpen = true"
-                        class="relative mt-5 inline-flex items-center gap-2 text-sm font-bold text-yellow-400 hover:text-yellow-300 transition-colors group"
+                        class="relative mt-5 inline-flex items-center gap-2 text-sm font-bold text-[#60d4f7] hover:text-[#60d4f7]/80 transition-colors group"
                     >
                         Request a callback
                         <svg class="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -335,9 +328,9 @@ onUnmounted(() => {
         <div class="max-w-7xl mx-auto">
             <div class="text-center max-w-2xl mx-auto mb-12 reveal">
                 <span class="inline-flex items-center gap-2.5 mb-4">
-                    <span class="w-8 h-[2px] bg-[#40e0d0]"></span>
-                    <span class="text-[#40e0d0] text-xs font-bold uppercase tracking-[0.3em]">Ways We Can Help</span>
-                    <span class="w-8 h-[2px] bg-[#40e0d0]"></span>
+                    <span class="w-8 h-[2px] bg-[#60d4f7]"></span>
+                    <span class="text-[#60d4f7] text-xs font-bold uppercase tracking-[0.3em]">Ways We Can Help</span>
+                    <span class="w-8 h-[2px] bg-[#60d4f7]"></span>
                 </span>
                 <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-950">Choose Your Channel</h2>
                 <p class="mt-3 text-slate-500 text-sm sm:text-base">Fast, dedicated assistance — however you prefer to reach us.</p>
@@ -380,9 +373,9 @@ onUnmounted(() => {
         <div class="max-w-7xl mx-auto">
             <div class="text-center max-w-2xl mx-auto mb-12 reveal">
                 <span class="inline-flex items-center gap-2.5 mb-4">
-                    <span class="w-8 h-[2px] bg-[#40e0d0]"></span>
-                    <span class="text-[#40e0d0] text-xs font-bold uppercase tracking-[0.3em]">Visit Us</span>
-                    <span class="w-8 h-[2px] bg-[#40e0d0]"></span>
+                    <span class="w-8 h-[2px] bg-[#60d4f7]"></span>
+                    <span class="text-[#60d4f7] text-xs font-bold uppercase tracking-[0.3em]">Visit Us</span>
+                    <span class="w-8 h-[2px] bg-[#60d4f7]"></span>
                 </span>
                 <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-950">Find Our Showroom</h2>
                 <p class="mt-3 text-slate-500 text-sm sm:text-base">Located on Peace Avenue, Akure. Walk-ins are welcome during business hours.</p>
@@ -391,7 +384,7 @@ onUnmounted(() => {
             <div class="reveal grid grid-cols-1 lg:grid-cols-12 bg-white rounded-3xl overflow-hidden shadow-[0_2px_14px_rgba(0,0,0,0.06)]">
                 <div class="lg:col-span-7 min-h-[320px] bg-[#0D1527]">
                     <iframe
-                        src="https://maps.google.com/maps?q=Peace%20Avenue%2C%20Akure%2C%20Nigeria&z=14&output=embed"
+                        :src="`https://maps.google.com/maps?q=${encodeURIComponent(businessAddress)}&z=14&output=embed`"
                         class="w-full h-full min-h-[320px]"
                         style="border: 0; filter: grayscale(20%);"
                         loading="lazy"
@@ -402,14 +395,14 @@ onUnmounted(() => {
                 </div>
                 <div class="lg:col-span-5 bg-gradient-to-br from-[#0D1527] via-[#12203C] to-[#1A365D] p-8 sm:p-10 flex flex-col justify-center relative overflow-hidden">
                     <div class="absolute -top-16 -right-16 w-56 h-56 rounded-full bg-yellow-400/[0.10] blur-3xl pointer-events-none"></div>
-                    <h3 class="relative text-2xl font-extrabold text-white">Envoy Electricals</h3>
+                    <h3 class="relative text-2xl font-extrabold text-white">{{ businessName }}</h3>
                     <p class="relative text-sm text-slate-400 leading-relaxed mt-3 mb-7">
-                        Shop 1, Peace Avenue Junction, opp Goddy Royal Hotel, Futa Southgate Road, Akure.
+                        {{ businessAddress }}
                     </p>
-                    <div class="relative space-y-4">
+<div class="relative space-y-4">
                         <div class="flex items-center gap-3 text-sm text-slate-200">
                             <svg class="w-4 h-4 text-yellow-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 21h18M4 17h16M6 17V9a6 6 0 0 1 12 0v8M9 17v-5h6v5M9 9h.01M15 9h.01" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                            Walk-in solar showroom &amp; live demos
+                            Walk-in solar showroom & live demos
                         </div>
                         <div class="flex items-center gap-3 text-sm text-slate-200">
                             <svg class="w-4 h-4 text-yellow-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 17h-3a3 3 0 0 1-3-3v-1a1 1 0 0 1 .2-.6L19 5l5.8 7.4a1 1 0 0 1 .2.6v1a3 3 0 0 1-3 3M8 17H5a3 3 0 0 1-3-3v-1a1 1 0 0 1 .2-.6L8 5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -421,7 +414,7 @@ onUnmounted(() => {
                         </div>
                     </div>
                     <a
-                        href="https://maps.google.com/?q=Peace+Avenue+Akure+Nigeria"
+                        :href="`https://maps.google.com/?q=${encodeURIComponent(businessAddress)}`"
                         target="_blank"
                         rel="noopener"
                         class="relative mt-8 inline-flex items-center justify-center gap-2 bg-gradient-to-r from-yellow-400 to-amber-400 hover:brightness-105 text-slate-950 font-bold text-sm px-6 py-3 rounded-xl transition-all"
@@ -439,9 +432,9 @@ onUnmounted(() => {
         <div class="max-w-3xl mx-auto">
             <div class="text-center mb-12 reveal">
                 <span class="inline-flex items-center gap-2.5 mb-4">
-                    <span class="w-8 h-[2px] bg-[#40e0d0]"></span>
-                    <span class="text-[#40e0d0] text-xs font-bold uppercase tracking-[0.3em]">Got Questions?</span>
-                    <span class="w-8 h-[2px] bg-[#40e0d0]"></span>
+                    <span class="w-8 h-[2px] bg-[#60d4f7]"></span>
+                    <span class="text-[#60d4f7] text-xs font-bold uppercase tracking-[0.3em]">Got Questions?</span>
+                    <span class="w-8 h-[2px] bg-[#60d4f7]"></span>
                 </span>
                 <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-950">Frequently Asked Questions</h2>
                 <p class="mt-3 text-slate-500 text-sm sm:text-base">Quick answers to the questions we hear most often.</p>
@@ -474,11 +467,11 @@ onUnmounted(() => {
 
     <!-- ===================== WHATSAPP FLOAT ===================== -->
     <a
-        href="https://wa.me/2348097089259"
+        :href="whatsappUrl"
         target="_blank"
         rel="noopener"
         title="Chat on WhatsApp"
-        class="fixed bottom-6 right-6 z-50 w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#25D366] text-white flex items-center justify-center shadow-[0_6px_18px_rgba(37,211,102,0.4)] hover:bg-[#1fb858] hover:-translate-y-1 active:translate-y-0 transition-all duration-200"
+        class="fixed bottom-6 right-6 z-50 w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-[#60d4f7] text-white flex items-center justify-center shadow-[0_6px_18px_rgba(96,212,247,0.4)] hover:bg-[#60d4f7]/80 hover:-translate-y-1 active:translate-y-0 transition-all duration-200"
     >
         <svg class="w-7 h-7 sm:w-8 sm:h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm4.5 13c-.2.2-1.4.7-1.7.8s-.4.1-.7 0-.9-.3-1.4-.7a5.6 5.6 0 0 1-1.9-2.5c-.1-.2.2-.4.4-.6l.4-.6a.8.8 0 0 0 .1-.2.5.5 0 0 0 0-.4c-.1-.2-.6-1.4-.8-1.9s-.4-.4-.6-.4h-.5a.8.8 0 0 0-.6.3 2.6 2.6 0 0 0-.8 1.9 4.5 4.5 0 0 0 .9 2.4 10 10 0 0 0 3.9 3.4c1.2.6 1.7.6 2.1.6a2.6 2.6 0 0 0 1.7-1.2 2 2 0 0 0 .1-1.2z"/></svg>
         <span class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#E4312B] border-2 border-white"></span>

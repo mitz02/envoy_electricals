@@ -34,11 +34,11 @@ class ReportController extends Controller
             ->when($to, fn ($q, $d) => $q->whereDate('sale_date', '<=', $d));
 
         $rows = match ($groupBy) {
-            'week' => $query->selectRaw("strftime('%Y-W%W', sale_date) as period, SUM(total) as total, COUNT(*) as count")
+            'week' => $query->selectRaw("DATE_FORMAT(sale_date, '%Y-%u') as period, SUM(total) as total, COUNT(*) as count")
                 ->groupBy('period')->orderBy('period')->get(),
-            'month' => $query->selectRaw("strftime('%Y-%m', sale_date) as period, SUM(total) as total, COUNT(*) as count")
+            'month' => $query->selectRaw("DATE_FORMAT(sale_date, '%Y-%m') as period, SUM(total) as total, COUNT(*) as count")
                 ->groupBy('period')->orderBy('period')->get(),
-            default => $query->selectRaw('date(sale_date) as period, SUM(total) as total, COUNT(*) as count')
+            default => $query->selectRaw('DATE(sale_date) as period, SUM(total) as total, COUNT(*) as count')
                 ->groupBy('period')->orderBy('period')->get(),
         };
 

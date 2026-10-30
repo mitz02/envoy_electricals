@@ -1,18 +1,20 @@
 <script setup>
 import { ref, computed } from 'vue';
-import { Link, router, Head } from '@inertiajs/vue3';
+import { Link, router, Head, usePage } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
 
 defineOptions({ layout: PublicLayout });
 
+const page = usePage();
+
 const props = defineProps({
     training: { type: Object, required: true },
     bankDetails: { type: Object, default: () => ({}) },
-    whatsappNumber: { type: String, default: '' },
 });
 
-const whatsapp = computed(() => (props.whatsappNumber || '2348097089259').replace(/\D/g, ''));
+const whatsappNumber = computed(() => page.props.settings?.website?.['website.whatsapp'] || '2348097089259');
+const whatsapp = computed(() => whatsappNumber.value.replace(/\D/g, ''));
 
 const bankName = computed(() => props.bankDetails.bank_name || 'Moniepoint MFB');
 const accountName = computed(() => props.bankDetails.account_name || 'Envoy Electricals');

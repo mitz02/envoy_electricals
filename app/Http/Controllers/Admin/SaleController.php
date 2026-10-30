@@ -13,16 +13,16 @@ use App\Services\InvoicePdfService;
 use App\Services\SaleService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
-use Inertia\Response;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Inertia\Response as InertiaResponse;
 
 class SaleController extends Controller
 {
     public function __construct(protected SaleService $saleService) {}
 
-    public function index(Request $request): Response
+    public function index(Request $request): InertiaResponse
     {
         $sales = Sale::query()
             ->with([
@@ -51,7 +51,7 @@ class SaleController extends Controller
         ]);
     }
 
-    public function create(): Response
+    public function create(): InertiaResponse
     {
         $storeId = session('admin_store_id');
         $isAllStores = ! $storeId;
@@ -116,6 +116,7 @@ class SaleController extends Controller
             'items.*.product_id' => ['required', 'exists:products,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+            'items.*.discount' => ['nullable', 'numeric', 'min:0'],
             'discount' => ['nullable', 'numeric', 'min:0'],
             'tax_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'amount_paid' => ['nullable', 'numeric', 'min:0'],
@@ -155,7 +156,7 @@ class SaleController extends Controller
         return redirect()->route('admin.sales.show', $sale)->with('success', $message);
     }
 
-    public function show(Sale $sale): Response
+    public function show(Sale $sale): InertiaResponse
     {
         $sale->load([
             'salesperson',
@@ -213,7 +214,7 @@ class SaleController extends Controller
     /**
      * Download invoice as PDF.
      */
-    public function downloadInvoice(Sale $sale, InvoicePdfService $pdf): BinaryFileResponse
+    public function downloadInvoice(Sale $sale, InvoicePdfService $pdf): Response|InertiaResponse
     {
         return $pdf->download($sale);
     }

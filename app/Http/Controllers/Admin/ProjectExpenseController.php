@@ -16,7 +16,7 @@ class ProjectExpenseController extends Controller
     public function store(Request $request, Project $project): RedirectResponse
     {
         $data = $request->validate([
-            'expense_type' => ['required', 'in:'.implode(',', [ProjectExpense::TYPE_LABOUR, ProjectExpense::TYPE_TRANSPORT, ProjectExpense::TYPE_OTHER])],
+            'expense_type' => ['required', 'string', 'max:100'],
             'amount' => ['required', 'numeric', 'min:0.01'],
             'expense_date' => ['required', 'date'],
             'payee' => ['nullable', 'string', 'max:255'],

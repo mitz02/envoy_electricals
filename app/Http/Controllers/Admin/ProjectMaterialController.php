@@ -17,13 +17,24 @@ class ProjectMaterialController extends Controller
     public function store(Request $request, Project $project): RedirectResponse
     {
         $data = $request->validate([
-            'product_id' => ['required', 'exists:products,id'],
+            'product_id' => ['nullable', 'integer', 'exists:products,id'],
+            'name' => ['nullable', 'string', 'max:255'],
             'quantity' => ['required', 'integer', 'min:1'],
             'unit_cost' => ['nullable', 'numeric', 'min:0'],
             'issue_now' => ['nullable', 'boolean'],
         ]);
 
-        $this->projects->addMaterial($project, $data, (int) $request->user()->id);
+        if (empty($data['product_id']) && empty($data['name'])) {
+            throw ValidationException::withMessages([
+                'name' => 'The material name is required when not selecting a product from inventory.',
+            ]);
+        }
+
+        try {
+            $this->projects->addMaterial($project, $data, (int) $request->user()->id);
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->validator)->withInput();
+        }
 
         return back()->with('success', 'Material added to project.');
     }

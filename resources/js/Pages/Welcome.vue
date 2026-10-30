@@ -1,9 +1,11 @@
 ﻿<script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { Head } from '@inertiajs/vue3';
+import { Head, usePage } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 
 defineOptions({ layout: PublicLayout });
+
+const page = usePage();
 
 const props = defineProps({
     canLogin: {
@@ -18,11 +20,16 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
-    whatsappNumber: {
-        type: String,
-        default: '',
+    testimonials: {
+        type: Array,
+        default: () => [],
     },
 });
+
+// WhatsApp number from settings
+const whatsappNumber = computed(() => page.props.settings?.website?.['website.whatsapp'] || '2348097089259');
+const whatsapp = computed(() => whatsappNumber.value.replace(/\D/g, ''));
+const whatsappUrl = computed(() => `https://wa.me/${whatsapp.value}`);
 
 // Featured products for the showcase grid (real products added by admin)
 const shopProducts = computed(() => props.featuredProducts);
@@ -140,11 +147,13 @@ onMounted(() => {
     updateSolutionPerView();
     window.addEventListener('resize', updateSolutionPerView);
     startSolutionAutoplay();
+    startTestimonialAutoplay();
 });
 onUnmounted(() => {
     if (heroTimer) clearInterval(heroTimer);
     window.removeEventListener('resize', updateSolutionPerView);
     stopSolutionAutoplay();
+    stopTestimonialAutoplay();
 });
 
 // Section 3: Solar Solutions carousel
@@ -310,6 +319,34 @@ function solutionPointerMove(e) {
 function solutionPointerUp() {
     solutionSwiping = false;
     if (!solutionAutoplayPaused.value) startSolutionAutoplay();
+}
+
+// Testimonials carousel state
+const activeTestimonialIndex = ref(0);
+let testimonialTimer = null;
+
+function nextTestimonial() {
+    if (props.testimonials.length > 0) {
+        activeTestimonialIndex.value = (activeTestimonialIndex.value + 1) % props.testimonials.length;
+    }
+}
+
+function prevTestimonial() {
+    if (props.testimonials.length > 0) {
+        activeTestimonialIndex.value = (activeTestimonialIndex.value - 1 + props.testimonials.length) % props.testimonials.length;
+    }
+}
+
+function startTestimonialAutoplay() {
+    if (testimonialTimer) clearInterval(testimonialTimer);
+    testimonialTimer = setInterval(nextTestimonial, 7000);
+}
+
+function stopTestimonialAutoplay() {
+    if (testimonialTimer) {
+        clearInterval(testimonialTimer);
+        testimonialTimer = null;
+    }
 }
 
 // Section 5: Gallery showcase state
@@ -478,13 +515,13 @@ const faqs = [
                     <div class="hero-reveal relative inline-flex items-center justify-center">
                         <span class="beam-pulse h-px w-10 sm:w-16 bg-gradient-to-r from-transparent via-[#FACC15]/60 to-[#FACC15]"></span>
                         <span class="relative mx-3 sm:mx-4 flex h-9 w-9 sm:h-11 sm:w-11 items-center justify-center">
-                            <span class="absolute inset-0 rounded-full bg-[#FACC15]/20 blur-md beam-halo"></span>
+                            <span class="absolute inset-0 rounded-full bg-[#60d4f7]/25 blur-md beam-halo"></span>
                             <svg class="sun-spin relative h-7 w-7 sm:h-9 sm:w-9 text-[#FDE047] drop-shadow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                 <circle cx="12" cy="12" r="4" fill="#FDE047" stroke="none" />
                                 <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" stroke-width="2.4" />
                             </svg>
                         </span>
-                        <span class="beam-pulse h-px w-10 sm:w-16 bg-gradient-to-l from-transparent via-[#40e0d0]/60 to-[#40e0d0]"></span>
+                        <span class="beam-pulse h-px w-10 sm:w-16 bg-gradient-to-l from-transparent via-[#60d4f7]/60 to-[#60d4f7]"></span>
                     </div>
 
                     <!-- Hero Headline -->
@@ -493,7 +530,7 @@ const faqs = [
                             {{ heroSlides[activeHeroIndex].titleLine1 }}
                         </span>
                         <span class="hero-title-delay-1 block relative mt-1 sm:mt-2">
-                            <span class="hero-title-grad bg-gradient-to-r from-[#FACC15] via-[#40e0d0] to-[#FACC15] bg-clip-text text-transparent">
+                            <span class="hero-title-grad bg-gradient-to-r from-[#FACC15] via-[#60d4f7] to-[#FACC15] bg-clip-text text-transparent">
                                 {{ heroSlides[activeHeroIndex].titleLine2 }}
                             </span>
                         </span>
@@ -501,8 +538,8 @@ const faqs = [
 
                     <!-- Animated Gradient Underline -->
                     <div class="hero-reveal hero-title-delay-2 mt-5 inline-flex items-center gap-2">
-                        <span class="h-1 w-16 sm:w-24 rounded-full bg-gradient-to-r from-[#FACC15] to-[#40e0d0]"></span>
-                        <span class="h-1 w-3 rounded-full bg-[#40e0d0]/70"></span>
+                        <span class="h-1 w-16 sm:w-24 rounded-full bg-gradient-to-r from-[#FACC15] to-[#60d4f7]"></span>
+                        <span class="h-1 w-3 rounded-full bg-[#60d4f7]/70"></span>
                     </div>
 
                     <!-- Subtitle -->
@@ -550,7 +587,7 @@ const faqs = [
                         >
                             <span
                                 v-if="i === activeHeroIndex"
-                                class="hero-progress-fill absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[#FACC15] to-[#40e0d0]"
+                                class="hero-progress-fill absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[#FACC15] to-[#60d4f7]"
                             ></span>
                             <span
                                 v-else
@@ -777,7 +814,7 @@ const faqs = [
                                     <!-- ======== CARD TOP: icon badge left + triangular photo cutout right ======== -->
                                     <div class="relative h-36 shrink-0 bg-white">
                                         <!-- Dark navy circular icon badge — top left -->
-                                        <div class="absolute top-4 left-4 z-20 w-[52px] h-[52px] rounded-full bg-[#0D1527] text-yellow-400 flex items-center justify-center shadow-md">
+                                        <div class="absolute top-4 left-4 z-20 w-[52px] h-[52px] rounded-full bg-[#0D1527] text-[#60d4f7] flex items-center justify-center shadow-md">
                                             <svg v-if="sol.icon === 'battery'" class="w-[26px] h-[26px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
                                                 <rect x="1" y="6" width="18" height="13" rx="2" />
                                                 <path d="M23 11v4M7 12h8" />
@@ -857,7 +894,7 @@ const faqs = [
                             :key="p"
                             type="button"
                             :aria-label="`Go to slide ${p + 1}`"
-                            :class="p === solutionPageIndex ? 'w-8 bg-yellow-400' : 'w-2.5 bg-white/25 hover:bg-white/60'"
+                            :class="p === solutionPageIndex ? 'w-8 bg-[#60d4f7]' : 'w-2.5 bg-white/25 hover:bg-white/60'"
                             class="h-2.5 rounded-full transition-all duration-300"
                             @click="goToSolutionPage(p)"
                         />
@@ -900,7 +937,7 @@ const faqs = [
                 <div class="absolute bottom-1 left-1/2 -translate-x-1/2 w-44 h-44 rounded-full border border-yellow-400/30 sol-pulse-slow"></div>
 
                 <!-- Turquoise horizon tick -->
-                <div class="absolute bottom-12 left-1/2 -translate-x-1/2 w-2/3 h-px bg-gradient-to-r from-transparent via-[#40e0d0]/70 to-transparent"></div>
+                <div class="absolute bottom-12 left-1/2 -translate-x-1/2 w-2/3 h-px bg-gradient-to-r from-transparent via-[#60d4f7]/70 to-transparent"></div>
 
                 <!-- Flowing layered waves transitioning into the next section -->
                 <svg class="absolute bottom-0 left-0 w-full h-14" viewBox="0 0 1440 56" preserveAspectRatio="none" version="1.1" xmlns="http://www.w3.org/2000/svg">
@@ -989,17 +1026,17 @@ const faqs = [
                     </div>
 
                     <!-- 02 Solar & Electrical Products -->
-                    <div class="reveal group relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-[#111C36] to-[#0A1020] px-7 sm:px-8 pt-7 sm:pt-8 pb-9 sm:pb-10 flex flex-col min-h-[440px] transition-all duration-500 hover:-translate-y-2 hover:border-[#40e0d0]/40 hover:shadow-2xl hover:shadow-[#40e0d0]/10" style="transition-delay: 160ms;">
+                    <div class="reveal group relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-[#111C36] to-[#0A1020] px-7 sm:px-8 pt-7 sm:pt-8 pb-9 sm:pb-10 flex flex-col min-h-[440px] transition-all duration-500 hover:-translate-y-2 hover:border-[#60d4f7]/40 hover:shadow-2xl hover:shadow-[#60d4f7]/10" style="transition-delay: 160ms;">
                         <!-- Top accent line -->
-                        <span class="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-transparent via-[#40e0d0] to-transparent opacity-80"></span>
+                        <span class="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-transparent via-[#60d4f7] to-transparent opacity-80"></span>
                         <!-- Ghost number -->
                         <span class="absolute top-7 right-8 text-7xl font-black text-white/[0.06] transition-transform duration-500 group-hover:rotate-6 group-hover:scale-110 select-none">02</span>
                         <!-- Ambient glow -->
-                        <span class="absolute -top-16 -right-16 w-44 h-44 rounded-full bg-[#40e0d0]/10 blur-3xl pointer-events-none"></span>
+                        <span class="absolute -top-16 -right-16 w-44 h-44 rounded-full bg-[#60d4f7]/10 blur-3xl pointer-events-none"></span>
 
                         <!-- Icon medallion with rotating dashed ring -->
-                        <div class="relative mt-1 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#40e0d0] to-[#40e0d0] text-slate-950 shadow-lg shadow-[#40e0d0]/30">
-                            <span class="wdw-spin absolute -inset-2 rounded-3xl border border-dashed border-[#40e0d0]/40"></span>
+                        <div class="relative mt-1 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#60d4f7] to-[#60d4f7] text-slate-950 shadow-lg shadow-[#60d4f7]/30">
+                            <span class="wdw-spin absolute -inset-2 rounded-3xl border border-dashed border-[#60d4f7]/40"></span>
                             <i class="bi bi-plug text-2xl"></i>
                         </div>
 
@@ -1010,15 +1047,15 @@ const faqs = [
 
                         <ul class="mt-5 space-y-3">
                             <li class="flex items-center gap-2.5 text-[13px] text-slate-300">
-                                <i class="bi bi-patch-check-fill text-[#40e0d0]"></i>
+                                <i class="bi bi-patch-check-fill text-[#60d4f7]"></i>
                                 Tier-1 panels, inverters & batteries
                             </li>
                             <li class="flex items-center gap-2.5 text-[13px] text-slate-300">
-                                <i class="bi bi-patch-check-fill text-[#40e0d0]"></i>
+                                <i class="bi bi-patch-check-fill text-[#60d4f7]"></i>
                                 Electrical fittings & accessories
                             </li>
                             <li class="flex items-center gap-2.5 text-[13px] text-slate-300">
-                                <i class="bi bi-patch-check-fill text-[#40e0d0]"></i>
+                                <i class="bi bi-patch-check-fill text-[#60d4f7]"></i>
                                 Warranty-backed, fair pricing
                             </li>
                         </ul>
@@ -1026,14 +1063,14 @@ const faqs = [
                         <div class="mt-auto pt-7">
                             <a
                                 href="/shop"
-                                class="group/btn inline-flex items-center gap-2.5 rounded-full border border-[#40e0d0]/40 px-5 py-2.5 text-sm font-bold text-[#40e0d0] transition-all duration-300 hover:bg-[#40e0d0] hover:text-slate-950"
+                                class="group/btn inline-flex items-center gap-2.5 rounded-full border border-[#60d4f7]/40 px-5 py-2.5 text-sm font-bold text-[#60d4f7] transition-all duration-300 hover:bg-[#60d4f7] hover:text-slate-950"
                             >
                                 Buy Our Products
                                 <i class="bi bi-arrow-right transition-transform duration-300 group-hover/btn:translate-x-1"></i>
                             </a>
                         </div>
 
-                        <span class="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#40e0d0]/10 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100"></span>
+                        <span class="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#60d4f7]/10 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100"></span>
                     </div>
 
                     <!-- 03 Professional Trainings -->
@@ -1110,25 +1147,137 @@ const faqs = [
         </section>
 
         <!-- ========================================================= -->
+        <!-- 4b. SECTION: TESTIMONIALS -->
+        <!-- ========================================================= -->
+        <section id="testimonials" class="relative bg-white py-16 sm:py-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
+            <!-- Ambient Glow Orbs -->
+            <div class="absolute -top-32 -right-24 w-96 h-96 rounded-full bg-yellow-400/10 blur-3xl pointer-events-none"></div>
+            <div class="absolute -bottom-32 -left-24 w-80 h-80 rounded-full bg-[#60d4f7]/10 blur-3xl pointer-events-none"></div>
+
+            <div class="max-w-7xl mx-auto relative">
+                <!-- Header -->
+                <div class="text-center max-w-3xl mx-auto mb-12 reveal">
+                    <span class="inline-flex items-center gap-2 text-[#016cbb] text-xs font-bold uppercase tracking-[0.3em] mb-4">
+                        <span class="w-8 h-px bg-[#016cbb]"></span>
+                        What Our Clients Say
+                        <span class="w-8 h-px bg-[#016cbb]"></span>
+                    </span>
+                    <h2 class="text-3xl sm:text-4xl md:text-5xl font-black uppercase tracking-tight text-slate-950 leading-tight">
+                        Trusted by<br />
+                        <span class="text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-[#016cbb]">Hundreds of Customers</span>
+                    </h2>
+                    <p class="mt-4 text-slate-500 text-sm sm:text-base leading-relaxed max-w-xl mx-auto">
+                        Real feedback from homeowners, businesses, and installers who chose Envoy Electricals for their solar journey.
+                    </p>
+                </div>
+
+                <!-- Testimonials Carousel -->
+                <div class="reveal" v-if="testimonials.length > 0">
+                    <div class="overflow-hidden">
+                        <div
+                            class="flex transition-transform duration-500 ease-out"
+                            :style="{ transform: `translateX(-${activeTestimonialIndex * 100}%)` }"
+                        >
+                            <div
+                                v-for="(testimonial, index) in testimonials"
+                                :key="testimonial.id"
+                                class="shrink-0 w-full px-4 sm:px-2"
+                            >
+                                <div class="bg-slate-50 rounded-2xl border border-slate-100 p-6 sm:p-8 h-full flex flex-col">
+                                    <!-- Rating Stars -->
+                                    <div class="flex items-center gap-1 text-amber-500 mb-4">
+                                        <template v-for="n in 5" :key="n">
+                                            <i :class="n <= testimonial.rating ? 'bi bi-star-fill' : 'bi bi-star'" class="text-lg" />
+                                        </template>
+                                    </div>
+
+                                    <!-- Content -->
+                                    <blockquote class="flex-1 text-slate-700 text-base sm:text-lg leading-relaxed font-medium italic">
+                                        "{{ testimonial.content }}"
+                                    </blockquote>
+
+                                    <!-- Author Info -->
+                                    <div class="mt-6 flex items-center gap-4">
+                                        <div v-if="testimonial.photo_path" class="w-12 h-12 rounded-full overflow-hidden flex-shrink-0">
+                                            <img :src="`/storage/${testimonial.photo_path}`" :alt="testimonial.author_name" class="w-full h-full object-cover" />
+                                        </div>
+                                        <div v-else class="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center text-slate-950 font-black text-xl flex-shrink-0">
+                                            {{ testimonial.author_name.charAt(0).toUpperCase() }}
+                                        </div>
+                                        <div class="flex-1 min-w-0">
+                                            <p class="font-bold text-slate-900 truncate">{{ testimonial.author_name }}</p>
+                                            <p v-if="testimonial.author_role" class="text-sm text-slate-500 truncate">{{ testimonial.author_role }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Navigation Dots -->
+                    <div class="flex items-center justify-center gap-2 mt-8">
+                        <button
+                            v-for="(_, i) in testimonials"
+                            :key="i"
+                            type="button"
+                            :class="i === activeTestimonialIndex ? 'w-8 bg-[#016cbb]' : 'w-2.5 bg-slate-300 hover:bg-slate-400'"
+                            class="h-2.5 rounded-full transition-all duration-300"
+                            @click="activeTestimonialIndex = i"
+                            :aria-label="`Go to testimonial ${i + 1}`"
+                        />
+                    </div>
+
+                    <!-- Navigation Arrows (for desktop) -->
+                    <div class="hidden md:flex items-center justify-center gap-4 mt-6">
+                        <button
+                            type="button"
+                            @click="prevTestimonial"
+                            class="w-11 h-11 border border-slate-300 text-slate-700 flex items-center justify-center text-lg font-semibold hover:border-slate-400 hover:bg-slate-100 transition-all duration-200"
+                            aria-label="Previous testimonial"
+                        >
+                            ←
+                        </button>
+                        <button
+                            type="button"
+                            @click="nextTestimonial"
+                            class="w-11 h-11 bg-[#016cbb] hover:bg-[#015a9e] text-white flex items-center justify-center text-lg font-bold transition-all duration-200"
+                            aria-label="Next testimonial"
+                        >
+                            →
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Empty State -->
+                <div v-else class="text-center py-12">
+                    <div class="mx-auto w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+                        <i class="bi bi-chat-square-dots text-2xl text-slate-400" />
+                    </div>
+                    <p class="text-slate-500">No testimonials published yet.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================================= -->
         <!-- 5. SECTION 5: OUR WORK GALLERY -->
         <!-- ========================================================= -->
         <section id="gallery" class="relative bg-[#0B1220] py-16 sm:py-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
             <!-- Ambient Glow Orbs -->
             <div class="absolute -top-32 -right-24 w-96 h-96 rounded-full bg-yellow-400/10 blur-3xl pointer-events-none"></div>
-            <div class="absolute -bottom-32 -left-24 w-80 h-80 rounded-full bg-[#40e0d0]/10 blur-3xl pointer-events-none"></div>
+            <div class="absolute -bottom-32 -left-24 w-80 h-80 rounded-full bg-[#60d4f7]/10 blur-3xl pointer-events-none"></div>
 
             <div class="max-w-7xl mx-auto relative">
                 <!-- Header + Filters -->
                 <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-9 reveal">
                     <div class="max-w-xl">
-                        <span class="inline-flex items-center gap-2 text-[#40e0d0] text-xs font-bold uppercase tracking-[0.3em] mb-3">
-                            <span class="w-8 h-px bg-[#40e0d0]"></span>
+                        <span class="inline-flex items-center gap-2 text-[#60d4f7] text-xs font-bold uppercase tracking-[0.3em] mb-3">
+                            <span class="w-8 h-px bg-[#60d4f7]"></span>
                             Our Work
-                            <span class="w-8 h-px bg-[#40e0d0]"></span>
+                            <span class="w-8 h-px bg-[#60d4f7]"></span>
                         </span>
                         <h2 class="text-3xl sm:text-4xl font-black uppercase tracking-tight text-white leading-tight">
                             Project<br />
-                            <span class="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-[#40e0d0]">Gallery</span>
+                            <span class="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-[#60d4f7]">Gallery</span>
                         </h2>
                     </div>
                     <div class="hidden md:flex items-center gap-2.5 text-white/40 text-xs font-bold uppercase tracking-[0.25em]">
@@ -1189,7 +1338,7 @@ const faqs = [
                 <button
                     type="button"
                     @click="galleryNext"
-                    class="absolute right-3 sm:right-8 top-1/2 -translate-y-1/2 w-11 h-11 sm:w-14 sm:h-14 rounded-full bg-yellow-400 text-slate-950 hover:bg-yellow-300 transition flex items-center justify-center text-xl shadow-lg"
+                    class="absolute right-3 sm:right-8 top-1/2 -translate-y-1/2 w-11 h-11 sm:w-14 sm:h-14 rounded-full bg-[#60d4f7] text-slate-950 hover:bg-[#60d4f7]/80 transition flex items-center justify-center text-xl shadow-lg"
                     aria-label="Next image"
                 >
                     →
@@ -1206,7 +1355,7 @@ const faqs = [
                         </div>
                         <figcaption class="mt-4 flex items-end justify-between gap-4">
                             <div>
-                                <span class="text-[10px] font-bold uppercase tracking-[0.25em] text-yellow-400">{{ filteredGallery[galleryIndex].category }}</span>
+                                <span class="text-[10px] font-bold uppercase tracking-[0.25em] text-[#60d4f7]">{{ filteredGallery[galleryIndex].category }}</span>
                                 <p class="mt-1 text-base sm:text-lg font-bold text-white">{{ filteredGallery[galleryIndex].caption }}</p>
                             </div>
                             <span class="shrink-0 text-sm font-black text-white/60">{{ String(galleryIndex + 1).padStart(2, '0') }} / {{ String(filteredGallery.length).padStart(2, '0') }}</span>
@@ -1337,15 +1486,15 @@ const faqs = [
             <div class="relative overflow-hidden bg-[#0D1527] pt-16 pb-36 sm:pt-20 sm:pb-44 px-4 sm:px-6 lg:px-8">
                 <!-- Ambient glows -->
                 <span class="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-yellow-400/15 blur-3xl pointer-events-none"></span>
-                <span class="absolute bottom-0 -left-24 w-72 h-72 rounded-full bg-[#40e0d0]/10 blur-3xl pointer-events-none"></span>
+                <span class="absolute bottom-0 -left-24 w-72 h-72 rounded-full bg-[#60d4f7]/10 blur-3xl pointer-events-none"></span>
                 <div class="relative max-w-7xl mx-auto flex flex-col md:flex-row md:items-end md:justify-between gap-6 reveal">
                     <div class="max-w-2xl">
-                        <span class="inline-flex items-center gap-2 text-[#40e0d0] text-xs font-bold uppercase tracking-[0.3em] mb-3">
-                            <span class="w-8 h-px bg-[#40e0d0]"></span>
+                        <span class="inline-flex items-center gap-2 text-[#60d4f7] text-xs font-bold uppercase tracking-[0.3em] mb-3">
+                            <span class="w-8 h-px bg-[#60d4f7]"></span>
                             For Your Specific Business, Making It Easy For You.
                         </span>
                         <h2 class="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-white leading-tight">
-                            Popular <span class="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-[#40e0d0]">Products</span>
+                            Popular <span class="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-[#60d4f7]">Products</span>
                         </h2>
                     </div>
                     <Link
@@ -1519,20 +1668,20 @@ const faqs = [
         <!-- ========================================================= -->
         <section id="process" class="relative py-20 sm:py-28 px-4 sm:px-6 lg:px-8 bg-white overflow-hidden">
             <!-- Ambient brand glow -->
-            <div class="absolute -top-24 -right-20 w-72 h-72 rounded-full bg-[#40e0d0]/10 blur-3xl pointer-events-none"></div>
+            <div class="absolute -top-24 -right-20 w-72 h-72 rounded-full bg-[#60d4f7]/10 blur-3xl pointer-events-none"></div>
             <div class="absolute -bottom-24 -left-20 w-72 h-72 rounded-full bg-yellow-400/10 blur-3xl pointer-events-none"></div>
 
             <div class="max-w-7xl mx-auto relative">
                 <!-- Section Header -->
                 <div class="max-w-2xl mx-auto text-center mb-14 sm:mb-20 relative z-10 reveal">
-                    <span class="inline-flex items-center gap-2 text-[#016cbb] text-xs font-bold uppercase tracking-[0.3em] mb-4">
-                        <span class="w-8 h-px bg-[#016cbb]"></span>
+                    <span class="inline-flex items-center gap-2 text-[#60d4f7] text-xs font-bold uppercase tracking-[0.3em] mb-4">
+                        <span class="w-8 h-px bg-[#60d4f7]"></span>
                         How We Work
-                        <span class="w-8 h-px bg-[#016cbb]"></span>
+                        <span class="w-8 h-px bg-[#60d4f7]"></span>
                     </span>
                     <h2 class="text-3xl sm:text-5xl font-black uppercase tracking-tight text-[#0D1527] leading-tight">
                         A Proven<br class="sm:hidden" />
-                        <span class="text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-[#016cbb]">4-Step Process</span>
+                        <span class="text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-[#60d4f7]">4-Step Process</span>
                     </h2>
                     <p class="mt-4 text-slate-500 text-sm sm:text-base leading-relaxed max-w-xl mx-auto">
                         Every project follows the same disciplined workflow — from the first site survey to installation, quality sign-off and long-term monitoring.
@@ -1548,7 +1697,7 @@ const faqs = [
                 >
                     <path
                         d="M 150,65 C 280,115 360,15 450,65 C 570,115 670,15 750,65 C 870,115 970,25 1050,65"
-                        stroke="#40e0d0"
+                        stroke="#60d4f7"
                         stroke-width="1.8"
                         stroke-dasharray="6 6"
                         stroke-opacity="0.45"
@@ -1565,7 +1714,7 @@ const faqs = [
                         :style="{ transitionDelay: `${100 + stepIdx * 80}ms` }"
                     >
                         <!-- Circular Node with Number Badge -->
-                        <div class="relative w-44 h-44 sm:w-52 sm:h-52 rounded-full p-2 bg-white shadow-xl border border-slate-100 mb-6 transition-all duration-300 group-hover:border-[#40e0d0]/60 group-hover:shadow-2xl group-hover:shadow-[#40e0d0]/10">
+                        <div class="relative w-44 h-44 sm:w-52 sm:h-52 rounded-full p-2 bg-white shadow-xl border border-slate-100 mb-6 transition-all duration-300 group-hover:border-[#60d4f7]/60 group-hover:shadow-2xl group-hover:shadow-[#60d4f7]/10">
                             <!-- Numbered Yellow Badge -->
                             <div
                                 class="absolute top-1 left-2 sm:top-2 sm:left-3 w-10 h-10 rounded-full bg-[#FACC15] text-[#0D1527] font-extrabold text-sm flex items-center justify-center shadow-md border-2 border-white z-20 group-hover:scale-110 group-hover:-rotate-6 transition-transform duration-300"
@@ -1600,10 +1749,10 @@ const faqs = [
                     <button
                         type="button"
                         @click="isContactModalOpen = true"
-                        class="group/btn inline-flex items-center gap-3 rounded-full bg-[#0D1527] hover:bg-slate-800 text-white font-bold px-7 py-3.5 shadow-lg shadow-[#0D1527]/20 transition-all duration-300"
+                        class="group/btn inline-flex items-center gap-3 rounded-full bg-[#0D1527] hover:bg-slate-800 text-white font-bold px-7 py-3.5 border border-[#60d4f7]/30 shadow-lg shadow-[#60d4f7]/10 transition-all duration-300"
                     >
                         Start Your Solar Project
-                        <i class="bi bi-arrow-right text-[#FACC15] transition-transform duration-300 group-hover/btn:translate-x-1"></i>
+                        <i class="bi bi-arrow-right text-[#60d4f7] transition-transform duration-300 group-hover/btn:translate-x-1"></i>
                     </button>
                 </div>
             </div>
@@ -1664,12 +1813,12 @@ const faqs = [
                                 class="w-full flex items-center justify-between gap-4 px-6 py-5 text-left"
                             >
                                 <span class="font-bold text-slate-900 text-sm sm:text-base leading-snug">
-                                    <span class="text-yellow-500 font-black mr-2">{{ String(i + 1).padStart(2, '0') }}</span>
+                                    <span class="text-[#60d4f7] font-black mr-2">{{ String(i + 1).padStart(2, '0') }}</span>
                                     {{ f.q }}
                                 </span>
                                 <span
                                     class="shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300"
-                                    :class="openFaq === i ? 'bg-yellow-400 text-slate-950 rotate-45' : 'bg-[#0D1527] text-white'"
+                                    :class="openFaq === i ? 'bg-[#60d4f7] text-slate-950 rotate-45' : 'bg-[#0D1527] text-white'"
                                 >
                                     <i class="bi bi-plus text-lg"></i>
                                 </span>
@@ -1682,7 +1831,7 @@ const faqs = [
 
                     <p class="mt-6 text-sm text-slate-500">
                         Looking for something specific?
-                        <Link :href="route('contact')" class="font-bold text-slate-900 underline decoration-yellow-400 decoration-2 underline-offset-4 hover:text-yellow-500 transition">
+                        <Link :href="route('contact')" class="font-bold text-slate-900 underline decoration-[#60d4f7] decoration-2 underline-offset-4 hover:text-[#60d4f7] transition">
                             Visit our contact page
                         </Link>
                     </p>

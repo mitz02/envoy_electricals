@@ -86,7 +86,6 @@ const filteredProducts = computed(() => {
 // Suggested products shown on focus (before typing) - top products by stock
 const suggestedProducts = computed(() => {
     return props.products
-        .filter(p => p.current_quantity > 0)
         .sort((a, b) => b.current_quantity - a.current_quantity)
         .slice(0, 10);
 });
@@ -403,19 +402,17 @@ function submit() {
                                     <i class="bi bi-star-fill text-amber-500" />
                                     Suggested (top stock)
                                 </div>
-                                <button
-                                    v-for="(p, idx) in suggestedProducts"
-                                    :key="p.id"
-                                    type="button"
-                                    class="w-full flex items-center gap-3 px-3 py-2.5 text-left transition hover:bg-slate-50"
-                                    :class="{
-                                        'bg-[#0D1527]/5': idx === selectedResultIndex,
-                                        'opacity-50 cursor-not-allowed': p.current_quantity <= 0,
-                                    }"
-                                    :disabled="p.current_quantity <= 0"
-                                    @click="addItem(p)"
-                                    @mouseenter="selectedResultIndex = idx"
-                                >
+<button
+                                        v-for="(p, idx) in suggestedProducts"
+                                        :key="p.id"
+                                        type="button"
+                                        class="w-full flex items-center gap-3 px-3 py-2.5 text-left transition hover:bg-slate-50"
+                                        :class="{
+                                            'bg-[#0D1527]/5': idx === selectedResultIndex,
+                                        }"
+                                        @click="addItem(p)"
+                                        @mouseenter="selectedResultIndex = idx"
+                                    >
                                     <div class="min-w-0 flex-1">
                                         <p class="truncate font-medium text-slate-900">{{ p.name }}</p>
                                         <p class="text-xs text-slate-400">{{ p.sku }} · {{ naira(p.cost_price) }} · {{ p.current_quantity }} in stock</p>
@@ -436,19 +433,17 @@ function submit() {
 
                             <!-- Filtered products when searching -->
                             <template v-else>
-                                <button
-                                    v-for="(p, idx) in filteredProducts"
-                                    :key="p.id"
-                                    type="button"
-                                    class="w-full flex items-center gap-3 px-3 py-2.5 text-left transition hover:bg-slate-50"
-                                    :class="{
-                                        'bg-[#0D1527]/5': idx === selectedResultIndex,
-                                        'opacity-50 cursor-not-allowed': p.current_quantity <= 0,
-                                    }"
-                                    :disabled="p.current_quantity <= 0"
-                                    @click="addItem(p)"
-                                    @mouseenter="selectedResultIndex = idx"
-                                >
+<button
+                                        v-for="(p, idx) in filteredProducts"
+                                        :key="p.id"
+                                        type="button"
+                                        class="w-full flex items-center gap-3 px-3 py-2.5 text-left transition hover:bg-slate-50"
+                                        :class="{
+                                            'bg-[#0D1527]/5': idx === selectedResultIndex,
+                                        }"
+                                        @click="addItem(p)"
+                                        @mouseenter="selectedResultIndex = idx"
+                                    >
                                     <div class="min-w-0 flex-1">
                                         <p class="truncate font-medium text-slate-900">{{ p.name }}</p>
                                         <p class="text-xs text-slate-400">{{ p.sku }} · {{ naira(p.cost_price) }} · {{ p.current_quantity }} in stock</p>
@@ -485,14 +480,13 @@ function submit() {
                 <div v-if="!search && items.length" class="mt-4 pt-4 border-t border-slate-100">
                     <p class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Quick Add (Recent)</p>
                     <div class="flex flex-wrap gap-2">
-                        <button
-                            v-for="p in props.products.slice(0, 8)"
-                            :key="p.id"
-                            type="button"
-                            class="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:border-[#0D1527] hover:bg-[#0D1527]/5 hover:text-[#0D1527] transition disabled:opacity-40"
-                            :disabled="p.current_quantity <= 0"
-                            @click="addItem(p)"
-                        >
+<button
+                                v-for="p in props.products.slice(0, 8)"
+                                :key="p.id"
+                                type="button"
+                                class="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-600 hover:border-[#0D1527] hover:bg-[#0D1527]/5 hover:text-[#0D1527] transition"
+                                @click="addItem(p)"
+                            >
                             {{ p.name }}
                         </button>
                     </div>

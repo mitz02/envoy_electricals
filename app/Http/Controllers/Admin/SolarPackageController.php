@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\BatteryCapacity;
+use App\Models\InverterCapacity;
 use App\Models\Media;
 use App\Models\Product;
 use App\Models\SolarPackage;
@@ -48,6 +50,8 @@ class SolarPackageController extends Controller
         return Inertia::render('Admin/SolarPackages/Form', [
             'package' => null,
             'products' => $this->productOptions(),
+            'inverterCapacities' => $this->inverterCapacityOptions(),
+            'batteryCapacities' => $this->batteryCapacityOptions(),
         ]);
     }
 
@@ -57,10 +61,13 @@ class SolarPackageController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'package_price' => ['required', 'numeric', 'min:0'],
-            'installation_cost' => ['nullable', 'numeric', 'min:0'],
             'estimated_load_capacity' => ['nullable', 'string', 'max:255'],
             'inverter_capacity' => ['nullable', 'string', 'max:255'],
             'custom_inverter_capacity' => ['nullable', 'string', 'max:255'],
+            'battery_capacity' => ['nullable', 'string', 'max:255'],
+            'custom_battery_capacity' => ['nullable', 'string', 'max:255'],
+            'panel_count' => ['nullable', 'integer', 'min:0'],
+            'panel_wattage' => ['nullable', 'string', 'max:255'],
             'warranty' => ['nullable', 'string', 'max:255'],
             'is_featured' => ['boolean'],
             'availability' => ['required', 'in:available,unavailable'],
@@ -70,7 +77,7 @@ class SolarPackageController extends Controller
             'items.*.name' => ['required', 'string', 'max:255'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.specification' => ['nullable', 'string', 'max:255'],
-            'items.*.unit_cost' => ['required', 'numeric', 'min:0'],
+            'items.*.unit_cost' => ['nullable', 'numeric', 'min:0'],
             'images' => ['nullable', 'array', 'max:10'],
             'images.*' => ['image', 'mimes:jpeg,jpg,png,webp', 'max:10240'],
         ]);
@@ -78,13 +85,16 @@ class SolarPackageController extends Controller
         $package = SolarPackage::create([
             'ref_id' => ReferenceGenerator::generate('solar_package'),
             'name' => $data['name'],
-            'description' => $data['description'] ?? null,
+            'description' => ($data['description'] ?? null) ?: null,
             'package_price' => $data['package_price'],
-            'installation_cost' => $data['installation_cost'] ?? 0,
-            'estimated_load_capacity' => $data['estimated_load_capacity'] ?? null,
-            'inverter_capacity' => $data['inverter_capacity'] ?? null,
-            'custom_inverter_capacity' => $data['custom_inverter_capacity'] ?? null,
-            'warranty' => $data['warranty'] ?? null,
+            'estimated_load_capacity' => ($data['estimated_load_capacity'] ?? null) ?: null,
+            'inverter_capacity' => ($data['inverter_capacity'] ?? null) ?: null,
+            'custom_inverter_capacity' => ($data['custom_inverter_capacity'] ?? null) ?: null,
+            'battery_capacity' => ($data['battery_capacity'] ?? null) ?: null,
+            'custom_battery_capacity' => ($data['custom_battery_capacity'] ?? null) ?: null,
+            'panel_count' => ! empty($data['panel_count']) ? (int) $data['panel_count'] : null,
+            'panel_wattage' => ($data['panel_wattage'] ?? null) ?: null,
+            'warranty' => ($data['warranty'] ?? null) ?: null,
             'is_featured' => (bool) ($data['is_featured'] ?? false),
             'availability' => $data['availability'],
             'is_visible_online' => (bool) ($data['is_visible_online'] ?? true),
@@ -113,6 +123,8 @@ class SolarPackageController extends Controller
         return Inertia::render('Admin/SolarPackages/Form', [
             'package' => $package->load('items', 'images.media'),
             'products' => $this->productOptions(),
+            'inverterCapacities' => $this->inverterCapacityOptions(),
+            'batteryCapacities' => $this->batteryCapacityOptions(),
         ]);
     }
 
@@ -122,10 +134,13 @@ class SolarPackageController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'package_price' => ['required', 'numeric', 'min:0'],
-            'installation_cost' => ['nullable', 'numeric', 'min:0'],
             'estimated_load_capacity' => ['nullable', 'string', 'max:255'],
             'inverter_capacity' => ['nullable', 'string', 'max:255'],
             'custom_inverter_capacity' => ['nullable', 'string', 'max:255'],
+            'battery_capacity' => ['nullable', 'string', 'max:255'],
+            'custom_battery_capacity' => ['nullable', 'string', 'max:255'],
+            'panel_count' => ['nullable', 'integer', 'min:0'],
+            'panel_wattage' => ['nullable', 'string', 'max:255'],
             'warranty' => ['nullable', 'string', 'max:255'],
             'is_featured' => ['boolean'],
             'availability' => ['required', 'in:available,unavailable'],
@@ -135,7 +150,7 @@ class SolarPackageController extends Controller
             'items.*.name' => ['required', 'string', 'max:255'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.specification' => ['nullable', 'string', 'max:255'],
-            'items.*.unit_cost' => ['required', 'numeric', 'min:0'],
+            'items.*.unit_cost' => ['nullable', 'numeric', 'min:0'],
             'images' => ['nullable', 'array', 'max:10'],
             'images.*' => ['image', 'mimes:jpeg,jpg,png,webp', 'max:10240'],
             'remove_images' => ['nullable', 'array'],
@@ -144,13 +159,16 @@ class SolarPackageController extends Controller
 
         $package->update([
             'name' => $data['name'],
-            'description' => $data['description'] ?? null,
+            'description' => ($data['description'] ?? null) ?: null,
             'package_price' => $data['package_price'],
-            'installation_cost' => $data['installation_cost'] ?? 0,
-            'estimated_load_capacity' => $data['estimated_load_capacity'] ?? null,
-            'inverter_capacity' => $data['inverter_capacity'] ?? null,
-            'custom_inverter_capacity' => $data['custom_inverter_capacity'] ?? null,
-            'warranty' => $data['warranty'] ?? null,
+            'estimated_load_capacity' => ($data['estimated_load_capacity'] ?? null) ?: null,
+            'inverter_capacity' => ($data['inverter_capacity'] ?? null) ?: null,
+            'custom_inverter_capacity' => ($data['custom_inverter_capacity'] ?? null) ?: null,
+            'battery_capacity' => ($data['battery_capacity'] ?? null) ?: null,
+            'custom_battery_capacity' => ($data['custom_battery_capacity'] ?? null) ?: null,
+            'panel_count' => ! empty($data['panel_count']) ? (int) $data['panel_count'] : null,
+            'panel_wattage' => ($data['panel_wattage'] ?? null) ?: null,
+            'warranty' => ($data['warranty'] ?? null) ?: null,
             'is_featured' => (bool) ($data['is_featured'] ?? false),
             'availability' => $data['availability'],
             'is_visible_online' => (bool) ($data['is_visible_online'] ?? true),
@@ -200,6 +218,9 @@ class SolarPackageController extends Controller
         $package->items()->delete();
 
         foreach ($items as $item) {
+            $item['product_id'] = ! empty($item['product_id']) ? (int) $item['product_id'] : null;
+            $item['specification'] = ! empty($item['specification']) ? $item['specification'] : null;
+            $item['unit_cost'] = ! empty($item['unit_cost']) ? (float) $item['unit_cost'] : 0;
             $package->items()->create($item);
         }
     }
@@ -249,6 +270,28 @@ class SolarPackageController extends Controller
             ->orderBy('name')
             ->get()
             ->map(fn ($p) => ['id' => $p->id, 'name' => $p->name, 'sku' => $p->sku])
+            ->toArray();
+    }
+
+    protected function inverterCapacityOptions(): array
+    {
+        return InverterCapacity::query()
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('label')
+            ->get(['id', 'name', 'label'])
+            ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name, 'label' => $c->label])
+            ->toArray();
+    }
+
+    protected function batteryCapacityOptions(): array
+    {
+        return BatteryCapacity::query()
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('label')
+            ->get(['id', 'name', 'label'])
+            ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name, 'label' => $c->label])
             ->toArray();
     }
 }

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\Role;
+use App\Models\Setting;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -93,6 +94,36 @@ class SettingsCategoryTest extends TestCase
 
         $product->refresh();
         $this->assertNull($product->category_id);
+    }
+
+    public function test_calculator_settings_persist_plain_text_and_json_values(): void
+    {
+        $owner = $this->owner();
+
+        $this->actingAs($owner)
+            ->post('/admin/settings/calculator', [
+                'panel_wattage' => 620,
+                'panel_efficiency' => 0.8,
+                'peak_sun_hours' => 4.5,
+                'battery_depth_of_discharge' => 0.8,
+                'inverter_safety_factor' => 1.4,
+                'battery_capacities' => '1.2, 2.56',
+                'inverter_sizes' => '1.5, 3',
+                'price_per_panel' => 185000,
+                'price_per_kwh_daily' => 220000,
+                'inverter_prices' => ['1.5' => 350000],
+                'battery_prices' => ['1.2' => 80000],
+                'installation_costs' => ['1.5' => 300000],
+            ])
+            ->assertRedirect();
+
+        $settings = Setting::where('group', 'calculator')->pluck('value', 'key');
+
+        $this->assertSame('1.2, 2.56', $settings['calculator.battery_capacities']);
+        $this->assertSame('1.5, 3', $settings['calculator.inverter_sizes']);
+        $this->assertSame('4.5', $settings['calculator.peak_sun_hours']);
+        $this->assertSame('0.8', $settings['calculator.battery_depth_of_discharge']);
+        $this->assertSame(['1.5' => 350000], json_decode($settings['calculator.inverter_prices'], true));
     }
 
     public function test_duplicate_name_gets_unique_slug(): void

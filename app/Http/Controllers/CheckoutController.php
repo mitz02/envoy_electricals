@@ -211,6 +211,16 @@ class CheckoutController extends Controller
             return response()->json(['success' => false, 'message' => 'Payment not successful.']);
         }
 
+        // receivePayment() refuses closed orders, so bail out with a clear answer
+        // instead of a 500. The webhook controller already guards this; the
+        // browser callback can race a cancellation too.
+        if (in_array($order->status, ['cancelled', 'refunded'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This order has been closed and can no longer be paid.',
+            ], 422);
+        }
+
         // Find and mark the payment as successful
         $payment = Payment::where('document_type', 'order')
             ->where('document_id', $order->id)
@@ -220,19 +230,42 @@ class CheckoutController extends Controller
             })
             ->first();
 
-        if ($payment && $payment->status !== Payment::STATUS_SUCCESS) {
-            $amountOk = ((int) ($verification['data']['amount'] ?? 0)) === (int) round((float) $payment->amount * 100);
-            if ($amountOk) {
-                $this->orderService->receivePayment(
-                    order: $order,
-                    amount: (float) $payment->amount,
-                    method: 'paystack',
-                    userId: $payment->created_by,
-                    payment: $payment,
-                );
-            }
+        if (! $payment) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No Paystack payment on this order matches that reference.',
+            ], 422);
         }
 
-        return response()->json(['success' => true, 'message' => 'Payment verified successfully.']);
+        if ($payment->status === Payment::STATUS_SUCCESS) {
+            return response()->json([
+                'success' => true,
+                'applied' => false,
+                'message' => 'Payment was already verified.',
+            ]);
+        }
+
+        $amountOk = ((int) ($verification['data']['amount'] ?? 0)) === (int) round((float) $payment->amount * 100);
+
+        if (! $amountOk) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Paystack amount does not match the amount due on this order.',
+            ], 422);
+        }
+
+        $this->orders->receivePayment(
+            order: $order,
+            amount: (float) $payment->amount,
+            method: 'paystack',
+            userId: $payment->created_by,
+            payment: $payment,
+        );
+
+        return response()->json([
+            'success' => true,
+            'applied' => true,
+            'message' => 'Payment verified successfully.',
+        ]);
     }
 }

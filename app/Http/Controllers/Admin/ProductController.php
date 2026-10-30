@@ -841,9 +841,14 @@ class ProductController extends Controller
             $activeStoreId = $stores->first()?->id;
         }
 
+        // Performance: select only the columns we need; load the store pivot in one
+        // query with the relation, not image files (we use a URL-only approach).
+        // We avoid eager-loading images for every product — just fetch the featured
+        // image path via a subquery so the whole list returns in 2 queries total.
         $products = Product::where('status', 'active')
+            ->select(['id', 'sku', 'name', 'unit', 'selling_price', 'cost_price', 'reorder_level', 'description'])
             ->when($activeStoreId, fn ($q) => $q->whereHas('stores', fn ($q) => $q->where('stores.id', $activeStoreId)))
-            ->with(['images', 'stores' => fn ($q) => $q->when($activeStoreId, fn ($sq) => $sq->where('stores.id', $activeStoreId))])
+            ->with(['stores' => fn ($q) => $q->when($activeStoreId, fn ($sq) => $sq->where('stores.id', $activeStoreId)->select(['stores.id']))])
             ->orderBy('name')
             ->get()
             ->map(function ($p) use ($activeStoreId) {
@@ -854,13 +859,35 @@ class ProductController extends Controller
                     'sku' => $p->sku,
                     'name' => $p->name,
                     'unit' => $p->unit,
+                    'description' => $p->description,
+                    'cost_price' => (float) $p->cost_price,
                     'selling_price' => $pivot && $pivot->selling_price !== null ? (float) $pivot->selling_price : (float) $p->selling_price,
                     'current_quantity' => $pivot ? (int) $pivot->current_quantity : 0,
                     'reorder_level' => $pivot ? (int) $pivot->reorder_level : (int) $p->reorder_level,
-                    'image' => $p->images->first()?->path ?? '/images/landing/solar_panels_sky.jpg',
+                    // Lightweight thumbnail: served as a storage URL without eager-loading all images.
+                    'image' => '/images/landing/solar_panels_sky.jpg',
                 ];
             })
             ->values();
+
+        // Back-fill featured image paths in one single query rather than N queries.
+        if ($products->isNotEmpty()) {
+            $productIds = $products->pluck('id')->all();
+            $featuredImages = DB::table('product_images')
+                ->whereIn('product_id', $productIds)
+                ->where('is_featured', true)
+                ->select(['product_id', 'path'])
+                ->get()
+                ->keyBy('product_id');
+
+            $products = $products->map(function ($p) use ($featuredImages) {
+                if (isset($featuredImages[$p['id']])) {
+                    $p['image'] = '/storage/'.$featuredImages[$p['id']]->path;
+                }
+
+                return $p;
+            });
+        }
 
         // The branch selector on this page is a ?store_id query param, so it can
         // differ from the session selection the global scope clamps to. The scope
@@ -953,7 +980,9 @@ class ProductController extends Controller
         }
 
         $signed = ($decrease ? -1 : 1) * $quantity;
-        $resulting = $this->inventory->getStoreStock($product, $storeId);
+        // Avoid an extra DB round-trip: the inbound/outbound methods already
+        // updated $product->current_quantity in memory.
+        $resulting = (int) $product->current_quantity;
         $previous = $resulting - $signed;
         $branch = Store::find($storeId)?->name;
 
@@ -961,6 +990,52 @@ class ProductController extends Controller
             "Stock adjusted by {$signed} ({$type}) at store #{$storeId}: {$data['reason']}");
 
         return back()->with('success', "{$product->name} at {$branch} is now {$resulting} (was {$previous}).");
+    }
+
+    /**
+     * Lightweight inline update — updates basic product details without image handling.
+     * Designed for the stock adjustment page "Edit product details" panel.
+     */
+    public function quickUpdate(Request $request, Product $product): RedirectResponse
+    {
+        $this->ensureProductVisible($request->user(), $product);
+
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:5000'],
+            'cost_price' => ['required', 'numeric', 'min:0'],
+            'selling_price' => ['required', 'numeric', 'min:0'],
+            'reorder_level' => ['nullable', 'integer', 'min:0'],
+            'status' => ['nullable', 'in:active,inactive'],
+        ]);
+
+        $old = $product->only(['name', 'description', 'cost_price', 'selling_price', 'reorder_level', 'status']);
+
+        $product->update([
+            'name' => $data['name'],
+            'description' => $data['description'] ?? null,
+            'cost_price' => $data['cost_price'],
+            'selling_price' => $data['selling_price'],
+            'reorder_level' => $data['reorder_level'] ?? 0,
+            'status' => $data['status'] ?? $product->status,
+        ]);
+
+        // Also sync the selling_price in any product_store pivot row so the
+        // per-branch price stays consistent with the product-level price.
+        DB::table('product_store')
+            ->where('product_id', $product->id)
+            ->update(['selling_price' => $data['selling_price'], 'updated_at' => now()]);
+
+        AuditLogger::log(
+            'quick_updated',
+            'product',
+            $product->id,
+            "Quick-updated product {$product->sku} - {$product->name}",
+            $old,
+            $product->fresh()->only(['name', 'description', 'cost_price', 'selling_price', 'reorder_level', 'status'])
+        );
+
+        return back()->with('success', "Product details for \"{$product->name}\" updated.");
     }
 
     /**

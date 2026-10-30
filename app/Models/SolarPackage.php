@@ -11,8 +11,11 @@ class SolarPackage extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'ref_id', 'name', 'description', 'package_price', 'installation_cost',
-        'estimated_load_capacity', 'inverter_capacity', 'custom_inverter_capacity', 'warranty', 'is_featured',
+        'ref_id', 'name', 'description', 'package_price',
+        'estimated_load_capacity', 'inverter_capacity', 'custom_inverter_capacity',
+        'battery_capacity', 'custom_battery_capacity',
+        'panel_count', 'panel_wattage',
+        'warranty', 'is_featured',
         'availability', 'components_json', 'featured_image_media_id', 'is_visible_online',
     ];
 

@@ -30,6 +30,11 @@ function firstImage(pkg) {
     </Head>
     <header class="bg-[#0D1527] text-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
+            <span class="inline-flex items-center gap-2 text-[#60d4f7] text-xs font-bold uppercase tracking-[0.3em] mb-3">
+                <span class="w-8 h-px bg-[#60d4f7]"></span>
+                Solar Packages
+                <span class="w-8 h-px bg-[#60d4f7]"></span>
+            </span>
             <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight">Complete Solar Packages</h1>
             <p class="mt-3 text-slate-300 max-w-2xl mx-auto">Fully kitted, engineered packages for homes and offices — installation available nationwide.</p>
         </div>
@@ -68,6 +73,9 @@ function firstImage(pkg) {
                     <div class="mt-4 space-y-1.5 text-sm text-slate-700">
                         <p v-if="pkg.estimated_load_capacity" class="flex items-center gap-2"><i class="bi bi-lightning-charge text-amber-500"></i> Covers up to {{ pkg.estimated_load_capacity }}</p>
                         <p v-if="pkg.inverter_capacity" class="flex items-center gap-2"><i class="bi bi-battery-charging text-amber-500"></i> {{ pkg.inverter_capacity }} inverter</p>
+                        <p v-if="pkg.battery_capacity" class="flex items-center gap-2"><i class="bi bi-battery-full text-emerald-500"></i> {{ pkg.battery_capacity }} battery</p>
+                        <p v-if="pkg.custom_battery_capacity" class="flex items-center gap-2"><i class="bi bi-battery-full text-emerald-500"></i> {{ pkg.custom_battery_capacity }} battery</p>
+                        <p v-if="pkg.panel_count" class="flex items-center gap-2"><i class="bi bi-solar-panel text-blue-500"></i> {{ pkg.panel_count }}× {{ pkg.panel_wattage || 'panel' }}</p>
                         <p v-if="pkg.warranty" class="flex items-center gap-2"><i class="bi bi-shield-check text-amber-500"></i> {{ pkg.warranty }} warranty</p>
                     </div>
 
@@ -87,9 +95,10 @@ function firstImage(pkg) {
                             <p class="text-[11px] font-bold uppercase tracking-widest text-slate-400">Package price</p>
                             <p class="text-2xl font-extrabold text-slate-950">{{ naira(pkg.package_price) }}</p>
                         </div>
-                        <div v-if="pkg.installation_cost > 0" class="text-right">
-                            <p class="text-[11px] font-bold uppercase tracking-widest text-slate-400">Installation</p>
-                            <p class="text-sm font-bold text-slate-600">{{ naira(pkg.installation_cost) }}</p>
+                        <div class="text-right">
+                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
+                                <i class="bi bi-check-circle-fill text-[10px]"></i> Installation Included
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -98,13 +107,13 @@ function firstImage(pkg) {
                     <div class="flex gap-3">
                         <Link
                             :href="`/packages/${pkg.id}`"
-                            class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-[#0D1527] py-3.5 text-center text-sm font-bold text-white hover:bg-amber-400 hover:text-slate-950 transition-colors"
+                            class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-[#0D1527] py-3.5 text-center text-sm font-bold text-white hover:bg-[#60d4f7] hover:text-slate-950 transition-colors border border-[#60d4f7]/30"
                         >
                             <i class="bi bi-cart-check" /> Buy Now
                         </Link>
                         <Link
                             :href="`/calculator?package=${pkg.id}`"
-                            class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white py-3.5 text-center text-sm font-bold text-slate-700 hover:bg-slate-50 hover:border-amber-400 transition-colors"
+                            class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white py-3.5 text-center text-sm font-bold text-slate-700 hover:bg-slate-50 hover:border-[#60d4f7] transition-colors"
                         >
                             Get Free Quote
                         </Link>
@@ -116,7 +125,7 @@ function firstImage(pkg) {
 
         <p v-if="!packages.length" class="py-20 text-center text-slate-400">Packages are being configured — check back soon or use the calculator.</p>
 
-        <div class="mt-12 rounded-3xl bg-[#0D1527] p-8 sm:p-12 flex flex-col sm:flex-row items-center justify-between gap-6">
+        <div class="mt-12 rounded-3xl bg-[#0D1527] p-8 sm:p-12 flex flex-col sm:flex-row items-center justify-between gap-6 border border-[#60d4f7]/30">
             <div>
                 <h2 class="text-2xl font-extrabold text-white">Every system is custom-designed for your load</h2>
                 <p class="mt-2 text-slate-300 max-w-xl">Tell us what you run and we'll recommend the exact package — no guesswork, no overselling.</p>

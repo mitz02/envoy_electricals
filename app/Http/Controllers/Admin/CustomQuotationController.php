@@ -4,9 +4,13 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Mail\CustomQuotationMail;
+use App\Models\Customer;
 use App\Models\CustomQuotation;
 use App\Models\CustomQuotationItem;
+use App\Models\Project;
+use App\Models\Setting;
 use App\Services\AuditLogger;
+use App\Services\ReferenceGenerator;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -60,10 +64,11 @@ class CustomQuotationController extends Controller
             'customer_phone' => ['nullable', 'string', 'max:255'],
             'customer_address' => ['nullable', 'string'],
             'job_description' => ['nullable', 'string'],
+            'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.item' => ['required', 'string', 'max:255'],
             'items.*.description' => ['nullable', 'string'],
-            'items.*.quantity' => ['required', 'numeric', 'min:1'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.unit' => ['nullable', 'string', 'max:50'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
         ]);
@@ -83,7 +88,7 @@ class CustomQuotationController extends Controller
                 'job_type' => 'Custom Service',
                 'title' => $data['job_description'] ? Str::limit($data['job_description'], 80) : 'Custom Quotation',
                 'description' => $data['job_description'],
-                'notes' => null,
+                'notes' => $data['notes'] ?? null,
                 'discount' => 0,
                 'tax' => 0,
                 'other_charges' => 0,
@@ -142,10 +147,11 @@ class CustomQuotationController extends Controller
             'customer_phone' => ['nullable', 'string', 'max:255'],
             'customer_address' => ['nullable', 'string'],
             'job_description' => ['nullable', 'string'],
+            'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.item' => ['required', 'string', 'max:255'],
             'items.*.description' => ['nullable', 'string'],
-            'items.*.quantity' => ['required', 'numeric', 'min:1'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.unit' => ['nullable', 'string', 'max:50'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
         ]);
@@ -157,6 +163,7 @@ class CustomQuotationController extends Controller
                 'customer_email' => $data['customer_email'],
                 'customer_address' => $data['customer_address'],
                 'description' => $data['job_description'],
+                'notes' => $data['notes'] ?? null,
                 'title' => $data['job_description'] ? Str::limit($data['job_description'], 80) : 'Custom Quotation',
             ]);
 
@@ -228,8 +235,20 @@ class CustomQuotationController extends Controller
     {
         $customQuotation->load('items');
 
-        $pdf = Pdf::loadView('pdf.custom-quotation', [
+        $settings = $this->getSettings();
+
+        $pdf = Pdf::loadView('pdf.quote-invoice', [
             'quotation' => $customQuotation,
+            'company' => [
+                'name' => $settings['business.name'] ?? 'Envoy Electricals',
+                'address' => $settings['business.address'] ?? '',
+                'email' => $settings['business.email'] ?? 'envoyelectricals@gmail.com',
+                'phone' => $settings['business.phone'] ?? '+234 809 708 9259',
+                'bank_name' => $settings['bank.bank_name'] ?? 'Wema Bank',
+                'account_name' => $settings['bank.account_name'] ?? 'Envoy Electricals',
+                'account_number' => $settings['bank.account_number'] ?? '0126278482',
+                'footer' => $settings['business.footer'] ?? 'powering your world with innovative solutions',
+            ],
         ])->setPaper('A4');
 
         return $pdf->download("Quotation-{$customQuotation->ref_id}.pdf")
@@ -238,28 +257,111 @@ class CustomQuotationController extends Controller
             ->header('Expires', 'Sat, 01 Jan 2000 00:00:00 GMT');
     }
 
+    protected function getSettings(): array
+    {
+        return Setting::whereIn('key', [
+            'business.name',
+            'business.address',
+            'business.email',
+            'business.phone',
+            'business.footer',
+            'bank.bank_name',
+            'bank.account_name',
+            'bank.account_number',
+        ])->pluck('value', 'key')->toArray();
+    }
+
     public function previewPdf(CustomQuotation $customQuotation)
     {
         $customQuotation->load('items');
 
         return Inertia::render('Admin/CustomQuotations/Preview', [
             'quotation' => $customQuotation,
-        ])->withHeaders([
-            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
-            'Pragma' => 'no-cache',
-            'Expires' => 'Sat, 01 Jan 2000 00:00:00 GMT',
         ]);
     }
 
     public function convertToProject(CustomQuotation $customQuotation): RedirectResponse
     {
-        // This would integrate with your project system
-        // For now, just mark as converted
-        $customQuotation->update(['status' => 'converted']);
+        $customQuotation->load('items');
 
-        AuditLogger::log('converted', 'custom_quotation', $customQuotation->id, "Converted quotation {$customQuotation->ref_id} to project");
+        $project = DB::transaction(function () use ($customQuotation) {
+            $customer = null;
+            if (! empty($customQuotation->customer_email)) {
+                $customer = Customer::withoutGlobalScope('store')->firstOrCreate(
+                    ['email' => $customQuotation->customer_email],
+                    [
+                        'name' => $customQuotation->customer_name,
+                        'phone' => $customQuotation->customer_phone,
+                        'address' => $customQuotation->customer_address,
+                        'customer_type' => 'walk_in',
+                        'store_id' => session('admin_store_id') ?? auth()->user()?->store_id ?? 1,
+                    ]
+                );
+            } elseif (! empty($customQuotation->customer_phone)) {
+                $customer = Customer::withoutGlobalScope('store')->firstOrCreate(
+                    ['phone' => $customQuotation->customer_phone],
+                    [
+                        'name' => $customQuotation->customer_name,
+                        'email' => $customQuotation->customer_email,
+                        'address' => $customQuotation->customer_address,
+                        'customer_type' => 'walk_in',
+                        'store_id' => session('admin_store_id') ?? auth()->user()?->store_id ?? 1,
+                    ]
+                );
+            } else {
+                $customer = Customer::create([
+                    'name' => $customQuotation->customer_name,
+                    'phone' => $customQuotation->customer_phone,
+                    'email' => $customQuotation->customer_email,
+                    'address' => $customQuotation->customer_address,
+                    'customer_type' => 'walk_in',
+                    'store_id' => session('admin_store_id') ?? auth()->user()?->store_id ?? 1,
+                ]);
+            }
 
-        return redirect()->back()->with('success', 'Quotation marked as converted to project.');
+            $project = Project::create([
+                'ref_id' => ReferenceGenerator::generate('project'),
+                'name' => $customQuotation->title,
+                'description' => $customQuotation->description,
+                'customer_id' => $customer->id,
+                'customer_address' => $customQuotation->customer_address,
+                'location' => $customQuotation->customer_address,
+                'store_id' => session('admin_store_id') ?? auth()->user()?->store_id ?? 1,
+                'contract_value' => $customQuotation->grand_total,
+                'status' => Project::STATUS_QUOTATION,
+                'start_date' => now()->toDateString(),
+                'created_by' => auth()->id(),
+                'material_cost' => 0,
+                'labour_cost' => 0,
+                'transport_cost' => 0,
+                'other_cost' => 0,
+                'project_cost' => 0,
+                'amount_received' => 0,
+                'balance' => $customQuotation->grand_total,
+                'gross_profit' => $customQuotation->grand_total,
+            ]);
+
+            foreach ($customQuotation->items as $item) {
+                $project->materials()->create([
+                    'name' => $item->item,
+                    'quantity' => $item->quantity,
+                    'unit_cost' => $item->unit_price,
+                    'total' => $item->total,
+                    'issued_to_inventory' => false,
+                ]);
+            }
+
+            $customQuotation->update([
+                'status' => 'converted',
+                'project_id' => $project->id,
+            ]);
+
+            AuditLogger::log('converted', 'custom_quotation', $customQuotation->id, "Converted quotation {$customQuotation->ref_id} to project {$project->ref_id}");
+
+            return $project;
+        });
+
+        return redirect()->route('admin.projects.show', $project)->with('success', "Quotation converted to project {$project->ref_id} successfully.");
     }
 
     public function destroy(CustomQuotation $customQuotation): RedirectResponse

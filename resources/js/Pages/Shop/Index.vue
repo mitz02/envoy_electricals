@@ -154,19 +154,19 @@ function applyPreset(p) {
             <div class="absolute inset-0 bg-gradient-to-r from-[#0D1527] via-[#0D1527]/85 to-[#0D1527]/45"></div>
             <div class="absolute inset-0" style="background-image:linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px); background-size:56px 56px;"></div>
             <div class="absolute -top-40 -right-32 w-[560px] h-[560px] rounded-full bg-yellow-400/[0.07] blur-[110px]"></div>
-            <div class="absolute top-1/3 -left-40 w-[480px] h-[480px] rounded-full bg-[#40e0d0]/[0.06] blur-[110px]"></div>
+            <div class="absolute top-1/3 -left-40 w-[480px] h-[480px] rounded-full bg-[#60d4f7]/[0.06] blur-[110px]"></div>
             <div class="absolute -bottom-32 left-1/3 w-[420px] h-[420px] rounded-full bg-yellow-400/[0.05] blur-[110px]"></div>
         </div>
 
         <div class="relative max-w-7xl mx-auto px-6 sm:px-12 lg:px-16 pt-16 sm:pt-24 pb-24 sm:pb-36">
             <div class="relative z-10 max-w-3xl">
                     <div class="inline-flex items-center gap-2.5 mb-6">
-                        <span class="w-10 h-[2px] bg-[#40e0d0]"></span>
-                        <span class="text-[#40e0d0] text-[11px] font-bold uppercase tracking-[0.25em]">Solar Shop</span>
+                        <span class="w-10 h-[2px] bg-[#60d4f7]"></span>
+                        <span class="text-[#60d4f7] text-[11px] font-bold uppercase tracking-[0.25em]">Solar Shop</span>
                     </div>
                     <h1 class="text-4xl sm:text-5xl lg:text-[56px] font-extrabold tracking-tight text-white leading-[1.05]">
                         Power Your World<br />
-                        With <span class="bg-gradient-to-r from-yellow-400 to-amber-300 bg-clip-text text-transparent">Trusted Solar Gear</span>
+                        With <span class="bg-gradient-to-r from-yellow-400 to-[#60d4f7] bg-clip-text text-transparent">Trusted Solar Gear</span>
                     </h1>
                     <p class="mt-5 max-w-lg text-slate-400 text-base sm:text-lg leading-relaxed">
                         Genuine panels, inverters &amp; batteries, delivered fast.
@@ -187,17 +187,17 @@ function applyPreset(p) {
                     </form>
 
                     <!-- Trust row -->
-                    <div class="mt-7 flex flex-wrap items-center gap-x-6 gap-y-2.5">
+<div class="mt-7 flex flex-wrap items-center gap-x-6 gap-y-2.5">
                         <span class="inline-flex items-center gap-2 text-xs font-semibold text-slate-300">
-                            <svg class="w-4 h-4 text-[#40e0d0]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12l14 0M13 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            <svg class="w-4 h-4 text-[#60d4f7]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12l14 0M13 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             Fast Delivery
                         </span>
                         <span class="inline-flex items-center gap-2 text-xs font-semibold text-slate-300">
                             <svg class="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4M20 12a8 8 0 1 1-16 0 8 8 0 0 1 16 0z" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                            Genuine &amp; Warranty
+                            Genuine & Warranty
                         </span>
                         <span class="inline-flex items-center gap-2 text-xs font-semibold text-slate-300">
-                            <svg class="w-4 h-4 text-[#40e0d0]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5h6v2M5 7l1 12h12l1-12M9 11v5M15 11v5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            <svg class="w-4 h-4 text-[#60d4f7]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5h6v2M5 7l1 12h12l1-12M9 11v5M15 11v5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             7-Day Returns
                         </span>
                     </div>
@@ -248,7 +248,7 @@ function applyPreset(p) {
                                 <button
                                     v-if="hasActiveFilters"
                                     type="button"
-                                    class="text-xs font-bold text-[#40e0d0] hover:underline"
+                                    class="text-xs font-bold text-[#60d4f7] hover:underline"
                                     @click="clearFilters"
                                 >Clear all</button>
                             </div>
@@ -394,13 +394,13 @@ function applyPreset(p) {
                             v-for="chip in chips"
                             :key="chip.key"
                             type="button"
-                            class="inline-flex items-center gap-1.5 rounded-full border border-[#40e0d0]/30 bg-[#40e0d0]/10 py-1 pl-3 pr-2 text-xs font-semibold text-[#1a6b63] hover:border-[#40e0d0]/50 transition-colors"
+                            class="inline-flex items-center gap-1.5 rounded-full border border-[#60d4f7]/30 bg-[#60d4f7]/10 py-1 pl-3 pr-2 text-xs font-semibold text-[#1a6b63] hover:border-[#60d4f7]/50 transition-colors"
                             @click="removeChip(chip.key)"
                         >
                             {{ chip.label }}
                             <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"/></svg>
                         </button>
-                        <button type="button" class="text-xs font-bold text-slate-500 hover:text-[#40e0d0] hover:underline" @click="clearFilters">Clear all</button>
+                        <button type="button" class="text-xs font-bold text-slate-500 hover:text-[#60d4f7] hover:underline" @click="clearFilters">Clear all</button>
                     </div>
 
                     <!-- Product grid — matching landing page card style -->
@@ -456,7 +456,7 @@ function applyPreset(p) {
                                 <div class="mt-auto pt-4">
                                     <Link
                                         :href="`/shop/${product.id}`"
-                                        class="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#0D1527] px-3 h-9 text-xs font-bold text-white transition-all duration-200 hover:bg-yellow-400 hover:text-slate-950"
+                                        class="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#0D1527] px-3 h-9 text-xs font-bold text-white transition-all duration-200 hover:bg-[#60d4f7] hover:text-slate-950 border border-[#60d4f7]/30"
                                         title="View Product"
                                     >
                                         View
@@ -485,8 +485,8 @@ function applyPreset(p) {
                                 :href="link.url"
                                 class="inline-flex min-w-[40px] h-10 items-center justify-center rounded-xl border px-3 text-sm font-bold transition-all"
                                 :class="link.active
-                                    ? 'border-yellow-400 bg-yellow-400 text-slate-950'
-                                    : 'border-slate-200 bg-white text-slate-600 hover:border-yellow-300 hover:text-yellow-700 shadow-sm'"
+                                    ? 'border-[#60d4f7] bg-[#60d4f7] text-slate-950'
+                                    : 'border-slate-200 bg-white text-slate-600 hover:border-[#60d4f7] hover:text-[#60d4f7] shadow-sm'"
                                 v-html="link.label"
                             />
                             <span v-else class="inline-flex h-10 items-center justify-center px-2 text-sm text-slate-400" v-html="link.label" />
@@ -507,8 +507,8 @@ function applyPreset(p) {
                     </div>
                 </div>
                 <div class="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_10px_30px_rgba(0,0,0,0.06)]">
-                    <div class="w-11 h-11 shrink-0 rounded-xl bg-[#40e0d0]/10 flex items-center justify-center">
-                        <svg class="w-5 h-5 text-[#40e0d0]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <div class="w-11 h-11 shrink-0 rounded-xl bg-[#60d4f7]/10 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-[#60d4f7]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     </div>
                     <div>
                         <p class="text-sm font-bold text-slate-800">Genuine & Warranty</p>
@@ -525,8 +525,8 @@ function applyPreset(p) {
                     </div>
                 </div>
                 <div class="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_10px_30px_rgba(0,0,0,0.06)]">
-                    <div class="w-11 h-11 shrink-0 rounded-xl bg-[#40e0d0]/10 flex items-center justify-center">
-                        <svg class="w-5 h-5 text-[#40e0d0]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 18v-6a9 9 0 0 1 18 0v6M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <div class="w-11 h-11 shrink-0 rounded-xl bg-[#60d4f7]/10 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-[#60d4f7]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 18v-6a9 9 0 0 1 18 0v6M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     </div>
                     <div>
                         <p class="text-sm font-bold text-slate-800">Real Support</p>

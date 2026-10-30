@@ -165,7 +165,7 @@ class StorefrontController extends Controller
     public function projects(): Response
     {
         return Inertia::render('Projects/Index', [
-            'projects' => Project::query()
+            'projects' => Project::withoutGlobalScope('store')
                 ->where('published', true)
                 ->with('media')
                 ->orderByDesc('completion_date')
@@ -572,9 +572,13 @@ class StorefrontController extends Controller
                 'description' => $solarPackage->description,
                 'is_featured' => $solarPackage->is_featured,
                 'package_price' => $solarPackage->package_price,
-                'installation_cost' => $solarPackage->installation_cost,
                 'estimated_load_capacity' => $solarPackage->estimated_load_capacity,
                 'inverter_capacity' => $solarPackage->inverter_capacity,
+                'custom_inverter_capacity' => $solarPackage->custom_inverter_capacity,
+                'battery_capacity' => $solarPackage->battery_capacity,
+                'custom_battery_capacity' => $solarPackage->custom_battery_capacity,
+                'panel_count' => $solarPackage->panel_count,
+                'panel_wattage' => $solarPackage->panel_wattage,
                 'warranty' => $solarPackage->warranty,
                 'availability' => $solarPackage->availability,
                 'items' => $solarPackage->items->map(fn ($it) => [
@@ -603,7 +607,7 @@ class StorefrontController extends Controller
 
         abort_unless($solarPackage->is_visible_online, 404);
 
-        $totalAmount = $solarPackage->package_price + ($solarPackage->installation_cost ?? 0);
+        $totalAmount = (float) $solarPackage->package_price;
 
         if ($totalAmount <= 0) {
             return response()->json(['message' => 'This package is free. No payment required.'], 422);
@@ -812,7 +816,7 @@ class StorefrontController extends Controller
                 ->with('error', 'This package is currently unavailable.');
         }
 
-        $totalAmount = $solarPackage->package_price + ($solarPackage->installation_cost ?? 0);
+        $totalAmount = (float) $solarPackage->package_price;
 
         // Record offline payment intent
         $payment = PaymentService::recordPayment(

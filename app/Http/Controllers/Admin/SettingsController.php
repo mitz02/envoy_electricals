@@ -34,6 +34,8 @@ class SettingsController extends Controller
             ->pluck('total', 'subcategory_id');
 
         $calculatorSettings = Setting::where('group', 'calculator')->pluck('value', 'key');
+        $businessSettings = Setting::where('group', 'business')->pluck('value', 'key');
+        $bankSettings = Setting::where('group', 'bank')->pluck('value', 'key');
 
         return Inertia::render('Admin/Settings', [
             'categories' => $categories->map(fn ($c) => [
@@ -43,7 +45,57 @@ class SettingsController extends Controller
                 'product_count' => (int) ($categoryCounts[$c->id] ?? 0) + (int) ($subcategoryCounts[$c->id] ?? 0),
             ])->values(),
             'calculatorSettings' => $calculatorSettings,
+            'businessSettings' => $businessSettings,
+            'bankSettings' => $bankSettings,
         ]);
+    }
+
+    public function updateBusiness(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'business.name' => ['required', 'string', 'max:255'],
+            'business.email' => ['required', 'email', 'max:255'],
+            'business.phone' => ['required', 'string', 'max:50'],
+            'business.address' => ['required', 'string', 'max:500'],
+            'business.footer' => ['nullable', 'string', 'max:500'],
+            'currency.symbol' => ['required', 'string', 'max:10'],
+        ]);
+
+        foreach ($data as $key => $value) {
+            Setting::updateOrCreate(
+                ['key' => $key, 'group' => 'business'],
+                ['value' => $value]
+            );
+        }
+
+        cache()->forget('settings.business');
+
+        AuditLogger::log('updated', 'settings', 0, 'Updated business settings');
+
+        return redirect()->back()->with('success', 'Business settings saved.');
+    }
+
+    public function updateBank(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'bank.bank_name' => ['required', 'string', 'max:255'],
+            'bank.account_name' => ['required', 'string', 'max:255'],
+            'bank.account_number' => ['required', 'string', 'max:50'],
+            'bank.instructions' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        foreach ($data as $key => $value) {
+            Setting::updateOrCreate(
+                ['key' => $key, 'group' => 'bank'],
+                ['value' => $value]
+            );
+        }
+
+        cache()->forget('settings.bank');
+
+        AuditLogger::log('updated', 'settings', 0, 'Updated bank settings');
+
+        return redirect()->back()->with('success', 'Bank settings saved.');
     }
 
     public function storeCategory(Request $request): JsonResponse|RedirectResponse
@@ -77,8 +129,10 @@ class SettingsController extends Controller
     public function storeCalculator(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'panel_wattage' => ['required', 'integer', 'min:1'],
+            'panel_wattage' => ['required', 'numeric', 'min:1'],
             'panel_efficiency' => ['required', 'numeric', 'min:0.01', 'max:1'],
+            'peak_sun_hours' => ['required', 'numeric', 'min:0.1', 'max:24'],
+            'battery_depth_of_discharge' => ['required', 'numeric', 'min:0.1', 'max:1'],
             'inverter_safety_factor' => ['required', 'numeric', 'min:0.01'],
             'battery_capacities' => ['required', 'string', 'max:500'],
             'inverter_sizes' => ['required', 'string', 'max:500'],
@@ -94,17 +148,10 @@ class SettingsController extends Controller
         ]);
 
         foreach ($data as $key => $value) {
-            if (is_array($value)) {
-                Setting::updateOrCreate(
-                    ['key' => 'calculator.'.$key, 'group' => 'calculator'],
-                    ['value' => json_encode($value)]
-                );
-            } else {
-                Setting::updateOrCreate(
-                    ['key' => 'calculator.'.$key, 'group' => 'calculator'],
-                    ['value' => (string) $value]
-                );
-            }
+            Setting::updateOrCreate(
+                ['key' => 'calculator.'.$key, 'group' => 'calculator'],
+                ['value' => is_array($value) ? json_encode($value) : (string) $value]
+            );
         }
 
         // Clear cache so changes take effect immediately

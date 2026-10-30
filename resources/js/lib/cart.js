@@ -62,6 +62,42 @@ export function clearCart() {
     syncCount();
 }
 
+/**
+ * Rebuild the cart from a dead order's items.
+ *
+ * Checkout clears the cart the moment an order is created so the same basket
+ * cannot be ordered twice. If that order is later cancelled or refunded the
+ * customer should not silently lose their basket, so this puts it back. Lines
+ * whose product has since been deleted are dropped, and quantities are kept as
+ * ordered rather than clamped: the server re-validates stock on the next
+ * checkout, so an item that is no longer available fails loudly there instead
+ * of quietly disappearing from the cart.
+ *
+ * @param {Array} items Order items, each with an eager-loaded `product`.
+ * @returns {number} Number of lines restored.
+ */
+export function restoreCart(items) {
+    const lines = (Array.isArray(items) ? items : [])
+        .filter((item) => item?.product)
+        .map((item) => ({
+            product_id: item.product.id,
+            name: item.product.name,
+            price: Number(item.product.selling_price ?? item.unit_price ?? 0),
+            image: item.product.images?.[0]?.path ?? '',
+            quantity: Math.max(1, Number(item.quantity) || 1),
+            available: Number(item.product.current_quantity ?? 0),
+        }));
+
+    if (lines.length === 0) {
+        return 0;
+    }
+
+    cartItems.value = lines;
+    syncCount();
+
+    return lines.length;
+}
+
 export function cartSubtotal() {
     return cartItems.value.reduce((sum, i) => sum + i.price * i.quantity, 0);
 }

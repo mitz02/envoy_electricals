@@ -1,10 +1,12 @@
 <script setup>
 import { ref, computed } from 'vue';
-import { Link, useForm } from '@inertiajs/vue3';
+import { Link, useForm, usePage } from '@inertiajs/vue3';
 
 const props = defineProps({
     estimateHref: { type: String, default: null },
 });
+
+const page = usePage();
 
 const emit = defineEmits(['estimate']);
 
@@ -17,6 +19,12 @@ const newsletter = useForm({
 const newsletterSubscribed = ref(false);
 const newsletterFailed = ref(false);
 const newsletterMessage = ref('');
+
+const businessName = computed(() => page.props.settings?.business?.name ?? 'Envoy Electricals');
+const businessPhone = computed(() => page.props.settings?.business?.phone ?? '+234 809 708 9259');
+const businessEmail = computed(() => page.props.settings?.business?.email ?? 'hello@envoyelectricals.com');
+const businessAddress = computed(() => page.props.settings?.business?.address ?? 'Shop 1, Peace Avenue Junction, Futa Southgate Road, Akure, Ondo State');
+const businessFooter = computed(() => page.props.settings?.business?.footer ?? 'powering your world with innovative solutions');
 
 const newsletterFeedback = computed(() => {
     if (newsletter.errors.email) return { text: newsletter.errors.email, ok: false };
@@ -61,16 +69,16 @@ function subscribeNewsletter() {
             <div class="absolute inset-0 bg-gradient-to-br from-[#0D1527] via-[#111827] to-[#0F1A2E]"></div>
             <div class="absolute inset-0 opacity-[0.035]" style="background-image: repeating-linear-gradient(0deg,transparent,transparent 39px,rgba(255,255,255,.08) 39px,rgba(255,255,255,.08) 40px), repeating-linear-gradient(90deg,transparent,transparent 39px,rgba(255,255,255,.08) 39px,rgba(255,255,255,.08) 40px);"></div>
             <div class="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full bg-yellow-400/[0.04] blur-[100px]"></div>
-            <div class="absolute -bottom-40 -right-40 w-[500px] h-[500px] rounded-full bg-[#40e0d0]/[0.04] blur-[100px]"></div>
+            <div class="absolute -bottom-40 -right-40 w-[500px] h-[500px] rounded-full bg-[#60d4f7]/[0.04] blur-[100px]"></div>
         </div>
 
         <!-- CTA Section -->
         <div class="relative max-w-7xl mx-auto px-6 sm:px-12 lg:px-16 pt-14 pb-14 z-10">
             <div class="flex flex-col lg:flex-row items-center lg:items-center justify-between gap-10">
                 <div class="lg:max-w-lg text-center lg:text-left">
-                    <div class="inline-flex items-center gap-2.5 mb-5">
-                        <span class="w-10 h-[2px] bg-[#40e0d0]"></span>
-                        <span class="text-[#40e0d0] text-[11px] font-bold uppercase tracking-[0.25em]">Free &amp; No-Obligation</span>
+<div class="inline-flex items-center gap-2.5 mb-5">
+                        <span class="w-10 h-[2px] bg-[#60d4f7]"></span>
+                        <span class="text-[#60d4f7] text-[11px] font-bold uppercase tracking-[0.25em]">Free & No-Obligation</span>
                     </div>
                     <h2 class="text-[26px] sm:text-[32px] lg:text-[38px] font-black uppercase leading-[1.1] tracking-tight">
                         Get Your Free<br class="hidden sm:block" /> Solar Estimate
@@ -145,7 +153,7 @@ function subscribeNewsletter() {
                             {{ newsletter.processing ? 'Adding…' : 'Join' }}
                         </button>
                     </div>
-                    <p v-if="newsletterFeedback" class="mt-2 text-xs font-semibold" :class="newsletterFeedback.ok ? 'text-[#40e0d0]' : 'text-red-400'">
+                    <p v-if="newsletterFeedback" class="mt-2 text-xs font-semibold" :class="newsletterFeedback.ok ? 'text-[#60d4f7]' : 'text-red-400'">
                         {{ newsletterFeedback.text }}
                     </p>
                 </div>
@@ -173,16 +181,16 @@ function subscribeNewsletter() {
                             </span>
                             <div>
                                 <p class="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Phone</p>
-                                <p class="text-[13px] text-slate-300">+234 809 708 9259</p>
+                                <p class="text-[13px] text-slate-300">{{ businessPhone }}</p>
                             </div>
                         </li>
                         <li class="flex items-start gap-3">
                             <span class="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0 mt-0.5">
-                                <svg class="w-3.5 h-3.5 text-[#40e0d0]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                                <svg class="w-3.5 h-3.5 text-[#60d4f7]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                             </span>
                             <div>
                                 <p class="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Email</p>
-                                <p class="text-[13px] text-slate-300">hello@envoyelectricals.com</p>
+                                <p class="text-[13px] text-slate-300">{{ businessEmail }}</p>
                             </div>
                         </li>
                         <li class="flex items-start gap-3">
@@ -191,7 +199,7 @@ function subscribeNewsletter() {
                             </span>
                             <div>
                                 <p class="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Address</p>
-                                <p class="text-[13px] text-slate-300 leading-relaxed">Shop 1, Peace Avenue Junction,<br>Futa Southgate Road, Akure, Ondo State</p>
+                                <p class="text-[13px] text-slate-300 leading-relaxed">{{ businessAddress }}</p>
                             </div>
                         </li>
                     </ul>
@@ -200,17 +208,17 @@ function subscribeNewsletter() {
                 <!-- Column 4: Follow Us + Hours (spans 2 cols) -->
                 <div class="lg:col-span-2">
                     <h4 class="text-xs font-bold text-white mb-5 uppercase tracking-[0.15em]">Follow Us</h4>
-                    <div class="flex items-center gap-2 mb-8">
-                        <a href="#" class="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center hover:bg-yellow-400 hover:text-slate-950 hover:border-yellow-400 transition-all duration-200" title="Instagram">
-                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+<div class="flex items-center gap-2 mb-8">
+                        <a href="#" class="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center hover:bg-[#60d4f7] hover:text-slate-950 hover:border-[#60d4f7] transition-all duration-200" title="Instagram">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 3.668-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
                         </a>
-                        <a href="#" class="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center hover:bg-yellow-400 hover:text-slate-950 hover:border-yellow-400 transition-all duration-200" title="X / Twitter">
+                        <a href="#" class="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center hover:bg-[#60d4f7] hover:text-slate-950 hover:border-[#60d4f7] transition-all duration-200" title="X / Twitter">
                             <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
                         </a>
-                        <a href="#" class="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center hover:bg-yellow-400 hover:text-slate-950 hover:border-yellow-400 transition-all duration-200" title="Facebook">
+                        <a href="#" class="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center hover:bg-[#60d4f7] hover:text-slate-950 hover:border-[#60d4f7] transition-all duration-200" title="Facebook">
                             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
                         </a>
-                        <a href="#" class="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center hover:bg-yellow-400 hover:text-slate-950 hover:border-yellow-400 transition-all duration-200" title="LinkedIn">
+                        <a href="#" class="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center hover:bg-[#60d4f7] hover:text-slate-950 hover:border-[#60d4f7] transition-all duration-200" title="LinkedIn">
                             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
                         </a>
                     </div>
@@ -227,11 +235,11 @@ function subscribeNewsletter() {
         <!-- Bottom bar -->
         <div class="relative z-10 border-t border-white/[0.06]">
             <div class="max-w-7xl mx-auto px-6 sm:px-12 lg:px-16 py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
-                <p class="text-[11px] text-slate-600">&copy; {{ new Date().getFullYear() }} Envoy Electricals. All rights reserved.</p>
+                <p class="text-[11px] text-slate-600">&copy; {{ new Date().getFullYear() }} {{ businessName }}. All rights reserved.</p>
                 <nav class="flex items-center gap-5 text-[11px] text-slate-500">
-                    <a href="#hero" class="hover:text-white transition">Back to top</a>
-                    <Link :href="route('about')" class="hover:text-white transition">Privacy</Link>
-                    <Link :href="route('about')" class="hover:text-white transition">Terms</Link>
+                    <a href="#hero" class="hover:text-[#60d4f7] transition">Back to top</a>
+                    <Link :href="route('about')" class="hover:text-[#60d4f7] transition">Privacy</Link>
+                    <Link :href="route('about')" class="hover:text-[#60d4f7] transition">Terms</Link>
                 </nav>
             </div>
         </div>

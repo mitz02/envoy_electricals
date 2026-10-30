@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Customer;
+use App\Models\Order;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\Sale;
@@ -23,12 +24,7 @@ class SaleService
      */
     public function createSale(array $data, array $items, int $userId): Sale
     {
-        $storeId = (int) ($data['store_id']
-            ?? session('admin_store_id')
-            ?? auth()->user()?->store_id
-            ?? Store::where('is_default', true)->value('id')
-            ?? Store::value('id')
-            ?? 1);
+        $storeId = $this->resolveStoreId($data);
 
         // Validate store-specific stock availability upfront before any mutation.
         foreach ($items as $item) {
@@ -46,20 +42,26 @@ class SaleService
             $subtotal = 0;
             $preparedItems = [];
 
+            $itemDiscountsTotal = 0;
             foreach ($items as $item) {
                 $product = Product::findOrFail($item['product_id']);
-                $lineTotal = round((float) $item['unit_price'] * (int) $item['quantity'], 2);
+                $itemDiscount = round((float) ($item['discount'] ?? 0), 2);
+                $grossLine = round((float) $item['unit_price'] * (int) $item['quantity'], 2);
+                $lineTotal = round(max($grossLine - $itemDiscount, 0), 2);
                 $preparedItems[] = [
                     'product' => $product,
                     'quantity' => (int) $item['quantity'],
                     'unit_price' => (float) $item['unit_price'],
+                    'discount' => $itemDiscount,
                     'line_total' => $lineTotal,
                 ];
-                $subtotal += $lineTotal;
+                $subtotal += $grossLine;
+                $itemDiscountsTotal += $itemDiscount;
             }
 
             $subtotal = round($subtotal, 2);
-            $discount = round((float) ($data['discount'] ?? 0), 2);
+            $orderDiscount = round((float) ($data['discount'] ?? 0), 2);
+            $discount = max($orderDiscount, $itemDiscountsTotal);
             $taxRate = (float) ($data['tax_rate'] ?? 0);
             $taxableBase = max($subtotal - $discount, 0);
             $tax = round($taxableBase * ($taxRate / 100), 2);
@@ -235,6 +237,204 @@ class SaleService
         }
 
         return null;
+    }
+
+    /**
+     * Resolve the store a sale should be attributed to.
+     *
+     * @param  array  $data  May carry an explicit `store_id`.
+     */
+    protected function resolveStoreId(array $data): int
+    {
+        return (int) ($data['store_id']
+            ?? session('admin_store_id')
+            ?? auth()->user()?->store_id
+            ?? Store::where('is_default', true)->value('id')
+            ?? Store::value('id')
+            ?? 1);
+    }
+
+    /**
+     * Recognise revenue for a delivered order by generating the sale invoice it
+     * corresponds to, and link the two documents together.
+     *
+     * Storefront orders are not `sales` rows, and every revenue, profit and
+     * receivables figure in the app reads `sales`. Without this, delivering an
+     * order moves stock but leaves the money invisible.
+     *
+     * Deliberately does NOT move inventory: OrderService::fulfillOrder has
+     * already deducted stock by the time this runs, and deducting again would
+     * double-count the outbound movement. Nor does it write payment rows — the
+     * order's own payments ledger is the cash record, and mirroring it here
+     * would count the money twice.
+     *
+     * Idempotent: an order that already has a linked sale returns that sale, so
+     * re-delivering or re-running the backfill cannot double up revenue.
+     *
+     * @param  string|null  $saleDate  Date to recognise the revenue on (defaults to today).
+     */
+    public function createSaleFromOrder(Order $order, ?int $userId = null, ?string $saleDate = null): Sale
+    {
+        if ($order->linked_sale_id) {
+            $existing = Sale::find($order->linked_sale_id);
+
+            if ($existing) {
+                return $existing;
+            }
+        }
+
+        $order->loadMissing('items.product');
+
+        if ($order->items->isEmpty()) {
+            throw ValidationException::withMessages([
+                'order' => "Order {$order->ref_id} has no items, so no sale could be generated.",
+            ]);
+        }
+
+        $storeId = $this->resolveStoreId([]);
+
+        return DB::transaction(function () use ($order, $userId, $saleDate, $storeId) {
+            $subtotal = 0.0;
+            $preparedItems = [];
+
+            foreach ($order->items as $item) {
+                $product = $item->product;
+
+                if (! $product) {
+                    throw ValidationException::withMessages([
+                        'items' => "Product for order item {$item->id} no longer exists.",
+                    ]);
+                }
+
+                $quantity = (int) $item->quantity;
+                $unitPrice = (float) $item->unit_price;
+                $unitCost = (float) $product->average_cost;
+                $lineTotal = round($unitPrice * $quantity, 2);
+
+                $preparedItems[] = [
+                    'product_id' => $product->id,
+                    'description' => $product->name,
+                    'quantity' => $quantity,
+                    'unit_price' => $unitPrice,
+                    'unit_cost' => $unitCost,
+                    'total' => $lineTotal,
+                    'profit' => round($lineTotal - round($unitCost * $quantity, 2), 2),
+                ];
+
+                $subtotal += $lineTotal;
+            }
+
+            $subtotal = round($subtotal, 2);
+            $discount = round((float) $order->discount, 2);
+            $tax = round((float) $order->tax, 2);
+            $taxableBase = max($subtotal - $discount, 0);
+            $taxRate = $taxableBase > 0 ? round(($tax / $taxableBase) * 100, 2) : 0.0;
+
+            // Trust the order's own total so the invoice always matches what the
+            // customer agreed to, even if the order predates current tax rules.
+            $total = round((float) $order->total, 2);
+            $amountPaid = min(round((float) $order->total_paid, 2), $total);
+            $balance = round($total - $amountPaid, 2);
+
+            $sale = Sale::create([
+                'ref_id' => ReferenceGenerator::generate('sale'),
+                'invoice_no' => ReferenceGenerator::generate('invoice'),
+                'sale_date' => $saleDate ?? now()->toDateString(),
+                'store_id' => $storeId,
+                'customer_id' => $this->resolveOrderCustomer($order, $storeId),
+                'salesperson_id' => $userId,
+                'subtotal' => $subtotal,
+                'discount' => $discount,
+                'tax_rate' => $taxRate,
+                'tax' => $tax,
+                'total' => $total,
+                'amount_paid' => $amountPaid,
+                'balance' => $balance,
+                'payment_method' => $order->payment_provider,
+                'status' => 'completed',
+                'remarks' => 'Storefront order '.$order->ref_id,
+                'created_by' => $userId,
+            ]);
+
+            foreach ($preparedItems as $pi) {
+                SaleItem::create(['sale_id' => $sale->id] + $pi);
+            }
+
+            $order->update(['linked_sale_id' => $sale->id]);
+
+            return $sale;
+        });
+    }
+
+    /**
+     * Find or create the customer a delivered order should be invoiced to.
+     *
+     * Storefront orders are created without a customer_id, so guest checkouts are
+     * matched on email then phone before a new walk-in customer is created. That
+     * keeps the backfill re-runnable without duplicating customer records.
+     */
+    protected function resolveOrderCustomer(Order $order, int $storeId): ?int
+    {
+        if ($order->customer_id) {
+            return (int) $order->customer_id;
+        }
+
+        if (! empty($order->customer_email)) {
+            $match = Customer::where('email', $order->customer_email)->first();
+
+            if ($match) {
+                return $match->id;
+            }
+        }
+
+        if (! empty($order->customer_phone)) {
+            $match = Customer::where('phone', $order->customer_phone)->first();
+
+            if ($match) {
+                return $match->id;
+            }
+        }
+
+        if (empty($order->customer_name)) {
+            return null;
+        }
+
+        return Customer::create([
+            'ref_id' => ReferenceGenerator::generate('customer'),
+            'name' => $order->customer_name,
+            'phone' => $order->customer_phone,
+            'email' => $order->customer_email,
+            'customer_type' => 'walk_in',
+            'store_id' => $storeId,
+        ])->id;
+    }
+
+    /**
+     * Void the sale generated for a delivered order, leaving inventory and the
+     * order's payments untouched.
+     *
+     * voidSale() is unsuitable here: it reverses stock and marks the sale's
+     * payments reversed, but undoing an order fulfillment already restores
+     * stock, and the customer genuinely did pay — only the delivery is undone.
+     */
+    public function voidLinkedOrderSale(Order $order, string $reason, int $userId): ?Sale
+    {
+        $sale = $order->linked_sale_id ? Sale::find($order->linked_sale_id) : null;
+
+        if (! $sale || $sale->status === 'void') {
+            return $sale;
+        }
+
+        $sale->update([
+            'status' => 'void',
+            'amount_paid' => 0,
+            'balance' => $sale->total,
+            'void_reason' => $reason,
+            'voided_by' => $userId,
+            'voided_at' => now(),
+        ]);
+
+        return $sale;
     }
 
     /**

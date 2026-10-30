@@ -1,12 +1,23 @@
+
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Invoice {{ $sale->invoice_no }}</title>
+
     <style>
+
+        /*
+        |--------------------------------------------------------------------------
+        | PAGE
+        |--------------------------------------------------------------------------
+        */
+
         @page {
-            margin: 20mm 15mm;
+            margin: 0;
         }
 
         * {
@@ -16,537 +27,1005 @@
         }
 
         body {
-            font-family: 'DejaVu Sans', Arial, Helvetica, sans-serif;
-            font-size: 11px;
-            line-height: 1.5;
-            color: #1e293b;
+            font-family: DejaVu Sans, Arial, Helvetica, sans-serif;
+            font-size: 10px;
+            color: #222222;
             background: #ffffff;
+            line-height: 1.35;
         }
 
-        .invoice-container {
-            max-width: 100%;
+        /*
+        |--------------------------------------------------------------------------
+        | MAIN PAGE CONTAINER
+        |--------------------------------------------------------------------------
+        |
+        | IMPORTANT:
+        | Do NOT use width:100% together with left/right padding here.
+        | Dompdf can push the right side outside the printable area.
+        |
+        */
+
+        .invoice {
+            width: auto;
+            margin-left: 14mm;
+            margin-right: 14mm;
+            padding-top: 16mm;
+            padding-bottom: 12mm;
         }
 
-        /* Header */
+
+        /*
+        |--------------------------------------------------------------------------
+        | HEADER
+        |--------------------------------------------------------------------------
+        */
+
         .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 3px solid #0d1527;
+            width: 100%;
+            border-bottom: 1px solid #dddddd;
+            padding-bottom: 18px;
+            margin-bottom: 28px;
         }
 
-        .company-info {
-            display: flex;
-            align-items: flex-start;
-            gap: 20px;
+        .header-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        .header-left {
+            width: 62%;
+            vertical-align: top;
+            padding-right: 10px;
+        }
+
+        .header-right {
+            width: 38%;
+            vertical-align: top;
+            text-align: right;
+            padding-left: 10px;
         }
 
         .logo {
-            width: 280px;
-            height: 280px;
-            object-fit: contain;
+            width: 145px;
+            height: auto;
+            margin-bottom: 5px;
         }
 
-        .company-details {
-            display: none;
+        .company-name {
+            font-size: 19px;
+            font-weight: bold;
+            color: #111cff;
+            margin-bottom: 3px;
+        }
+
+        .company-info {
+            font-size: 10px;
+            color: #333333;
+            line-height: 1.5;
         }
 
         .invoice-title {
-            text-align: right;
-        }
-
-        .invoice-title h2 {
-            font-size: 28px;
-            font-weight: 900;
-            color: #0d1527;
-            letter-spacing: 0.02em;
+            font-size: 25px;
+            line-height: 1;
+            font-weight: bold;
+            color: #111cff;
+            text-transform: uppercase;
             margin-bottom: 8px;
         }
 
-        .invoice-title .invoice-no {
-            font-size: 13px;
-            font-weight: 600;
-            color: #475569;
-            font-family: monospace;
-        }
-
-        .invoice-meta {
-            margin-top: 12px;
+        .invoice-number {
             font-size: 10px;
-            color: #64748b;
+            color: #333333;
+            margin-bottom: 10px;
+            white-space: nowrap;
         }
 
-        .invoice-meta div {
-            margin: 3px 0;
-        }
-
-        .invoice-meta span {
-            font-weight: 600;
-            color: #0d1527;
-        }
-
-        .status-badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 9999px;
+        .status {
             font-size: 9px;
-            font-weight: 700;
+            font-weight: bold;
+            color: #333333;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-top: 8px;
         }
 
-        .status-completed {
-            background: #dcfce7;
-            color: #166534;
+
+        /*
+        |--------------------------------------------------------------------------
+        | BILL TO / DETAILS
+        |--------------------------------------------------------------------------
+        */
+
+        .top-information {
+            width: 100%;
+            margin-bottom: 24px;
         }
 
-        .status-pending {
-            background: #fef3c7;
-            color: #92400e;
+        .information-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
         }
 
-        .status-void {
-            background: #fee2e2;
-            color: #991b1b;
+        .bill-to {
+            width: 58%;
+            vertical-align: top;
+            padding-right: 15px;
         }
 
-        /* Billed To / Details Grid */
-        .details-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 15px;
-            margin: 25px 0;
+        .invoice-details {
+            width: 42%;
+            vertical-align: top;
+            text-align: right;
+            padding-left: 15px;
         }
 
-        .detail-box {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 12px;
-        }
-
-        .detail-label {
-            font-size: 8px;
-            font-weight: 700;
+        .section-title {
+            font-size: 10px;
+            font-weight: bold;
             text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: #94a3b8;
-            margin-bottom: 4px;
-        }
-
-        .detail-value {
-            font-size: 11px;
-            font-weight: 600;
-            color: #0d1527;
-            line-height: 1.4;
-        }
-
-        /* Billed To Section */
-        .billed-section {
-            margin: 25px 0;
-        }
-
-        .billed-row {
-            display: flex;
-            gap: 40px;
-        }
-
-        .billed-col {
-            flex: 1;
-        }
-
-        .billed-label {
-            font-size: 8px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: #94a3b8;
+            color: #444444;
             margin-bottom: 6px;
         }
 
-        .billed-content {
+        .customer-name {
             font-size: 11px;
-            color: #1e293b;
-            line-height: 1.6;
+            font-weight: bold;
+            color: #222222;
+            margin-bottom: 2px;
         }
 
-        .billed-content .name {
-            font-weight: 700;
-            font-size: 12px;
-            color: #0d1527;
+        .customer-info {
+            font-size: 10px;
+            color: #333333;
+            line-height: 1.5;
+        }
+
+        .details-label {
+            font-weight: bold;
+            color: #333333;
+        }
+
+        .details-row {
             margin-bottom: 4px;
+            font-size: 10px;
+            white-space: nowrap;
         }
 
-        .billed-content .outstanding {
-            font-size: 9px;
-            color: #b45309;
-            background: #fef3c7;
-            padding: 4px 8px;
-            border-radius: 4px;
-            display: inline-block;
-            margin-top: 8px;
+
+        /*
+        |--------------------------------------------------------------------------
+        | ITEMS
+        |--------------------------------------------------------------------------
+        */
+
+        .items {
+            width: 100%;
+            margin-top: 10px;
         }
 
-        /* Items Table */
         .items-table {
             width: 100%;
             border-collapse: collapse;
-            margin: 20px 0;
-            font-size: 10px;
+            table-layout: fixed;
         }
 
         .items-table th {
-            background: #0d1527;
-            color: #facc15;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            font-size: 8px;
-            padding: 10px 8px;
+            padding: 7px 6px;
             text-align: left;
+            font-size: 9px;
+            font-weight: normal;
+            color: #999999;
+            border-bottom: 1px solid #dddddd;
         }
 
-        .items-table th:last-child,
-        .items-table th:nth-last-child(2),
-        .items-table th:nth-last-child(3),
-        .items-table th:nth-last-child(4) {
+        .items-table th.item {
+            width: 34%;
+        }
+
+        .items-table th.qty {
+            width: 10%;
+            text-align: center;
+        }
+
+        .items-table th.price {
+            width: 18%;
+            text-align: right;
+        }
+
+        .items-table th.discount {
+            width: 20%;
+            text-align: center;
+        }
+
+        .items-table th.total {
+            width: 18%;
             text-align: right;
         }
 
         .items-table td {
-            padding: 10px 8px;
-            border-bottom: 1px solid #e2e8f0;
-            vertical-align: top;
+            padding: 7px 6px;
+            font-size: 10px;
+            color: #333333;
+            border-bottom: 1px solid #eeeeee;
+            vertical-align: middle;
+            overflow: hidden;
         }
 
-        .items-table tr:last-child td {
-            border-bottom: none;
-        }
-
-        .items-table td:first-child {
-            color: #94a3b8;
-            font-weight: 500;
-        }
-
-        .items-table .item-name {
-            font-weight: 600;
-            color: #0d1527;
-            margin-bottom: 2px;
-        }
-
-        .items-table .item-sku {
-            font-size: 8px;
-            color: #64748b;
-            font-family: monospace;
-        }
-
-        .items-table .text-right {
-            text-align: right;
-        }
-
-        .items-table .text-center {
+        .items-table td.qty {
             text-align: center;
         }
 
-        /* Totals */
-        .totals-section {
-            margin-top: 20px;
-            padding-left: 50%;
-        }
-
-        .totals-table {
-            width: 100%;
-            font-size: 10px;
-        }
-
-        .totals-table td {
-            padding: 6px 12px;
-        }
-
-        .totals-table .label {
-            color: #64748b;
-            text-align: right;
-            font-weight: 500;
-        }
-
-        .totals-table .value {
-            color: #0d1527;
-            font-weight: 600;
+        .items-table td.price {
             text-align: right;
             white-space: nowrap;
         }
 
-        .totals-table .discount .value {
-            color: #dc2626;
-        }
-
-        .totals-table .total-row td {
-            border-top: 2px solid #0d1527;
-            font-size: 13px;
-            font-weight: 800;
-            color: #0d1527;
-            padding-top: 12px;
-        }
-
-        .totals-table .paid-row .value {
-            color: #16a34a;
-        }
-
-        .totals-table .balance-row {
-            background: #fef3c7;
-        }
-
-        .totals-table .balance-row .value {
-            color: #b45309;
-            font-weight: 800;
-        }
-
-        .totals-table .balance-row td {
-            padding: 10px 12px;
-        }
-
-        .totals-table .balance-zero .value {
-            color: #16a34a;
-        }
-
-        /* Notes & Terms */
-        .notes-terms {
-            margin-top: 30px;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-        }
-
-        .notes-box,
-        .terms-box {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 15px;
-        }
-
-        .box-title {
-            font-size: 8px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: #94a3b8;
-            margin-bottom: 8px;
-        }
-
-        .notes-box p,
-        .terms-box p {
-            font-size: 9px;
-            color: #475569;
-            line-height: 1.6;
-        }
-
-        /* Footer */
-        .footer {
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid #e2e8f0;
+        .items-table td.discount {
             text-align: center;
+            white-space: nowrap;
+        }
+
+        .items-table td.total {
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .item-name {
+            font-weight: bold;
+            color: #333333;
+            word-wrap: break-word;
+        }
+
+        .item-sku {
+            font-size: 8px;
+            color: #999999;
+            margin-top: 1px;
+        }
+
+        .discount-value {
+            color: #ff3333;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | BOTTOM SECTION
+        |--------------------------------------------------------------------------
+        */
+
+        .bottom-section {
+            width: 100%;
+            margin-top: 18px;
+        }
+
+        .bottom-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        .bottom-left {
+            width: 60%;
+            vertical-align: top;
+            padding-right: 25px;
+        }
+
+        .bottom-right {
+            width: 40%;
+            vertical-align: top;
+            padding-left: 5px;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | PAYMENT DETAILS
+        |--------------------------------------------------------------------------
+        */
+
+        .payment-details {
+            margin-top: 38px;
+        }
+
+        .payment-title {
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            color: #444444;
+        }
+
+        .payment-row {
+            font-size: 10px;
+            margin-bottom: 7px;
+            color: #333333;
+        }
+
+        .payment-row strong {
+            color: #222222;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | TOTALS
+        |--------------------------------------------------------------------------
+        */
+
+        .totals-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        .totals-table td {
+            padding: 5px 0;
+            font-size: 10px;
+            border-bottom: 1px solid #eeeeee;
+        }
+
+        .totals-label {
+            width: 55%;
+            text-align: left;
+            color: #666666;
+        }
+
+        .totals-value {
+            width: 45%;
+            text-align: right;
+            font-weight: bold;
+            color: #333333;
+            white-space: nowrap;
+        }
+
+        .grand-total td {
+            padding-top: 8px;
+            padding-bottom: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #111cff;
+            border-top: 1px solid #dddddd;
+        }
+
+        .grand-total .totals-value {
+            color: #111cff;
+        }
+
+        .amount-paid .totals-value {
+            color: #555555;
+        }
+
+        .amount-due .totals-value {
+            color: #555555;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | NOTES
+        |--------------------------------------------------------------------------
+        */
+
+        .notes {
+            margin-top: 42px;
+            padding-top: 12px;
+            border-top: 1px solid #dddddd;
+        }
+
+        .notes-text {
             font-size: 9px;
-            color: #94a3b8;
+            color: #333333;
+            line-height: 1.5;
         }
 
-        .footer p {
-            margin: 4px 0;
+
+        /*
+        |--------------------------------------------------------------------------
+        | FOOTER
+        |--------------------------------------------------------------------------
+        */
+
+        .footer {
+            margin-top: 7px;
+            padding-top: 8px;
+            border-top: 1px solid #eeeeee;
+            font-size: 8px;
+            color: #333333;
         }
 
-        .footer a {
-            color: #64748b;
-            text-decoration: none;
+
+        /*
+        |--------------------------------------------------------------------------
+        | WATERMARK
+        |--------------------------------------------------------------------------
+        */
+
+        .watermark {
+            position: fixed;
+            top: 40%;
+            left: 35%;
+            width: 250px;
+            opacity: 0.025;
         }
 
-        /* Utility */
-        .text-right { text-align: right; }
-        .text-center { text-align: center; }
-        .font-mono { font-family: monospace; }
+
+        /*
+        |--------------------------------------------------------------------------
+        | PRINT
+        |--------------------------------------------------------------------------
+        */
+
+        @media print {
+
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+        }
+
     </style>
+
 </head>
+
+
 <body>
-    <div class="invoice-container">
-        <!-- Header -->
-        <div class="header">
-            <div class="company-info">
-                <img src="{{ asset('envoy_images/logo.png') }}" alt="{{ $company['name'] }}" class="logo">
-            </div>
 
-            <div class="invoice-title">
-                <h2>INVOICE</h2>
-                <div class="invoice-no">{{ $sale->invoice_no }}</div>
-                <div class="invoice-meta">
-                    <div><span>Reference:</span> {{ $sale->ref_id }}</div>
-                    <div><span>Date:</span> {{ \Carbon\Carbon::parse($sale->sale_date)->format('d M Y') }}</div>
-                    <div><span>Salesperson:</span> {{ $sale->salesperson?->name ?? '—' }}</div>
-                    @if($sale->store)
-                    <div><span>Branch:</span> {{ $sale->store->name }}</div>
-                    @endif
-                </div>
 
-                <span class="status-badge status-{{ $sale->status }}">
-                    {{ ucfirst($sale->status) }}
-                </span>
-            </div>
-        </div>
+<div class="invoice">
 
-        <!-- Details Grid -->
-        <div class="details-grid">
-            <div class="detail-box">
-                <div class="detail-label">Invoice Date</div>
-                <div class="detail-value">{{ \Carbon\Carbon::parse($sale->sale_date)->format('d M Y') }}</div>
-            </div>
-            <div class="detail-box">
-                <div class="detail-label">Due Date</div>
-                <div class="detail-value">On Receipt</div>
-            </div>
-            <div class="detail-box">
-                <div class="detail-label">Payment Method</div>
-                <div class="detail-value">{{ ucfirst(str_replace('_', ' ', $sale->payment_method ?? '—')) }}</div>
-            </div>
-            <div class="detail-box">
-                <div class="detail-label">Branch</div>
-                <div class="detail-value">{{ $sale->store?->name ?? '—' }}</div>
-            </div>
-        </div>
 
-        <!-- Billed To -->
-        <div class="billed-section">
-            <div class="billed-row">
-                <div class="billed-col">
-                    <div class="billed-label">Billed To</div>
-                    <div class="billed-content">
-                        <div class="name">{{ $sale->customer?->name ?? 'Walk-in Customer' }}</div>
-                        @if($sale->customer)
-                            @if($sale->customer->phone)
-                            <div>{{ $sale->customer->phone }}</div>
-                            @endif
-                            @if($sale->customer->email)
-                            <div>{{ $sale->customer->email }}</div>
-                            @endif
-                            @if($sale->customer->address)
-                            <div>{{ $sale->customer->address }}</div>
-                            @endif
-                            @if($sale->customer->outstanding > $sale->balance)
-                            <div class="outstanding">
-                                Also owes {{ \App\Helpers\Currency::format($sale->customer->outstanding - $sale->balance) }} from other invoices
-                            </div>
-                            @endif
-                        @endif
+    <!-- =========================================================
+         WATERMARK
+    ========================================================== -->
+
+    <img
+        src="{{ public_path('envoy_images/logo.png') }}"
+        class="watermark"
+        alt=""
+    >
+
+
+    <!-- =========================================================
+         HEADER
+    ========================================================== -->
+
+    <div class="header">
+
+        <table class="header-table">
+
+            <tr>
+
+
+                <!-- COMPANY INFORMATION -->
+
+                <td class="header-left">
+
+                    <img
+                        src="{{ public_path('envoy_images/logo.png') }}"
+                        class="logo"
+                        alt="{{ $company['name'] ?? 'Envoy Electricals' }}"
+                    >
+
+                    <div class="company-name">
+                        {{ $company['name'] ?? 'Envoy Electricals' }}
                     </div>
-                </div>
 
-                <div class="billed-col">
-                    <div class="billed-label">Sold By</div>
-                    <div class="billed-content">
-                        <div class="name">{{ $sale->salesperson?->name ?? '—' }}</div>
+                    <div class="company-info">
+
+                        {{ $company['email'] ?? 'envoyelectricals@gmail.com' }}
+
+                        <br>
+
+                        {{ $company['address'] ?? 'Shop 1, Peace Avenue Junction, opp Goddy Royal Hotel, Futa Southgate Road, Akure' }}
+
                     </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- Items Table -->
-        <table class="items-table">
-            <thead>
-                <tr>
-                    <th style="width: 5%;">#</th>
-                    <th style="width: 40%;">Item</th>
-                    <th style="width: 10%;" class="text-center">Qty</th>
-                    <th style="width: 15%;" class="text-right">Unit Price</th>
-                    <th style="width: 15%;" class="text-right">Total</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($items as $index => $item)
-                <tr>
-                    <td>{{ $index + 1 }}</td>
-                    <td>
-                        <div class="item-name">{{ $item->product?->name ?? $item->description }}</div>
-                        @if($item->product?->sku)
-                        <div class="item-sku">{{ $item->product->sku }}</div>
-                        @endif
-                    </td>
-                    <td class="text-center">{{ $item->quantity }}</td>
-                    <td class="text-right">{{ \App\Helpers\Currency::format($item->unit_price) }}</td>
-                    <td class="text-right">{{ \App\Helpers\Currency::format($item->total) }}</td>
-                </tr>
-                @endforeach
-            </tbody>
+                </td>
+
+
+                <!-- INVOICE INFORMATION -->
+
+                <td class="header-right">
+
+                    <div class="invoice-title">
+                        Invoice
+                    </div>
+
+                    <div class="invoice-number">
+                        #{{ $sale->invoice_no }}
+                    </div>
+
+                    <div class="status">
+                        {{ strtoupper($sale->status ?? 'DRAFT') }}
+                    </div>
+
+                </td>
+
+            </tr>
+
         </table>
 
-        <!-- Totals -->
-        <div class="totals-section">
-            <table class="totals-table">
-                <tr>
-                    <td class="label">Subtotal</td>
-                    <td class="value">{{ \App\Helpers\Currency::format($sale->subtotal) }}</td>
-                </tr>
-                @if($sale->discount > 0)
-                <tr class="discount">
-                    <td class="label">Discount</td>
-                    <td class="value">-{{ \App\Helpers\Currency::format($sale->discount) }}</td>
-                </tr>
-                @endif
-                @if($sale->tax > 0)
-                <tr>
-                    <td class="label">Tax ({{ $sale->tax_rate }}%)</td>
-                    <td class="value">{{ \App\Helpers\Currency::format($sale->tax) }}</td>
-                </tr>
-                @endif
-                <tr class="total-row">
-                    <td class="label">Total</td>
-                    <td class="value">{{ \App\Helpers\Currency::format($sale->total) }}</td>
-                </tr>
-                <tr class="paid-row">
-                    <td class="label">Paid</td>
-                    <td class="value">{{ \App\Helpers\Currency::format($sale->amount_paid) }}</td>
-                </tr>
-                <tr class="balance-row {{ $sale->balance <= 0 ? 'balance-zero' : '' }}">
-                    <td class="label">Balance Due</td>
-                    <td class="value">{{ \App\Helpers\Currency::format($sale->balance) }}</td>
-                </tr>
-            </table>
-        </div>
-
-        <!-- Notes & Terms -->
-        <div class="notes-terms">
-            <div class="notes-box">
-                <div class="box-title">Notes</div>
-                <p>{{ $sale->remarks ?: '—' }}</p>
-            </div>
-
-            <div class="terms-box">
-                <div class="box-title">Terms & Conditions</div>
-                <p>
-                    Payment is due on receipt. Goods purchased are not returnable without the original receipt and within 7 days of sale.
-                    All solar installations carry manufacturer warranties as specified. Title to goods remains with Envoy Electricals until full payment is received.
-                </p>
-            </div>
-        </div>
-
-        <!-- Footer -->
-        <div class="footer">
-            <p><strong>{{ $company['name'] }}</strong></p>
-            @if($company['phone'] || $company['email'])
-            <p>
-                @if($company['phone'])
-                Tel: {{ $company['phone'] }}
-                @endif
-                @if($company['phone'] && $company['email'])
-                &nbsp;&middot;&nbsp;
-                @endif
-                @if($company['email'])
-                Email: {{ $company['email'] }}
-                @endif
-            </p>
-            @endif
-            <p>Generated on {{ now()->format('d M Y H:i') }} · Invoice Ref: {{ $sale->ref_id }}</p>
-        </div>
     </div>
+
+
+
+    <!-- =========================================================
+         BILL TO + DETAILS
+    ========================================================== -->
+
+    <div class="top-information">
+
+        <table class="information-table">
+
+            <tr>
+
+
+                <!-- BILL TO -->
+
+                <td class="bill-to">
+
+                    <div class="section-title">
+                        Bill To
+                    </div>
+
+
+                    <div class="customer-name">
+
+                        {{ $sale->customer?->name ?? 'Walk-in Customer' }}
+
+                    </div>
+
+
+                    @if($sale->customer)
+
+
+                        @if($sale->customer->phone)
+
+                            <div class="customer-info">
+
+                                {{ $sale->customer->phone }}
+
+                            </div>
+
+                        @endif
+
+
+                        @if($sale->customer->email)
+
+                            <div class="customer-info">
+
+                                {{ $sale->customer->email }}
+
+                            </div>
+
+                        @endif
+
+
+                        @if($sale->customer->address)
+
+                            <div class="customer-info">
+
+                                {{ $sale->customer->address }}
+
+                            </div>
+
+                        @endif
+
+
+                    @endif
+
+                </td>
+
+
+
+                <!-- DETAILS -->
+
+                <td class="invoice-details">
+
+                    <div class="section-title">
+                        Details
+                    </div>
+
+
+                    <div class="details-row">
+
+                        <span class="details-label">
+                            Issue Date:
+                        </span>
+
+                        {{ \Carbon\Carbon::parse($sale->sale_date)->format('d/m/Y') }}
+
+                    </div>
+
+
+                    @if($sale->due_date)
+
+                        <div class="details-row">
+
+                            <span class="details-label">
+                                Due Date:
+                            </span>
+
+                            {{ \Carbon\Carbon::parse($sale->due_date)->format('d/m/Y') }}
+
+                        </div>
+
+                    @endif
+
+
+                </td>
+
+            </tr>
+
+        </table>
+
+    </div>
+
+
+
+    <!-- =========================================================
+         ITEMS
+    ========================================================== -->
+
+    <div class="items">
+
+        <table class="items-table">
+
+
+            <thead>
+
+                <tr>
+
+                    <th class="item">
+                        Item
+                    </th>
+
+                    <th class="qty">
+                        Qty
+                    </th>
+
+                    <th class="price">
+                        Price
+                    </th>
+
+                    <th class="discount">
+                        Discount / Bonus
+                    </th>
+
+                    <th class="total">
+                        Total
+                    </th>
+
+                </tr>
+
+            </thead>
+
+
+            <tbody>
+
+
+                @foreach($items as $index => $item)
+
+
+                    @php
+
+                        $originalAmount =
+                            $item->quantity * $item->unit_price;
+
+                        $itemDiscount =
+                            max(0, $originalAmount - $item->total);
+
+                    @endphp
+
+
+                    <tr>
+
+
+                        <!-- ITEM -->
+
+                        <td>
+
+                            <div class="item-name">
+
+                                {{ $item->product?->name ?? $item->description }}
+
+                            </div>
+
+
+                            @if($item->product?->sku)
+
+                                <div class="item-sku">
+
+                                    {{ $item->product->sku }}
+
+                                </div>
+
+                            @endif
+
+                        </td>
+
+
+                        <!-- QUANTITY -->
+
+                        <td class="qty">
+
+                            {{ $item->quantity }}
+
+                        </td>
+
+
+                        <!-- PRICE -->
+
+                        <td class="price">
+
+                            &#8358;{{ number_format($item->unit_price, 0, '.', ',') }}
+
+                        </td>
+
+
+                        <!-- DISCOUNT -->
+
+                        <td class="discount">
+
+                            @if($itemDiscount > 0)
+
+                                <span class="discount-value">
+
+                                    -&#8358;{{ number_format($itemDiscount, 0, '.', ',') }}
+
+                                </span>
+
+                            @else
+
+                                -
+
+                            @endif
+
+                        </td>
+
+
+                        <!-- TOTAL -->
+
+                        <td class="total">
+
+                            &#8358;{{ number_format($item->total, 0, '.', ',') }}
+
+                        </td>
+
+
+                    </tr>
+
+
+                @endforeach
+
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+
+
+    <!-- =========================================================
+         PAYMENT DETAILS + TOTALS
+    ========================================================== -->
+
+    <div class="bottom-section">
+
+        <table class="bottom-table">
+
+            <tr>
+
+
+                <!-- PAYMENT DETAILS -->
+
+                <td class="bottom-left">
+
+                    <div class="payment-details">
+
+                        <div class="payment-title">
+                            Payment Details
+                        </div>
+
+
+                        <div class="payment-row">
+
+                            <strong>Bank:</strong>
+
+                            {{ $company['bank_name'] ?? 'Wema Bank' }}
+
+                        </div>
+
+
+                        <div class="payment-row">
+
+                            <strong>Account Name:</strong>
+
+                            {{ $company['account_name'] ?? 'Envoy Electricals' }}
+
+                        </div>
+
+
+                        <div class="payment-row">
+
+                            <strong>Account Number:</strong>
+
+                            {{ $company['account_number'] ?? '0126278482' }}
+
+                        </div>
+
+                    </div>
+
+                </td>
+
+
+
+                <!-- TOTALS -->
+
+                <td class="bottom-right">
+
+                    <table class="totals-table">
+
+
+                        <!-- SUBTOTAL -->
+
+                        <tr>
+
+                            <td class="totals-label">
+                                Subtotal
+                            </td>
+
+                            <td class="totals-value">
+
+                                &#8358;{{ number_format($sale->subtotal, 0, '.', ',') }}
+
+                            </td>
+
+                        </tr>
+
+
+                        <!-- DISCOUNT -->
+
+                        @if($sale->discount > 0)
+
+                            <tr>
+
+                                <td class="totals-label">
+                                    Discount
+                                </td>
+
+                                <td class="totals-value">
+
+                                    -&#8358;{{ number_format($sale->discount, 0, '.', ',') }}
+
+                                </td>
+
+                            </tr>
+
+                        @endif
+
+
+                        <!-- TAX -->
+
+                        @if($sale->tax > 0)
+
+                            <tr>
+
+                                <td class="totals-label">
+
+                                    Tax ({{ $sale->tax_rate }}%)
+
+                                </td>
+
+                                <td class="totals-value">
+
+                                    &#8358;{{ number_format($sale->tax, 0, '.', ',') }}
+
+                                </td>
+
+                            </tr>
+
+                        @endif
+
+
+                        <!-- TOTAL -->
+
+                        <tr class="grand-total">
+
+                            <td>
+                                Total
+                            </td>
+
+                            <td class="totals-value">
+
+                                &#8358;{{ number_format($sale->total, 0, '.', ',') }}
+
+                            </td>
+
+                        </tr>
+
+
+                        <!-- AMOUNT PAID -->
+
+                        <tr class="amount-paid">
+
+                            <td class="totals-label">
+                                Amount Paid
+                            </td>
+
+                            <td class="totals-value">
+
+                                &#8358;{{ number_format($sale->amount_paid, 0, '.', ',') }}
+
+                            </td>
+
+                        </tr>
+
+
+                        <!-- AMOUNT DUE -->
+
+                        <tr class="amount-due">
+
+                            <td class="totals-label">
+                                Amount Due
+                            </td>
+
+                            <td class="totals-value">
+
+                                &#8358;{{ number_format($sale->balance, 0, '.', ',') }}
+
+                            </td>
+
+                        </tr>
+
+
+                    </table>
+
+                </td>
+
+            </tr>
+
+        </table>
+
+    </div>
+
+
+
+    <!-- =========================================================
+         NOTES
+    ========================================================== -->
+
+    <div class="notes">
+
+        <div class="notes-text">
+
+            <strong>Notes:</strong>
+
+            {{ $sale->remarks ?: 'This estimate covers only the replacement of the solar cable.' }}
+
+        </div>
+
+    </div>
+
+
+
+    <!-- =========================================================
+         FOOTER
+    ========================================================== -->
+
+    <div class="footer">
+
+        {{ $company['footer'] ?? 'powering your world with innovative solutions' }}
+
+    </div>
+
+
+</div>
+
+
 </body>
+
 </html>
+

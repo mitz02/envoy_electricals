@@ -17,6 +17,7 @@ const form = useForm({
     customer_phone: props.quotation.customer_phone,
     customer_address: props.quotation.customer_address,
     job_description: props.quotation.description,
+    notes: props.quotation.notes,
     items: props.quotation.items.map(item => ({
         id: item.id,
         item: item.item,
@@ -86,6 +87,12 @@ function submit() {
             <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
                 <h2 class="mb-4 text-sm font-semibold text-slate-900">Job Description</h2>
                 <textarea v-model="form.job_description" rows="4" placeholder="Describe the work to be done..." class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20" />
+            </div>
+
+            <!-- Notes -->
+            <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
+                <h2 class="mb-4 text-sm font-semibold text-slate-900">Notes (Internal / For Customer)</h2>
+                <textarea v-model="form.notes" rows="3" placeholder="e.g. This product takes 2 days to arrive, installation requires site survey, etc." class="w-full rounded-lg border-slate-300 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20" />
             </div>
 
             <!-- Items -->

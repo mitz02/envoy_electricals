@@ -11,7 +11,6 @@ defineOptions({ layout: AdminLayout });
 
 const props = defineProps({
     project: { type: Object, required: true },
-    products: { type: Array, default: () => [] },
 });
 
 const { has } = useCan();
@@ -48,31 +47,62 @@ function changeStatus() {
 }
 
 // ---- materials
+// 'inventory' = linked to a shop product | 'custom' = free-text, no product link
+const materialMode = ref('custom');
+
 const materialForm = useForm({
     product_id: '',
+    name: '',
     quantity: 1,
     unit_cost: '',
     issue_now: false,
 });
 
+function setMaterialMode(mode) {
+    materialMode.value = mode;
+    materialForm.reset('product_id', 'name', 'unit_cost', 'issue_now');
+}
+
 function pickProduct() {
-    const p = props.products.find((p) => String(p.id) === String(materialForm.product_id));
-    if (p) materialForm.unit_cost = p.average_cost ?? '';
+    const p = props.products?.find((p) => String(p.id) === String(materialForm.product_id));
+    if (p) {
+        if (!materialForm.name) materialForm.name = p.name;
+        materialForm.unit_cost = p.average_cost ?? '';
+    }
 }
 
 function addMaterial() {
-    materialForm.post(`/admin/projects/${props.project.id}/materials`, {
-        preserveScroll: true,
-        onSuccess: () => materialForm.reset('product_id', 'quantity', 'unit_cost', 'issue_now'),
-    });
+    // For custom mode, never send product_id or issue_now
+    materialForm
+        .transform((data) => ({
+            ...data,
+            product_id: materialMode.value === 'inventory' ? data.product_id : null,
+            issue_now: materialMode.value === 'inventory' ? data.issue_now : false,
+        }))
+        .post(`/admin/projects/${props.project.id}/materials`, {
+            preserveScroll: true,
+            onSuccess: () => materialForm.reset('product_id', 'name', 'quantity', 'unit_cost', 'issue_now'),
+        });
 }
 
 function issueMaterial(material) {
-    router.post(`/admin/projects/${props.project.id}/materials/${material.id}/issue`, {}, { preserveScroll: true });
+    router.post(`/admin/projects/${props.project.id}/materials/${material.id}/issue`, {}, {
+        preserveScroll: true,
+        onError: (errors) => {
+            if (errors.material) {
+                alert(errors.material);
+            } else if (errors.error) {
+                alert(errors.error);
+            }
+        },
+        onSuccess: () => {
+            // Page will reload via Inertia redirect
+        }
+    });
 }
 
 function removeMaterial(material) {
-    if (!confirm(`Remove ${material.product?.name} from this project?${material.issued_to_inventory ? ' Stock will be returned to inventory.' : ''}`)) return;
+    if (!confirm(`Remove ${material.name} from this project?${material.issued_to_inventory ? ' Stock will be returned to inventory.' : ''}`)) return;
     router.delete(`/admin/projects/${props.project.id}/materials/${material.id}`, { preserveScroll: true });
 }
 
@@ -100,6 +130,7 @@ function deletePayment(payment) {
 // ---- expenses
 const expenseForm = useForm({
     expense_type: 'labour',
+    custom_expense_type: '',
     amount: '',
     expense_date: new Date().toISOString().slice(0, 10),
     payee: '',
@@ -109,13 +140,17 @@ const expenseForm = useForm({
 const expenseTypes = [
     { value: 'labour', label: 'Labour' },
     { value: 'transport', label: 'Transport' },
-    { value: 'other', label: 'Other' },
 ];
 
 function addExpense() {
+    const type = expenseForm.expense_type === 'custom' ? expenseForm.custom_expense_type : expenseForm.expense_type;
     expenseForm.post(`/admin/projects/${props.project.id}/expenses`, {
         preserveScroll: true,
-        onSuccess: () => expenseForm.reset('amount', 'payee', 'notes'),
+        onSuccess: () => expenseForm.reset('amount', 'payee', 'notes', 'custom_expense_type'),
+        transform: (data) => ({
+            ...data,
+            expense_type: type,
+        }),
     });
 }
 
@@ -125,8 +160,8 @@ function deleteExpense(expense) {
 }
 
 // ---- media
+const mediaFiles = ref([]);
 const mediaForm = useForm({
-    files: [],
     stage: '',
     caption: '',
     published: false,
@@ -135,14 +170,22 @@ const mediaForm = useForm({
 const stages = ['before', 'installation', 'completed', 'document'];
 
 function onFiles(e) {
-    mediaForm.files = [...e.target.files];
+    mediaFiles.value = [...e.target.files];
 }
 
 function uploadMedia() {
-    mediaForm.post(`/admin/projects/${props.project.id}/media`, {
+    if (!mediaFiles.value.length) return;
+    mediaForm.transform((data) => ({
+        ...data,
+        files: mediaFiles.value,
+    })).post(`/admin/projects/${props.project.id}/media`, {
         preserveScroll: true,
-        onSuccess: () => mediaForm.reset('files', 'stage', 'caption', 'published'),
-        onFinish: () => { document.getElementById('media-input').value = ''; },
+        onSuccess: () => {
+            mediaFiles.value = [];
+            mediaForm.reset('stage', 'caption', 'published');
+            const el = document.getElementById('media-input');
+            if (el) el.value = '';
+        },
     });
 }
 
@@ -166,6 +209,18 @@ const hasExpenses = computed(() => has('projects.expenses') || isOwner.value);
 const hasMedia = computed(() => has('projects.media') || isOwner.value);
 const canEdit = computed(() => has('projects.edit') || isOwner.value);
 const canDelete = computed(() => has('projects.delete') || isOwner.value);
+
+function togglePublished() {
+    const nextState = !props.project.published;
+    router.post(`/admin/projects/${props.project.id}/publish`, {
+        published: nextState,
+    }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            props.project.published = nextState;
+        },
+    });
+}
 </script>
 
 <template>
@@ -188,6 +243,9 @@ const canDelete = computed(() => has('projects.delete') || isOwner.value);
                 <select v-if="canEdit" v-model="statusForm.status" class="rounded-lg border-slate-300 px-3 py-2 text-sm focus:border-amber-400 focus:ring-amber-400/20" @change="changeStatus">
                     <option v-for="s in ($page.props.statuses || [])" :key="s" :value="s">{{ statusLabel(s) }}</option>
                 </select>
+                <button v-if="canEdit" @click="togglePublished" class="rounded-lg border px-4 py-2 text-sm font-semibold transition" :class="project.published ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'border-slate-300 text-slate-700 hover:bg-slate-50'">
+                    {{ project.published ? '✓ Published' : '○ Draft' }}
+                </button>
                 <Link v-if="canEdit" :href="`/admin/projects/${project.id}/edit`" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Edit</Link>
                 <Link v-if="canDelete" :href="`/admin/projects/${project.id}`" method="delete" as="button" class="rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50" @click="deleteProject">Delete</Link>
             </div>
@@ -280,31 +338,86 @@ const canDelete = computed(() => has('projects.delete') || isOwner.value);
         <!-- MATERIALS -->
         <div v-if="tab === 'materials'" class="space-y-5">
             <div v-if="hasMaterials" class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
-                <h2 class="mb-4 text-sm font-semibold text-slate-900">Add Material</h2>
-                <form class="grid gap-3 sm:grid-cols-12" @submit.prevent="addMaterial">
-                    <div class="sm:col-span-5">
+                <div class="mb-4 flex items-center justify-between">
+                    <h2 class="text-sm font-semibold text-slate-900">Add Material</h2>
+                    <!-- Mode toggle -->
+                    <div class="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+                        <button type="button"
+                            class="rounded-md px-3 py-1.5 text-xs font-semibold transition"
+                            :class="materialMode === 'inventory' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'"
+                            @click="setMaterialMode('inventory')">
+                            From Inventory
+                        </button>
+                        <button type="button"
+                            class="rounded-md px-3 py-1.5 text-xs font-semibold transition"
+                            :class="materialMode === 'custom' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'"
+                            @click="setMaterialMode('custom')">
+                            Custom (not in inventory)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- INVENTORY MODE -->
+                <form v-if="materialMode === 'inventory'" class="grid gap-3 sm:grid-cols-12" @submit.prevent="addMaterial">
+                    <div class="sm:col-span-4">
+                        <label class="mb-1 block text-xs font-medium text-slate-600">Product</label>
                         <select v-model="materialForm.product_id" class="w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" @change="pickProduct">
-                            <option value="">Select product…</option>
-                            <option v-for="p in products" :key="p.id" :value="p.id">{{ p.name }} ({{ p.sku }})</option>
+                            <option value="">— Select product —</option>
+                            <option v-for="p in (products || [])" :key="p.id" :value="p.id">{{ p.name }} ({{ p.sku }})</option>
                         </select>
                         <div v-if="materialForm.errors.product_id" class="mt-1 text-xs text-red-600">{{ materialForm.errors.product_id }}</div>
                     </div>
+                    <div class="sm:col-span-3">
+                        <label class="mb-1 block text-xs font-medium text-slate-600">Material Name *</label>
+                        <input v-model="materialForm.name" type="text" required placeholder="e.g. 4mm² Cable" class="w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" />
+                        <div v-if="materialForm.errors.name" class="mt-1 text-xs text-red-600">{{ materialForm.errors.name }}</div>
+                    </div>
                     <div class="sm:col-span-2">
+                        <label class="mb-1 block text-xs font-medium text-slate-600">Qty *</label>
                         <input v-model="materialForm.quantity" type="number" min="1" step="1" placeholder="Qty" class="w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" />
                     </div>
                     <div class="sm:col-span-2">
-                        <input v-model="materialForm.unit_cost" type="number" min="0" step="0.01" placeholder="Unit cost" class="w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" />
+                        <label class="mb-1 block text-xs font-medium text-slate-600">Unit Cost (₦)</label>
+                        <input v-model="materialForm.unit_cost" type="number" min="0" step="0.01" placeholder="Auto from product" class="w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" />
                     </div>
-                    <label class="flex items-center gap-2 text-sm text-slate-600 sm:col-span-3">
-                        <input v-model="materialForm.issue_now" type="checkbox" class="rounded border-slate-300" />
-                        Issue now
-                    </label>
-                    <div class="flex items-end gap-2 sm:col-span-12">
-                        <button type="submit" class="rounded-lg bg-[#0D1527] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0D1527]/90 disabled:opacity-50" :disabled="materialForm.processing">Add / Issue</button>
-                        <span class="text-xs text-slate-400">Leave unit cost blank to use the product's average cost. Issuing deducts stock automatically.</span>
+                    <div class="flex items-end sm:col-span-1">
+                        <label class="flex items-center gap-1.5 text-xs text-slate-600">
+                            <input v-model="materialForm.issue_now" type="checkbox" class="rounded border-slate-300" />
+                            Issue now
+                        </label>
+                    </div>
+                    <div class="flex items-center gap-3 sm:col-span-12">
+                        <button type="submit" class="rounded-lg bg-[#0D1527] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0D1527]/90 disabled:opacity-50" :disabled="materialForm.processing">Add Material</button>
+                        <span class="text-xs text-slate-400">Select a product to link inventory tracking. Cost auto-fills from product's average cost.</span>
+                    </div>
+                    <div v-if="materialForm.errors.product" class="sm:col-span-12 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">{{ materialForm.errors.product }}</div>
+                </form>
+
+                <!-- CUSTOM MODE -->
+                <form v-else class="grid gap-3 sm:grid-cols-12" @submit.prevent="addMaterial">
+                    <div class="sm:col-span-5">
+                        <label class="mb-1 block text-xs font-medium text-slate-600">Material Name *</label>
+                        <input v-model="materialForm.name" type="text" required placeholder="e.g. Conduit pipe, Copper wire, etc." class="w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" />
+                        <div v-if="materialForm.errors.name" class="mt-1 text-xs text-red-600">{{ materialForm.errors.name }}</div>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="mb-1 block text-xs font-medium text-slate-600">Qty *</label>
+                        <input v-model="materialForm.quantity" type="number" min="1" step="1" placeholder="Qty" class="w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" />
+                    </div>
+                    <div class="sm:col-span-3">
+                        <label class="mb-1 block text-xs font-medium text-slate-600">Unit Cost (₦) *</label>
+                        <input v-model="materialForm.unit_cost" type="number" min="0" step="0.01" required placeholder="Cost per unit" class="w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" />
+                        <div v-if="materialForm.errors.unit_cost" class="mt-1 text-xs text-red-600">{{ materialForm.errors.unit_cost }}</div>
+                    </div>
+                    <div class="flex items-end sm:col-span-2">
+                        <button type="submit" class="w-full rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600 disabled:opacity-50" :disabled="materialForm.processing">Add Material</button>
+                    </div>
+                    <div class="sm:col-span-12">
+                        <p class="text-xs text-amber-700 bg-amber-50 rounded-md px-3 py-2">
+                            ⚠ Custom materials are not linked to inventory stock. Their cost is always counted toward project cost automatically.
+                        </p>
                     </div>
                 </form>
-                <div v-if="materialForm.errors.product" class="mt-2 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">{{ materialForm.errors.product }}</div>
             </div>
 
             <div class="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-xs">
@@ -324,21 +437,26 @@ const canDelete = computed(() => has('projects.delete') || isOwner.value);
                         <tbody class="divide-y divide-slate-100">
                             <tr v-for="m in project.materials" :key="m.id" class="hover:bg-slate-50">
                                 <td class="px-4 py-3">
-                                    <p class="font-medium text-slate-900">{{ m.product?.name }}</p>
-                                    <p class="text-xs text-slate-400">{{ m.product?.sku }} · stock: {{ m.product?.current_quantity }}</p>
+                                    <p class="font-medium text-slate-900">{{ m.name }}</p>
+                                    <p v-if="m.product" class="text-xs text-slate-400">{{ m.product.sku }} · stock: {{ m.product.current_quantity }}</p>
+                                    <span v-else class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">Custom</span>
                                 </td>
                                 <td class="px-4 py-3 text-right">{{ m.quantity }}</td>
                                 <td class="px-4 py-3 text-right">{{ maskNaira('inventory_value', m.unit_cost, 2) }}</td>
                                 <td class="px-4 py-3 text-right font-semibold text-slate-900">{{ maskNaira('inventory_value', m.total) }}</td>
                                 <td class="px-4 py-3 text-center">
-                                    <span :class="m.issued_to_inventory ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'" class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium">
+                                    <!-- Custom material: always counted, no inventory link -->
+                                    <span v-if="!m.product_id" class="inline-flex rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700">Counted</span>
+                                    <!-- Inventory material: show issued/pending -->
+                                    <span v-else :class="m.issued_to_inventory ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'" class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium">
                                         {{ m.issued_to_inventory ? 'Issued' : 'Pending' }}
                                     </span>
                                 </td>
                                 <td class="px-4 py-3 text-center text-xs text-slate-500">{{ m.issued_date ? formatDate(m.issued_date) : '—' }}</td>
                                 <td class="px-4 py-3 text-right">
                                     <template v-if="hasMaterials">
-                                        <button v-if="!m.issued_to_inventory" class="rounded-md px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50" @click="issueMaterial(m)">Issue</button>
+                                        <!-- Only show Issue button for inventory-linked materials that haven't been issued -->
+                                        <button v-if="m.product_id && !m.issued_to_inventory" class="rounded-md px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50" @click="issueMaterial(m)">Issue</button>
                                         <button class="rounded-md px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50" @click="removeMaterial(m)">Remove</button>
                                     </template>
                                 </td>
@@ -426,9 +544,20 @@ const canDelete = computed(() => has('projects.delete') || isOwner.value);
                 <h2 class="mb-4 text-sm font-semibold text-slate-900">Record Project Expense</h2>
                 <form class="grid gap-3 sm:grid-cols-12" @submit.prevent="addExpense">
                     <div class="sm:col-span-2">
-                        <select v-model="expenseForm.expense_type" class="w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20">
-                            <option v-for="t in expenseTypes" :key="t.value" :value="t.value">{{ t.label }}</option>
-                        </select>
+                        <label class="mb-1 block text-xs font-medium text-slate-600">Expense Type</label>
+                        <div class="flex gap-2">
+                            <select v-model="expenseForm.expense_type" class="flex-1 w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" @change="expenseForm.custom_expense_type = ''">
+                                <option v-for="t in expenseTypes" :key="t.value" :value="t.value">{{ t.label }}</option>
+                                <option value="custom">Custom…</option>
+                            </select>
+                            <input
+                                v-if="expenseForm.expense_type === 'custom'"
+                                v-model="expenseForm.custom_expense_type"
+                                type="text"
+                                placeholder="Custom type name"
+                                class="w-40 rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20"
+                            />
+                        </div>
                     </div>
                     <div class="sm:col-span-2">
                         <input v-model="expenseForm.amount" type="number" min="0.01" step="0.01" placeholder="Amount (₦)" class="w-full rounded-lg border-slate-300 text-sm focus:border-amber-400 focus:ring-amber-400/20" />

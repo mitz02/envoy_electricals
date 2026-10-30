@@ -166,6 +166,7 @@ function addItem(product) {
             unit_price: product.selling_price,
             available: product.current_quantity,
             quantity: 1,
+            discount: 0,
         });
     }
     search.value = '';
@@ -247,7 +248,9 @@ watch(search, (val) => {
 /* ---------- Totals ---------- */
 
 const subtotal = computed(() => items.value.reduce((sum, i) => sum + i.quantity * Number(i.unit_price || 0), 0));
-const taxable = computed(() => Math.max(subtotal.value - Number(discount.value || 0), 0));
+const itemDiscounts = computed(() => items.value.reduce((sum, i) => sum + Number(i.discount || 0), 0));
+const totalDiscount = computed(() => itemDiscounts.value + Number(discount.value || 0));
+const taxable = computed(() => Math.max(subtotal.value - totalDiscount.value, 0));
 const tax = computed(() => (taxable.value * Number(taxRate.value || 0)) / 100);
 const total = computed(() => taxable.value + tax.value);
 
@@ -371,13 +374,14 @@ function submit() {
     form
         .transform((data) => ({
             ...data,
-            discount: Number(discount.value || 0),
+            discount: totalDiscount.value,
             tax_rate: Number(taxRate.value || 0),
             amount_paid: amountPaid.value,
             items: items.value.map((i) => ({
                 product_id: i.product_id,
                 quantity: i.quantity,
                 unit_price: Number(i.unit_price || 0),
+                discount: Number(i.discount || 0),
             })),
         }))
         .post('/admin/sales');
@@ -631,6 +635,7 @@ function submit() {
                                 <th class="px-4 py-2.5 text-left font-semibold text-slate-600">Product</th>
                                 <th class="px-3 py-2.5 text-center font-semibold text-slate-600">Qty</th>
                                 <th class="px-3 py-2.5 text-right font-semibold text-slate-600">Unit Price</th>
+                                <th class="px-3 py-2.5 text-right font-semibold text-slate-600">Discount</th>
                                 <th class="px-3 py-2.5 text-right font-semibold text-slate-600">Total</th>
                                 <th class="py-2.5 pr-4 text-right"></th>
                             </tr>
@@ -680,8 +685,27 @@ function submit() {
                                         class="w-24 rounded-lg border-slate-300 py-1.5 pr-2 text-right text-sm focus:border-amber-400 focus:ring-amber-400/20"
                                     />
                                 </td>
-                                <td class="px-3 py-3 text-right font-semibold text-slate-900 whitespace-nowrap">
-                                    {{ naira(item.quantity * Number(item.unit_price || 0)) }}
+                                <td class="px-3 py-3 text-right">
+                                    <div class="inline-flex items-center gap-1 justify-end">
+                                        <span class="text-xs text-slate-400">₦</span>
+                                        <input
+                                            v-model.number="item.discount"
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            :max="item.quantity * Number(item.unit_price || 0)"
+                                            class="w-20 rounded-lg border-slate-300 py-1.5 pr-2 text-right text-sm focus:border-amber-400 focus:ring-amber-400/20"
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                </td>
+                                <td class="px-3 py-3 text-right whitespace-nowrap">
+                                    <p class="font-semibold text-slate-900">
+                                        {{ naira(Math.max(item.quantity * Number(item.unit_price || 0) - Number(item.discount || 0), 0)) }}
+                                    </p>
+                                    <p v-if="item.discount > 0" class="text-[10px] text-red-500 font-medium">
+                                        -{{ naira(item.discount) }} off
+                                    </p>
                                 </td>
                                 <td class="py-3 pr-4 text-right">
                                     <button
@@ -793,15 +817,24 @@ function submit() {
                             <span class="font-semibold text-white">{{ naira(subtotal) }}</span>
                         </div>
                         <div class="flex items-center justify-between gap-2">
-                            <span class="text-slate-400 flex-1">Discount</span>
-                            <input
-                                v-model.number="discount"
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                class="w-24 rounded-lg border-0 bg-white/10 py-1 pr-2 text-right text-sm font-semibold text-white placeholder:text-slate-500 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/40"
-                                placeholder="0"
-                            />
+                            <span class="text-slate-400 flex-1">
+                                Discount
+                                <span v-if="itemDiscounts > 0" class="text-[10px] text-amber-300 block">
+                                    (₦{{ itemDiscounts.toLocaleString() }} from line items)
+                                </span>
+                            </span>
+                            <div class="flex items-center gap-1.5">
+                                <span v-if="totalDiscount > 0" class="text-xs text-amber-300 font-semibold">-{{ naira(totalDiscount) }}</span>
+                                <input
+                                    v-model.number="discount"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    class="w-20 rounded-lg border-0 bg-white/10 py-1 pr-2 text-right text-sm font-semibold text-white placeholder:text-slate-500 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/40"
+                                    placeholder="+Extra"
+                                    title="Additional overall discount"
+                                />
+                            </div>
                         </div>
                         <div class="flex justify-between">
                             <span class="text-slate-400">Tax ({{ taxRate }}%)</span>

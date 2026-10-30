@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS `settings` (
 -- INSERT INTO `settings` (`key`, `value`, `group`) VALUES
 -- ('calculator.panel_wattage', '620', 'calculator'),
 -- ('calculator.panel_efficiency', '0.8', 'calculator'),
+-- ('calculator.peak_sun_hours', '4.5', 'calculator'),
+-- ('calculator.battery_depth_of_discharge', '0.8', 'calculator'),
 -- ('calculator.inverter_safety_factor', '1.4', 'calculator'),
 -- ('calculator.battery_capacities', '1.2, 2.56, 5.12, 10.24, 16, 20, 25.6, 32', 'calculator'),
 -- ('calculator.inverter_sizes', '1.5, 3, 5, 8, 10, 12', 'calculator'),

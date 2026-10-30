@@ -49,6 +49,8 @@ class Project extends Model
         'balance', 'gross_profit', 'start_date', 'expected_completion_date',
         'completion_date', 'status', 'assigned_user_id', 'technician_user_id',
         'published', 'notes', 'created_by',
+        'manual_material_cost', 'manual_labour_cost', 'manual_transport_cost',
+        'manual_other_cost', 'manual_project_cost',
     ];
 
     protected $casts = [
@@ -65,11 +67,16 @@ class Project extends Model
         'amount_received' => 'float',
         'balance' => 'float',
         'gross_profit' => 'float',
+        'manual_material_cost' => 'float',
+        'manual_labour_cost' => 'float',
+        'manual_transport_cost' => 'float',
+        'manual_other_cost' => 'float',
+        'manual_project_cost' => 'float',
     ];
 
     public function customer(): BelongsTo
     {
-        return $this->belongsTo(Customer::class);
+        return $this->belongsTo(Customer::class)->withoutGlobalScope('store');
     }
 
     public function assignedUser(): BelongsTo

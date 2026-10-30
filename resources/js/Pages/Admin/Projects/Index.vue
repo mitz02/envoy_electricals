@@ -56,53 +56,62 @@ function statusLabel(s) {
 }
 
 const summaryCards = computed(() => [
-    { 
-        label: 'Active Projects', 
-        value: props.summary.active_projects ?? 0, 
-        icon: 'bi bi-briefcase-fill', 
-        accent: '#0D1527',
-        accentSoft: '#0D152715',
-        trend: { value: props.summary.active_vs_last_month ?? 0, label: 'vs last month' },
-        statType: 'count'
-    },
-    { 
-        label: 'Project Revenue', 
-        value: naira(props.summary.projects_revenue ?? 0), 
-        icon: 'bi bi-cash-stack', 
-        accent: '#059669',
-        accentSoft: '#05966915',
-        trend: { value: props.summary.revenue_vs_last_month ?? 0, label: 'vs last month' },
-        statType: 'currency'
-    },
-    { 
-        label: 'Project Cost', 
-        value: maskNaira('project_cost', props.summary.projects_cost ?? 0), 
-        icon: 'bi bi-credit-card', 
-        accent: '#374151',
-        accentSoft: '#37415115',
-        trend: { value: props.summary.cost_vs_last_month ?? 0, label: 'vs last month' },
-        statType: 'currency'
-    },
-    { 
-        label: 'Project Profit', 
-        value: maskNaira('gross_profit', props.summary.projects_profit ?? 0), 
-        icon: 'bi bi-graph-up-arrow', 
-        accent: '#FACC15',
-        accentSoft: '#FACC1533',
-        textAccent: '#B8860B',
-        trend: { value: props.summary.profit_vs_last_month ?? 0, label: 'vs last month' },
-        statType: 'currency'
-    },
-    { 
-        label: 'Outstanding', 
-        value: naira(props.summary.outstanding ?? 0), 
-        icon: 'bi bi-clock-history', 
-        accent: '#ea580c',
-        accentSoft: '#ea580c15',
-        trend: { value: props.summary.outstanding_vs_last_month ?? 0, label: 'vs last month' },
-        statType: 'currency'
-    },
-]);
+        { 
+            label: 'Active Projects', 
+            value: props.summary.active_projects ?? 0, 
+            icon: 'bi bi-briefcase-fill', 
+            accent: '#0D1527',
+            accentSoft: '#0D152715',
+            trend: { value: 0, label: 'vs last month' },
+            statType: 'count'
+        },
+        { 
+            label: 'Total Projects', 
+            value: props.summary.total_projects ?? 0, 
+            icon: 'bi bi-collection', 
+            accent: '#6366f1',
+            accentSoft: '#6366f115',
+            trend: { value: 0, label: 'vs last month' },
+            statType: 'count'
+        },
+        { 
+            label: 'Project Revenue', 
+            value: naira(props.summary.projects_revenue ?? 0), 
+            icon: 'bi bi-cash-stack', 
+            accent: '#059669',
+            accentSoft: '#05966915',
+            trend: { value: 0, label: 'vs last month' },
+            statType: 'currency'
+        },
+        { 
+            label: 'Project Cost', 
+            value: maskNaira('project_cost', props.summary.projects_cost ?? 0), 
+            icon: 'bi bi-credit-card', 
+            accent: '#374151',
+            accentSoft: '#37415115',
+            trend: { value: 0, label: 'vs last month' },
+            statType: 'currency'
+        },
+        { 
+            label: 'Project Profit', 
+            value: maskNaira('gross_profit', props.summary.projects_profit ?? 0), 
+            icon: 'bi bi-graph-up-arrow', 
+            accent: '#FACC15',
+            accentSoft: '#FACC1533',
+            textAccent: '#B8860B',
+            trend: { value: 0, label: 'vs last month' },
+            statType: 'currency'
+        },
+        { 
+            label: 'Outstanding', 
+            value: naira(props.summary.outstanding ?? 0), 
+            icon: 'bi bi-clock-history', 
+            accent: '#ea580c',
+            accentSoft: '#ea580c15',
+            trend: { value: 0, label: 'vs last month' },
+            statType: 'currency'
+        },
+    ]);
 
 function getProgress(p) {
     if (!p.start_date || !p.expected_completion_date) return null;

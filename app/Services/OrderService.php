@@ -20,7 +20,7 @@ use Illuminate\Validation\ValidationException;
  */
 class OrderService
 {
-    public function __construct(protected InventoryService $inventory) {}
+    public function __construct(protected InventoryService $inventory, protected SaleService $sales) {}
 
     /**
      * Create an order from storefront cart lines. Prices always come from the
@@ -219,6 +219,9 @@ class OrderService
      * Fulfill an order by deducting stock for each item and recording stock movements.
      * Should be called when an order is marked as delivered/fulfilled.
      *
+     * Also recognises the revenue by generating the order's sale invoice, since
+     * every revenue, profit and receivables figure in the app reads `sales`.
+     *
      * @throws ValidationException
      */
     public function fulfillOrder(Order $order, int $userId): Order
@@ -257,6 +260,198 @@ class OrderService
             $order->update([
                 'fulfillment' => 'delivered',
                 'status' => 'completed',
+            ]);
+
+            $this->sales->createSaleFromOrder($order, $userId);
+
+            return $order;
+        });
+    }
+
+    /**
+     * Cancel an order. If the order is paid, optionally issue a refund.
+     *
+     * @throws ValidationException
+     */
+    public function cancelOrder(Order $order, int $userId, ?float $refundAmount = null, ?string $refundReason = null): Order
+    {
+        if (in_array($order->status, ['cancelled', 'refunded'])) {
+            throw ValidationException::withMessages(['order' => 'Order is already '.$order->status.'.']);
+        }
+
+        if ($order->fulfillment === 'delivered') {
+            throw ValidationException::withMessages(['order' => 'Cannot cancel an order that has been delivered.']);
+        }
+
+        return DB::transaction(function () use ($order, $userId, $refundAmount, $refundReason) {
+            // If order is paid and refund requested, create a payment_out record
+            if ($order->status === 'paid' && $refundAmount && $refundAmount > 0) {
+                $totalPaid = $this->totalPaid($order);
+                $refundAmount = round(min($refundAmount, $totalPaid), 2);
+
+                if ($refundAmount > 0) {
+                    PaymentService::recordPayment(
+                        type: 'payment_out',
+                        amount: $refundAmount,
+                        paymentMethod: 'bank_transfer',
+                        documentType: 'order',
+                        documentId: $order->id,
+                        customerId: $order->customer_id,
+                        supplierId: null,
+                        reference: 'REFUND:'.$order->ref_id,
+                        userId: $userId,
+                        gateway: Payment::GATEWAY_LOCAL,
+                        status: Payment::STATUS_SUCCESS,
+                        remarks: $refundReason ?? 'Order cancelled - refund issued',
+                    );
+                }
+            }
+
+            $order->update([
+                'status' => $refundAmount && $refundAmount > 0 ? 'refunded' : 'cancelled',
+            ]);
+
+            return $order;
+        });
+    }
+
+    /**
+     * Mark an order as processing (being prepared for shipment).
+     *
+     * @throws ValidationException
+     */
+    public function markProcessing(Order $order): Order
+    {
+        if (in_array($order->status, ['cancelled', 'refunded', 'completed'])) {
+            throw ValidationException::withMessages(['order' => 'Cannot change status of a '.$order->status.' order.']);
+        }
+
+        if ($order->status === 'processing') {
+            return $order;
+        }
+
+        if (! in_array($order->status, ['pending', 'paid'])) {
+            throw ValidationException::withMessages(['order' => 'Order must be pending or paid to mark as processing.']);
+        }
+
+        return $order->update(['status' => 'processing']) ? $order->fresh() : $order;
+    }
+
+    /**
+     * Add a manual payment to an order (cash, bank transfer, etc.).
+     *
+     * @throws ValidationException
+     */
+    public function addPayment(
+        Order $order,
+        float $amount,
+        string $method,
+        int $userId,
+        ?string $remarks = null,
+        ?string $paymentDate = null
+    ): Payment {
+        if (in_array($order->status, ['cancelled', 'refunded'])) {
+            throw ValidationException::withMessages(['amount' => 'Payments cannot be recorded on a '.$order->status.' order.']);
+        }
+
+        $amount = round($amount, 2);
+        if ($amount <= 0) {
+            throw ValidationException::withMessages(['amount' => 'Payment amount must be greater than zero.']);
+        }
+
+        $balance = $this->balance($order);
+        if ($amount > $balance) {
+            throw ValidationException::withMessages([
+                'amount' => "Payment cannot exceed outstanding balance of ₦{$balance}.",
+            ]);
+        }
+
+        $payment = DB::transaction(function () use ($order, $amount, $method, $userId, $remarks, $paymentDate) {
+            $payment = PaymentService::recordPayment(
+                type: 'payment_in',
+                amount: $amount,
+                paymentMethod: $method,
+                documentType: 'order',
+                documentId: $order->id,
+                customerId: $order->customer_id,
+                supplierId: null,
+                reference: null,
+                userId: $userId,
+                remarks: $remarks,
+                paymentDate: $paymentDate,
+            );
+
+            if ($this->totalPaid($order) >= (float) $order->total) {
+                $order->update([
+                    'status' => 'paid',
+                    'payment_reference' => $payment->ref_id,
+                    'payment_provider' => $payment->gateway ?? $payment->payment_method,
+                ]);
+            }
+
+            return $payment;
+        });
+
+        NotificationService::notifyAdmins(
+            'Order payment received',
+            '₦'.number_format((float) $amount, 2)." received for order {$order->ref_id}.",
+            'payment',
+            route('admin.orders.show', $order->id),
+            ['orders.view'],
+        );
+
+        return $payment;
+    }
+
+    /**
+     * Undo fulfillment: restore stock and reset fulfillment status.
+     *
+     * @throws ValidationException
+     */
+    public function undoFulfillment(Order $order, int $userId): Order
+    {
+        if ($order->fulfillment !== 'delivered') {
+            throw ValidationException::withMessages(['order' => 'Order is not fulfilled.']);
+        }
+
+        if (! in_array($order->status, ['completed', 'paid', 'processing'])) {
+            throw ValidationException::withMessages(['order' => 'Cannot undo fulfillment for this order status.']);
+        }
+
+        $order->load('items.product');
+
+        return DB::transaction(function () use ($order, $userId) {
+            foreach ($order->items as $item) {
+                $product = $item->product;
+
+                if (! $product) {
+                    throw ValidationException::withMessages([
+                        'items' => "Product for order item {$item->id} no longer exists.",
+                    ]);
+                }
+
+                $this->inventory->inbound(
+                    product: $product,
+                    quantity: $item->quantity,
+                    type: StockMovement::TYPE_RETURN,
+                    reference: 'ORDER-RETURN:'.$order->ref_id,
+                    unitCost: (float) $product->average_cost,
+                    reason: 'Order fulfillment undone',
+                    documentType: 'order',
+                    documentId: $order->id,
+                    userId: $userId,
+                );
+            }
+
+            $this->sales->voidLinkedOrderSale(
+                $order,
+                "Order {$order->ref_id} fulfillment undone.",
+                $userId,
+            );
+
+            $order->update([
+                'fulfillment' => 'pending',
+                'status' => $order->status === 'completed' ? 'paid' : $order->status,
             ]);
 
             return $order;

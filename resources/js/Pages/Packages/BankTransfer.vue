@@ -1,16 +1,17 @@
 <script setup>
 import { ref, computed } from 'vue';
-import { Link, router, Head } from '@inertiajs/vue3';
+import { Link, router, Head, usePage } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import FlashMessages from '@/Components/FlashMessages.vue';
 
 defineOptions({ layout: PublicLayout });
 
+const page = usePage();
+
 const props = defineProps({
     package: { type: Object, required: true },
     image: { type: Object, default: null },
     bankDetails: { type: Object, default: () => ({}) },
-    whatsappNumber: { type: String, default: '' },
 });
 
 function parsePrice(value) {
@@ -21,12 +22,11 @@ function parsePrice(value) {
     return Number.isNaN(parsed) ? 0 : parsed;
 }
 
-const whatsapp = computed(() => (props.whatsappNumber || '2348097089259').replace(/\D/g, ''));
+const whatsappNumber = computed(() => page.props.settings?.website?.['website.whatsapp'] || '2348097089259');
+const whatsapp = computed(() => whatsappNumber.value.replace(/\D/g, ''));
 
 const totalAmount = computed(() => {
-    const price = parsePrice(props.package.package_price);
-    const installation = parsePrice(props.package.installation_cost);
-    return price + installation;
+    return parsePrice(props.package.package_price);
 });
 
 const bankName = computed(() => props.bankDetails.bank_name || 'Moniepoint MFB');
@@ -101,7 +101,13 @@ function confirmOffline() {
             />
             <div class="min-w-0">
                 <p class="font-bold text-slate-900">{{ package.name }}</p>
-                <p class="mt-0.5 text-xs text-slate-500">{{ package.estimated_load_capacity ? `Load ${package.estimated_load_capacity}W · ` : '' }}{{ package.inverter_capacity || '' }} {{ package.warranty ? `· ${package.warranty} warranty` : '' }}</p>
+                <p class="mt-0.5 text-xs text-slate-500">
+                    {{ package.estimated_load_capacity ? `Load ${package.estimated_load_capacity}W · ` : '' }}
+                    {{ package.inverter_capacity || '' }} {{ package.battery_capacity ? `· ${package.battery_capacity} battery` : '' }}
+                    {{ package.custom_battery_capacity ? `· ${package.custom_battery_capacity} battery` : '' }}
+                    {{ package.panel_count ? `· ${package.panel_count} panels` : '' }}
+                    {{ package.warranty ? `· ${package.warranty} warranty` : '' }}
+                </p>
             </div>
         </div>
 

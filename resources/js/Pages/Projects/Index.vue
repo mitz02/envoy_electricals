@@ -50,6 +50,11 @@ function naira(v) {
     </Head>
     <header class="bg-[#0D1527] text-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
+            <span class="inline-flex items-center gap-2 text-[#60d4f7] text-xs font-bold uppercase tracking-[0.3em] mb-3">
+                <span class="w-8 h-px bg-[#60d4f7]"></span>
+                Our Projects
+                <span class="w-8 h-px bg-[#60d4f7]"></span>
+            </span>
             <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight">Our Solar Projects</h1>
             <p class="mt-3 text-slate-300 max-w-2xl mx-auto">Real installations across homes, offices and businesses — proof that clean energy works, everyday.</p>
         </div>
@@ -72,17 +77,17 @@ function naira(v) {
                     <h3 class="text-base font-extrabold text-slate-950">{{ p.name }}</h3>
                     <p class="mt-1 text-sm text-slate-500 line-clamp-2">{{ p.description || p.location || 'Residential/commercial solar installation.' }}</p>
                     <div class="mt-3 flex items-center justify-between text-xs text-slate-400">
-                        <span v-if="p.location" class="flex items-center gap-1"><i class="bi bi-geo-alt text-amber-500"></i> {{ p.location }}</span>
+                        <span v-if="p.location" class="flex items-center gap-1"><i class="bi bi-geo-alt text-[#60d4f7]"></i> {{ p.location }}</span>
                         <span v-if="p.contract_value > 0" class="font-bold text-slate-700">{{ naira(p.contract_value) }}</span>
                     </div>
-                    <span class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-amber-600 group-hover:text-amber-700">View project <i class="bi bi-arrow-right"></i></span>
+                    <span class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-[#60d4f7] group-hover:text-[#60d4f7]/80">View project <i class="bi bi-arrow-right"></i></span>
                 </div>
             </button>
         </div>
 
         <p v-else class="py-20 text-center text-slate-400">Our project gallery is coming soon — check back shortly.</p>
 
-        <div class="mt-12 rounded-3xl bg-[#0D1527] p-8 sm:p-12 flex flex-col sm:flex-row items-center justify-between gap-6">
+        <div class="mt-12 rounded-3xl bg-[#0D1527] p-8 sm:p-12 flex flex-col sm:flex-row items-center justify-between gap-6 border border-[#60d4f7]/30">
             <div>
                 <h2 class="text-2xl font-extrabold text-white">Want a system like these?</h2>
                 <p class="mt-2 text-slate-300 max-w-xl">We design, supply and install across Lagos and Nigeria. Start with a free calculator run.</p>
