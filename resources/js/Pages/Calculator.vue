@@ -330,10 +330,17 @@ const hasComponentPrices = computed(() => {
 });
 
 const estimatedPrice = computed(() => {
-    if (hasComponentPrices.value) {
-        return panelCost.value + inverterCost.value + batteryCost.value + installationCost.value;
+    // Use the detailed catalogue prices whenever they are complete. If an admin
+    // has only partially configured them, retain the legacy estimate instead of
+    // rendering a misleading zero or partial total.
+    const detailed = panelCost.value + inverterCost.value + batteryCost.value + installationCost.value;
+    const legacy = Math.round(panelsRequired.value * num(pricePerPanel.value) + totalDailyKwh.value * num(pricePerKwhDaily.value));
+
+    if (hasComponentPrices.value && detailed > 0) {
+        return detailed;
     }
-    return Math.round(panelsRequired.value * num(pricePerPanel.value) + totalDailyKwh.value * num(pricePerKwhDaily.value));
+
+    return legacy > 0 ? legacy : detailed;
 });
 
 // ---- Formatting ----

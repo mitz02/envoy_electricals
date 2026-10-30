@@ -460,11 +460,23 @@ class ProductController extends Controller
             'allow_online_purchase' => $request->boolean('allow_online_purchase', true),
         ]);
 
-        // Handle store change - ensure product is available in the new store
-        if (! empty($data['store_id'])) {
-            $storeId = (int) $data['store_id'];
-            $this->inventory->ensureStorePivot($product, $storeId);
-        }
+        // Keep branch-level pricing in sync with the catalogue edit. Stock is
+        // branch-specific, but a product price edit must also update the branch
+        // used by the form so later sales and quotations use the corrected value.
+        $storeId = $this->authorizeStore(
+            $request,
+            isset($data['store_id']) ? (int) $data['store_id'] : null,
+        );
+        $this->inventory->ensureStorePivot($product, $storeId);
+        DB::table('product_store')
+            ->where('product_id', $product->id)
+            ->where('store_id', $storeId)
+            ->update([
+                'average_cost' => $data['cost_price'],
+                'selling_price' => $data['selling_price'],
+                'reorder_level' => $data['reorder_level'] ?? 0,
+                'updated_at' => now(),
+            ]);
 
         if (! empty($data['remove_images'])) {
             $removals = ProductImage::where('product_id', $product->id)
