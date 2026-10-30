@@ -296,10 +296,13 @@ class ReceiptController extends Controller
 
     public function sendEmail(Request $request, Receipt $receipt): RedirectResponse
     {
-        $email = $request->input('email', $receipt->customer_email);
+        $data = $request->validate([
+            'email' => ['nullable', 'email', 'max:255'],
+        ]);
+        $email = $data['email'] ?? $receipt->customer_email;
 
         if (empty($email)) {
-            return redirect()->back()->with('error', 'Customer email address is required.');
+            return redirect()->back()->withErrors(['email' => 'Customer email address is required.']);
         }
 
         try {

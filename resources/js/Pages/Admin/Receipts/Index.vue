@@ -94,12 +94,14 @@ function sendEmail() {
     if (!emailInput.value) return;
     isSendingEmail.value = true;
     router.post(`/admin/receipts/${emailReceipt.value.id}/send-email`, {
-        email: emailInput.value,
+        email: emailInput.value.trim(),
     }, {
         preserveScroll: true,
+        onSuccess: () => {
+            emailModalOpen.value = false;
+        },
         onFinish: () => {
             isSendingEmail.value = false;
-            emailModalOpen.value = false;
         },
     });
 }
@@ -895,6 +897,8 @@ function formatDate(val) {
                     <input
                         v-model="emailInput"
                         type="email"
+                        autocomplete="email"
+                        required
                         placeholder="customer@example.com"
                         class="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
                     />
